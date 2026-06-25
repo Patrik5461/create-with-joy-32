@@ -84,9 +84,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Interný systém pre správu eventového nábytku, skladu, rezervácií a logistiky." },
       { name: "robots", content: "noindex, nofollow" },
       { property: "og:title", content: "MimaProduction CRM" },
-      { property: "og:description", content: "Interný systém MimaProduction." },
+      { property: "og:description", content: "Interný systém pre správu eventového nábytku, skladu, rezervácií a logistiky." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "MimaProduction CRM" },
+      { name: "twitter:description", content: "Interný systém pre správu eventového nábytku, skladu, rezervácií a logistiky." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/de2c6da4-db4c-482b-b4df-9e96adc755ef" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/de2c6da4-db4c-482b-b4df-9e96adc755ef" },
     ],
     links: [
       {
