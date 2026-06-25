@@ -71,7 +71,7 @@ export function ReservationForm({ existingId, initial }: { existingId?: string; 
         _item_id: row.furniture_item_id,
         _from: fromIso,
         _to: toIso,
-        _exclude_reservation: existingId ?? null,
+        _exclude_reservation: existingId ?? undefined,
       });
       if (!error && data && data[0]) {
         setItems((prev) => prev.map((p, i) => i === idx ? { ...p, loading: false, availability: { total: data[0].total, available: data[0].available, reserved: data[0].reserved } } : p));
