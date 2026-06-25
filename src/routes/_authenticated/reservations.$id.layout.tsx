@@ -249,18 +249,13 @@ function LayoutEditor() {
 
   async function exportPng() {
     const node = canvasRef.current; if (!node) return;
-    const { toPng } = await import("html-to-image");
-    const dataUrl = await toPng(node, { backgroundColor: "#ffffff", pixelRatio: 2 });
-    const a = document.createElement("a");
-    a.href = dataUrl; a.download = `plan-${reservation.data?.event_name ?? id}.png`; a.click();
+    const { exportLayoutAsPng } = await import("@/lib/layout-export.client");
+    await exportLayoutAsPng({ node, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
   }
   async function exportPdf() {
     const node = canvasRef.current; if (!node) return;
-    const [{ toPng }, jspdf] = await Promise.all([import("html-to-image"), import("jspdf")]);
-    const dataUrl = await toPng(node, { backgroundColor: "#ffffff", pixelRatio: 2 });
-    const pdf = new jspdf.jsPDF({ orientation: "landscape", unit: "pt", format: [layout.width, layout.height] });
-    pdf.addImage(dataUrl, "PNG", 0, 0, layout.width, layout.height);
-    pdf.save(`plan-${reservation.data?.event_name ?? id}.pdf`);
+    const { exportLayoutAsPdf } = await import("@/lib/layout-export.client");
+    await exportLayoutAsPdf({ node, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
   }
 
   // Drag from palette
