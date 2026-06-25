@@ -105,6 +105,26 @@ function Warehouse() {
     },
   });
 
+  const reservedNow = useQuery({
+    queryKey: ["furniture_reserved_now"],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("reservation_items")
+        .select("furniture_item_id, qty, reservations!inner(status, load_at, available_from_at)")
+        .lte("reservations.load_at", now)
+        .gt("reservations.available_from_at", now)
+        .neq("reservations.status", "cancelled");
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const r of (data ?? []) as any[]) {
+        map[r.furniture_item_id] = (map[r.furniture_item_id] ?? 0) + (r.qty ?? 0);
+      }
+      return map;
+    },
+  });
+
   const toggleActive = useMutation({
     mutationFn: async (row: FurnitureRow) => {
       const { error } = await supabase.from("furniture_items").update({ active: !row.active }).eq("id", row.id);
@@ -174,7 +194,8 @@ function Warehouse() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((i) => {
-            const available = i.total_qty - i.damaged_qty - i.retired_qty;
+            const reserved = reservedNow.data?.[i.id] ?? 0;
+            const available = i.total_qty - i.damaged_qty - i.retired_qty - reserved;
             return (
               <Card key={i.id} className={`overflow-hidden flex flex-col py-0 gap-0 ${!i.active ? "opacity-60" : ""}`}>
                 <div className="relative h-48 bg-muted overflow-hidden shrink-0">
