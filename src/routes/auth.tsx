@@ -70,7 +70,7 @@ function AuthPage() {
               </p>
             </form>
             <div className="mt-4 rounded-md border border-dashed border-border bg-muted/40 p-3 text-xs">
-              <p className="font-medium text-foreground mb-1">Dočasné prihlasovacie údaje (počas vývoja)</p>
+              <p className="font-medium text-foreground mb-1">Dočasné prihlasovacie údaje (počas vývoja systému)</p>
               <p className="text-muted-foreground">Email: <span className="font-mono">admin@mimaproduction.sk</span></p>
               <p className="text-muted-foreground">Heslo: <span className="font-mono">Mima2026</span></p>
             </div>
