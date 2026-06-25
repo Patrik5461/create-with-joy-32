@@ -128,11 +128,11 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
 
       let reservationId = existingId;
       if (existingId) {
-        const { error } = await supabase.from("reservations").update(payload).eq("id", existingId);
+        const { error } = await supabase.from("reservations").update(payload as any).eq("id", existingId);
         if (error) throw error;
         await supabase.from("reservation_items").delete().eq("reservation_id", existingId);
       } else {
-        const { data, error } = await supabase.from("reservations").insert(payload).select("id").single();
+        const { data, error } = await supabase.from("reservations").insert(payload as any).select("id").single();
         if (error) throw error;
         reservationId = data.id;
       }
