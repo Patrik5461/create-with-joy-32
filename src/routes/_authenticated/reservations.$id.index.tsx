@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/reservations/$id/")({
-  head: () => ({ meta: [{ title: "Rezervácia · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Rezervácia · Mima Production CRM" }] }),
   component: ReservationDetail,
 });
 

@@ -39,7 +39,7 @@ export function AppSidebar() {
             <ShieldCheck className="size-[18px]" />
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="font-bold text-[15px] text-sidebar-foreground tracking-tight">MimaProduction</span>
+            <span className="font-bold text-[15px] text-sidebar-foreground tracking-tight">Mima Production</span>
             <span className="text-[10px] uppercase tracking-[0.14em] text-sidebar-foreground/60 font-semibold">CRM</span>
           </div>
         </div>

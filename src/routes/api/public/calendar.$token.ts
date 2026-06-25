@@ -127,10 +127,10 @@ function buildIcs(reservations: ReservationRow[], owner: string): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//MimaProduction//CRM//SK",
+    "PRODID:-//Mima Production//CRM//SK",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:MimaProduction CRM – ${escapeIcs(owner)}`,
+    `X-WR-CALNAME:Mima Production CRM – ${escapeIcs(owner)}`,
     "X-WR-TIMEZONE:Europe/Bratislava",
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     "X-PUBLISHED-TTL:PT1H",

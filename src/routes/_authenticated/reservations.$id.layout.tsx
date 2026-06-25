@@ -18,7 +18,7 @@ import { z } from "zod";
 const searchSchema = z.object({ view: z.coerce.boolean().optional() });
 
 export const Route = createFileRoute("/_authenticated/reservations/$id/layout")({
-  head: () => ({ meta: [{ title: "Plán rozloženia · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Plán rozloženia · Mima Production CRM" }] }),
   validateSearch: searchSchema,
   component: LayoutEditor,
 });
