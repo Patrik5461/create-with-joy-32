@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarRange, Package, Truck, AlertTriangle, TrendingUp, Boxes } from "lucide-react";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
-import { STATUS_LABEL, STATUS_BADGE_VARIANT } from "@/lib/reservation-status";
+import { STATUS_LABEL, STATUS_BADGE_VARIANT, type ReservationStatus } from "@/lib/reservation-status";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard · MimaProduction CRM" }] }),
@@ -122,7 +122,7 @@ function Dashboard() {
                   </div>
                   <div className="text-right text-sm">
                     <div className="font-mono">{format(new Date(r.load_at), "HH:mm")}</div>
-                    <Badge variant={STATUS_BADGE_VARIANT[r.status]} className="text-[10px]">{STATUS_LABEL[r.status]}</Badge>
+                    <Badge variant={STATUS_BADGE_VARIANT[r.status as ReservationStatus]} className="text-[10px]">{STATUS_LABEL[r.status as ReservationStatus]}</Badge>
                   </div>
                 </div>
               ))}
@@ -165,7 +165,7 @@ function Dashboard() {
                   </div>
                   <div className="text-right text-xs">
                     <div>{format(new Date(r.event_start_at), "d. MMM HH:mm", { locale: sk })}</div>
-                    <Badge variant={STATUS_BADGE_VARIANT[r.status]} className="text-[10px] mt-1">{STATUS_LABEL[r.status]}</Badge>
+                    <Badge variant={STATUS_BADGE_VARIANT[r.status as ReservationStatus]} className="text-[10px] mt-1">{STATUS_LABEL[r.status as ReservationStatus]}</Badge>
                   </div>
                 </div>
               ))}
