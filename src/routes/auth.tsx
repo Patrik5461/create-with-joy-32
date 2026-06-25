@@ -15,7 +15,31 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-...
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate({ to: "/dashboard", replace: true });
+    });
+  }, [navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) {
+      toast.error("Nesprávne prihlasovacie údaje");
+      return;
+    }
+    toast.success("Prihlásenie úspešné");
+    navigate({ to: "/dashboard", replace: true });
+  };
+
+  return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--color-primary)/10,_transparent_60%),_radial-gradient(ellipse_at_bottom_right,_var(--color-accent)/15,_transparent_50%)] bg-background">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
