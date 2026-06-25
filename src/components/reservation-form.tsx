@@ -28,7 +28,7 @@ function toLocalInput(iso: string | null) {
 }
 
 function fromLocalInput(v: string) {
-  return v ? new Date(v).toISOString() : "";
+  return v ? new Date(v).toISOString() : null;
 }
 
 function defaultStart(iso?: string) {
@@ -91,8 +91,8 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
       setItems((prev) => prev.map((p, i) => i === idx ? { ...p, loading: true } : p));
       const { data, error } = await supabase.rpc("check_item_availability", {
         _item_id: row.furniture_item_id,
-        _from: fromIso,
-        _to: toIso,
+        _from: fromIso!,
+        _to: toIso!,
         _exclude_reservation: existingId ?? undefined,
       });
       if (!error && data && data[0]) {
@@ -128,11 +128,11 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
 
       let reservationId = existingId;
       if (existingId) {
-        const { error } = await supabase.from("reservations").update(payload).eq("id", existingId);
+        const { error } = await supabase.from("reservations").update(payload as any).eq("id", existingId);
         if (error) throw error;
         await supabase.from("reservation_items").delete().eq("reservation_id", existingId);
       } else {
-        const { data, error } = await supabase.from("reservations").insert(payload).select("id").single();
+        const { data, error } = await supabase.from("reservations").insert(payload as any).select("id").single();
         if (error) throw error;
         reservationId = data.id;
       }
