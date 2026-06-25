@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   ArrowLeft, Save, Printer, FileImage, FileText, Trash2, RotateCw,
   Square, Circle, Armchair, Users, DoorOpen, Music, Crown, Plus, Minus,
-  AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater,
+  AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -78,7 +78,7 @@ const PALETTE: { type: ElType; label: string; icon: any; defaults: Partial<Layou
 ];
 
 function isZone(t: ElType) { return t.startsWith("zone_"); }
-function isResizable(t: ElType) { return isZone(t) || t === "stage" || t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
+function isResizable(_t: ElType) { return true; }
 function isTable(t: ElType) { return t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
 
 function snap(v: number) { return Math.round(v / GRID) * GRID; }
@@ -134,6 +134,15 @@ function LayoutEditor() {
   function removeEl(id: string) {
     setLayout((l) => ({ ...l, elements: l.elements.filter((e) => e.id !== id) }));
     setSelectedId(null);
+  }
+  function duplicateEl(id: string) {
+    setLayout((l) => {
+      const src = l.elements.find((e) => e.id === id);
+      if (!src) return l;
+      const copy: LayoutElement = { ...src, id: uid(), x: snap(src.x + 30), y: snap(src.y + 30) };
+      setSelectedId(copy.id);
+      return { ...l, elements: [...l.elements, copy] };
+    });
   }
   function addEl(type: ElType, x = 100, y = 100) {
     const def = PALETTE.find((p) => p.type === type)!;
@@ -230,6 +239,7 @@ function LayoutEditor() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); removeEl(selectedId); }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateEl(selectedId); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -411,9 +421,15 @@ function LayoutEditor() {
                         <input type="color" value={selected.color ?? "#0ea5e9"} onChange={(e) => updateEl(selected.id, { color: e.target.value })} className="w-full h-8 rounded border" />
                       </div>
                     )}
-                    <Button variant="destructive" size="sm" className="w-full" onClick={() => removeEl(selected.id)}>
-                      <Trash2 className="size-4 mr-1" />Vymazať
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" size="sm" onClick={() => duplicateEl(selected.id)}>
+                        <Copy className="size-4 mr-1" />Kopírovať
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => removeEl(selected.id)}>
+                        <Trash2 className="size-4 mr-1" />Vymazať
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Tip: Ctrl/Cmd + D duplikuje označený prvok.</p>
                   </div>
                 )}
 
