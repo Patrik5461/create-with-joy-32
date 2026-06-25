@@ -11,7 +11,7 @@ import { sk } from "date-fns/locale";
 import { STATUS_LABEL, STATUS_COLOR, type ReservationStatus } from "@/lib/reservation-status";
 
 export const Route = createFileRoute("/_authenticated/layouts")({
-  head: () => ({ meta: [{ title: "Plán rozloženia · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Plán rozloženia · Mima Production CRM" }] }),
   component: LayoutsPage,
 });
 

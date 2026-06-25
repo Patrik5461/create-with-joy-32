@@ -10,7 +10,7 @@ import { sk } from "date-fns/locale";
 import { STATUS_LABEL, STATUS_BADGE_VARIANT, type ReservationStatus } from "@/lib/reservation-status";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Dashboard · Mima Production CRM" }] }),
   component: Dashboard,
 });
 
@@ -97,7 +97,7 @@ function Dashboard() {
       <AppHeader title="Dashboard" />
       <div className="p-4 md:p-6 space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">MimaProduction CRM</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Mima Production CRM</h2>
           <p className="text-sm text-muted-foreground">Prehľad dnešného dňa a stavu skladu.</p>
         </div>
 

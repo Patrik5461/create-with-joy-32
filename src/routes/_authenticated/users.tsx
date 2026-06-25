@@ -19,7 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 const ROLE_LABEL: Record<string, string> = { admin: "Administrátor", manager: "Manažér", warehouse: "Skladník" };
 
 export const Route = createFileRoute("/_authenticated/users")({
-  head: () => ({ meta: [{ title: "Používatelia · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Používatelia · Mima Production CRM" }] }),
   beforeLoad: async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw redirect({ to: "/auth" });

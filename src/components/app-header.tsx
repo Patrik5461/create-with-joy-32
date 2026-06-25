@@ -47,7 +47,7 @@ export function AppHeader({ title }: { title: string }) {
       <Separator orientation="vertical" className="h-5" />
       <div className="flex-1 min-w-0">
         <h1 className="text-sm font-semibold tracking-tight truncate">{title}</h1>
-        <p className="text-[11px] text-muted-foreground hidden sm:block">MimaProduction CRM</p>
+        <p className="text-[11px] text-muted-foreground hidden sm:block">Mima Production CRM</p>
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

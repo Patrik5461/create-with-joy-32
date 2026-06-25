@@ -17,7 +17,7 @@ import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { DamageReportDialog } from "@/components/damage-report-dialog";
 
 export const Route = createFileRoute("/_authenticated/warehouse")({
-  head: () => ({ meta: [{ title: "Sklad · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Sklad · Mima Production CRM" }] }),
   component: Warehouse,
 });
 
