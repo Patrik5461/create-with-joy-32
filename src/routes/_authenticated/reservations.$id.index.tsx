@@ -15,7 +15,7 @@ import { RESERVATION_STATUSES, STATUS_LABEL, STATUS_BADGE_VARIANT, type Reservat
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
-export const Route = createFileRoute("/_authenticated/reservations/$id")({
+export const Route = createFileRoute("/_authenticated/reservations/$id/")({
   head: () => ({ meta: [{ title: "Rezervácia · MimaProduction CRM" }] }),
   component: ReservationDetail,
 });
