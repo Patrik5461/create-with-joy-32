@@ -287,6 +287,23 @@ function LayoutEditor() {
             </div>
           </div>
         )}
+        {!readOnly && (
+          <div className="flex flex-wrap items-center gap-1 rounded-md border bg-muted/40 p-2 print:hidden">
+            <span className="text-xs text-muted-foreground mr-2 px-1">Zarovnať stoly:</span>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("left")} title="Zarovnať vľavo"><AlignStartVertical className="size-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("hcenter")} title="Centrovať horizontálne"><AlignHorizontalJustifyCenter className="size-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("right")} title="Zarovnať vpravo"><AlignStartVertical className="size-4 rotate-180" /></Button>
+            <span className="mx-1 h-5 w-px bg-border" />
+            <Button variant="ghost" size="sm" onClick={() => alignTables("top")} title="Zarovnať hore"><AlignStartHorizontal className="size-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("vcenter")} title="Centrovať vertikálne"><AlignVerticalJustifyCenter className="size-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("bottom")} title="Zarovnať dole"><AlignStartHorizontal className="size-4 rotate-180" /></Button>
+            <span className="mx-1 h-5 w-px bg-border" />
+            <Button variant="ghost" size="sm" onClick={() => alignTables("distH")} title="Rovnomerne horizontálne">↔ rozložiť</Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("distV")} title="Rovnomerne vertikálne">↕ rozložiť</Button>
+            <span className="mx-1 h-5 w-px bg-border" />
+            <Button variant="outline" size="sm" onClick={arrangeTablesGrid} title="Usporiadať do mriežky"><LayoutGrid className="size-4 mr-1" />Mriežka</Button>
+          </div>
+        )}
         {readOnly && (
           <div className="flex items-center justify-between gap-2 print:hidden">
             <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/reservations/$id/layout", params: { id }, search: {} })}>
