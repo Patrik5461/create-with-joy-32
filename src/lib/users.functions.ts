@@ -18,8 +18,7 @@ async function ensureAdmin(context: any) {
 export const checkIsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin
+    const { data } = await context.supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId)
