@@ -177,7 +177,7 @@ function Warehouse() {
             const available = i.total_qty - i.damaged_qty - i.retired_qty;
             return (
               <Card key={i.id} className={`overflow-hidden flex flex-col py-0 gap-0 ${!i.active ? "opacity-60" : ""}`}>
-                <div className="relative aspect-[4/3] bg-muted">
+                <div className="relative h-48 bg-muted overflow-hidden shrink-0">
                   <FurniturePhoto value={i.photo_url} alt={i.name} className="w-full h-full" />
                   <Badge className={`absolute top-2 left-2 border ${categoryClass(i.furniture_categories?.code)}`}>
                     {i.furniture_categories?.name ?? "—"}
