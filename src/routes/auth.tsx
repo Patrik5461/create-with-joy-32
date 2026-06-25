@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import mimaLogo from "/mima-logo.png";
+const mimaLogo = "/mima-logo.png";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Prihlásenie · MimaProduction CRM" }] }),
