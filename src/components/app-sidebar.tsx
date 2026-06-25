@@ -33,10 +33,10 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2.5 px-2 py-3">
-          <div className="size-9 rounded-xl bg-sidebar-primary grid place-items-center text-sidebar-primary-foreground shrink-0 shadow-sm">
-            <ShieldCheck className="size-5" />
+      <SidebarHeader className="border-b border-sidebar-border h-14 justify-center py-0">
+        <div className="flex items-center gap-2.5 px-2">
+          <div className="size-8 rounded-lg bg-sidebar-primary grid place-items-center text-sidebar-primary-foreground shrink-0 shadow-sm">
+            <ShieldCheck className="size-[18px]" />
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
             <span className="font-bold text-[15px] text-sidebar-foreground tracking-tight">MimaProduction</span>
