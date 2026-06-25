@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit3, Trash2, LayoutGrid } from "lucide-react";
 import { ReservationForm } from "@/components/reservation-form";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
@@ -67,6 +67,11 @@ function ReservationDetail() {
         <div className="flex items-center justify-between">
           <Button variant="ghost" size="sm" asChild><Link to="/reservations"><ArrowLeft className="size-4 mr-1" />Späť</Link></Button>
           <div className="flex gap-2">
+            {!editing && (
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/reservations/$id/layout" params={{ id }}><LayoutGrid className="size-4 mr-1" />Otvoriť plán rozloženia</Link>
+              </Button>
+            )}
             {canEdit && !editing && <Button variant="outline" size="sm" onClick={() => setEditing(true)}><Edit3 className="size-4 mr-1" />Upraviť</Button>}
             {canDelete && !editing && <Button variant="ghost" size="sm" onClick={() => { if (confirm("Naozaj zmazať rezerváciu?")) remove.mutate(); }}><Trash2 className="size-4" /></Button>}
           </div>
