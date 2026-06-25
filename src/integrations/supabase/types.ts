@@ -237,6 +237,7 @@ export type Database = {
           created_at: string
           email: string
           full_name: string | null
+          ics_token: string
           id: string
           updated_at: string
         }
@@ -245,6 +246,7 @@ export type Database = {
           created_at?: string
           email: string
           full_name?: string | null
+          ics_token?: string
           id: string
           updated_at?: string
         }
@@ -253,6 +255,7 @@ export type Database = {
           created_at?: string
           email?: string
           full_name?: string | null
+          ics_token?: string
           id?: string
           updated_at?: string
         }
@@ -415,6 +418,7 @@ export type Database = {
           total: number
         }[]
       }
+      rotate_my_ics_token: { Args: never; Returns: string }
     }
     Enums: {
       app_role: "admin" | "manager" | "warehouse"
