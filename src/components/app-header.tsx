@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useTheme } from "@/components/theme-provider";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "@tanstack/react-router";
@@ -24,7 +23,6 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 export function AppHeader({ title }: { title: string }) {
-  const { theme, toggle } = useTheme();
   const { data: user } = useCurrentUser();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -51,9 +49,6 @@ export function AppHeader({ title }: { title: string }) {
         <h1 className="text-sm font-semibold tracking-tight truncate">{title}</h1>
         <p className="text-[11px] text-muted-foreground hidden sm:block">MimaProduction CRM</p>
       </div>
-      <Button variant="ghost" size="icon" onClick={toggle} aria-label="Prepnúť tému">
-        {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-      </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="gap-2 h-9 px-2">
