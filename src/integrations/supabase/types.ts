@@ -311,6 +311,7 @@ export type Database = {
           event_name: string
           event_start_at: string | null
           id: string
+          layout: Json | null
           load_at: string
           note: string | null
           phone: string | null
@@ -332,6 +333,7 @@ export type Database = {
           event_name: string
           event_start_at?: string | null
           id?: string
+          layout?: Json | null
           load_at: string
           note?: string | null
           phone?: string | null
@@ -353,6 +355,7 @@ export type Database = {
           event_name?: string
           event_start_at?: string | null
           id?: string
+          layout?: Json | null
           load_at?: string
           note?: string | null
           phone?: string | null
