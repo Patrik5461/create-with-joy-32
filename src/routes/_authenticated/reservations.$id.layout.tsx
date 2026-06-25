@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createClientOnlyFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,6 +55,13 @@ interface LayoutData {
   elements: LayoutElement[];
 }
 
+interface ExportLayoutOptions {
+  node: HTMLElement;
+  filename: string;
+  width: number;
+  height: number;
+}
+
 const CANVAS_W = 1400;
 const CANVAS_H = 900;
 const GRID = 20;
@@ -83,6 +91,23 @@ function isTable(t: ElType) { return t === "rect_table" || t === "round_table" |
 
 function snap(v: number) { return Math.round(v / GRID) * GRID; }
 function uid() { return Math.random().toString(36).slice(2, 10); }
+
+const exportLayoutAsPng = createClientOnlyFn(async ({ node, filename }: ExportLayoutOptions) => {
+  const { toPng } = await import("html-to-image");
+  const dataUrl = await toPng(node, { backgroundColor: "#ffffff", pixelRatio: 2 });
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = `${filename}.png`;
+  link.click();
+});
+
+const exportLayoutAsPdf = createClientOnlyFn(async ({ node, filename, width, height }: ExportLayoutOptions) => {
+  const [{ toPng }, { jsPDF }] = await Promise.all([import("html-to-image"), import("jspdf")]);
+  const dataUrl = await toPng(node, { backgroundColor: "#ffffff", pixelRatio: 2 });
+  const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: [width, height] });
+  pdf.addImage(dataUrl, "PNG", 0, 0, width, height);
+  pdf.save(`${filename}.pdf`);
+});
 
 // ---------------- Component ----------------
 function LayoutEditor() {
@@ -249,12 +274,10 @@ function LayoutEditor() {
 
   async function exportPng() {
     const node = canvasRef.current; if (!node) return;
-    const { exportLayoutAsPng } = await import("@/lib/layout-export.client");
     await exportLayoutAsPng({ node, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
   }
   async function exportPdf() {
     const node = canvasRef.current; if (!node) return;
-    const { exportLayoutAsPdf } = await import("@/lib/layout-export.client");
     await exportLayoutAsPdf({ node, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
   }
 
