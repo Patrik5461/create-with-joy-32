@@ -547,6 +547,21 @@ function ElementVisual({ el }: { el: LayoutElement }) {
       </div>
     );
   }
+  if (el.type === "stage") {
+    return (
+      <div
+        className="w-full h-full rounded-md grid place-items-center text-white font-bold tracking-widest shadow-md"
+        style={{
+          background: "repeating-linear-gradient(90deg, #1f2937 0 24px, #111827 24px 48px)",
+          border: "3px solid #f59e0b",
+          fontSize: 14,
+          letterSpacing: 3,
+        }}
+      >
+        🎤 {el.label || "PÓDIUM"}
+      </div>
+    );
+  }
   // zones
   const color = el.color ?? "#0ea5e9";
   return (
