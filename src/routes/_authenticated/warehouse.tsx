@@ -11,9 +11,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X } from "lucide-react";
+import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
+import { DamageReportDialog } from "@/components/damage-report-dialog";
 
 export const Route = createFileRoute("/_authenticated/warehouse")({
   head: () => ({ meta: [{ title: "Sklad · MimaProduction CRM" }] }),
@@ -86,6 +87,7 @@ function Warehouse() {
   const [editing, setEditing] = useState<FurnitureRow | null>(null);
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<FurnitureRow | null>(null);
+  const [damageFor, setDamageFor] = useState<FurnitureRow | null>(null);
 
   const categories = useQuery({
     queryKey: ["furniture_categories"],
@@ -246,6 +248,9 @@ function Warehouse() {
                         <Button size="sm" className="flex-1" onClick={() => { setEditing(i); setOpen(true); }}>
                           <Pencil className="size-3.5 mr-1" />Upraviť
                         </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setDamageFor(i)} title="Nahlásiť poškodenie">
+                          <AlertTriangle className="size-3.5 text-rose-600" />
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => toggleActive.mutate(i)} title={i.active ? "Deaktivovať" : "Aktivovať"}>
                           <Power className="size-3.5" />
                         </Button>
@@ -263,13 +268,20 @@ function Warehouse() {
       </div>
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        {detail && <DetailDialog item={detail} />}
+        {detail && <DetailDialog item={detail} onReportDamage={() => { setDamageFor(detail); setDetail(null); }} canManage={canManage} />}
       </Dialog>
+
+      <DamageReportDialog
+        open={!!damageFor}
+        onOpenChange={(o) => !o && setDamageFor(null)}
+        item={damageFor ? { id: damageFor.id, name: damageFor.name, total_qty: damageFor.total_qty, damaged_qty: damageFor.damaged_qty, retired_qty: damageFor.retired_qty } : null}
+        reservedNow={damageFor ? reservedNow.data?.[damageFor.id] ?? 0 : 0}
+      />
     </>
   );
 }
 
-function DetailDialog({ item }: { item: FurnitureRow }) {
+function DetailDialog({ item, onReportDamage, canManage }: { item: FurnitureRow; onReportDamage: () => void; canManage: boolean }) {
   const available = item.total_qty - item.damaged_qty - item.retired_qty;
   return (
     <DialogContent className="max-w-2xl">
@@ -303,6 +315,12 @@ function DetailDialog({ item }: { item: FurnitureRow }) {
               <div className="text-xs text-muted-foreground mb-1">Poznámka</div>
               <p className="text-sm whitespace-pre-wrap">{item.note}</p>
             </div>
+          )}
+          {canManage && (
+            <Button variant="outline" className="w-full" onClick={onReportDamage}>
+              <AlertTriangle className="size-4 mr-1 text-rose-600" />
+              Nahlásiť poškodenie
+            </Button>
           )}
         </div>
       </div>
