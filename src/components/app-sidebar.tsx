@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, Building2, LayoutPanelTop, Settings } from "lucide-react";
+import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, Building2, LayoutPanelTop, Settings, Wrench } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +19,7 @@ const mainItems = [
   { title: "Sklad", url: "/warehouse", icon: Package },
   { title: "Klienti", url: "/clients", icon: Users },
   { title: "Logistika", url: "/logistics", icon: Truck },
+  { title: "Údržba", url: "/maintenance", icon: Wrench },
   { title: "Plán rozloženia", url: "/layouts", icon: LayoutPanelTop },
 ] as const;
 
