@@ -91,8 +91,8 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
       setItems((prev) => prev.map((p, i) => i === idx ? { ...p, loading: true } : p));
       const { data, error } = await supabase.rpc("check_item_availability", {
         _item_id: row.furniture_item_id,
-        _from: fromIso,
-        _to: toIso,
+        _from: fromIso!,
+        _to: toIso!,
         _exclude_reservation: existingId ?? undefined,
       });
       if (!error && data && data[0]) {
