@@ -52,7 +52,7 @@ interface Report {
   resolved_at: string | null;
   furniture_items: { name: string; internal_code: string } | null;
   reservations: { event_name: string; clients: { company_name: string } | null } | null;
-  reporter: { full_name: string | null; email: string } | null;
+  reporter?: { full_name: string | null; email: string } | null;
 }
 
 function MaintenancePage() {
@@ -73,12 +73,18 @@ function MaintenancePage() {
           id, furniture_item_id, qty, severity, status, description, reason,
           photo_paths, reported_at, reported_by, reservation_id, resolved_at,
           furniture_items(name, internal_code),
-          reservations(event_name, clients(company_name)),
-          reporter:profiles!damaged_items_reported_by_fkey(full_name, email)
+          reservations(event_name, clients(company_name))
         `)
         .order("reported_at", { ascending: false });
       if (error) throw error;
-      return data as unknown as Report[];
+      const rows = (data ?? []) as unknown as Report[];
+      const ids = Array.from(new Set(rows.map((r) => r.reported_by).filter(Boolean) as string[]));
+      if (ids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+        const map = new Map((profs ?? []).map((p: any) => [p.id, p]));
+        for (const r of rows) r.reporter = r.reported_by ? map.get(r.reported_by) ?? null : null;
+      }
+      return rows;
     },
   });
 
