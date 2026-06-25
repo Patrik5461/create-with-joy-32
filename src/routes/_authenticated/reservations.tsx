@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
-import { STATUS_LABEL, STATUS_BADGE_VARIANT, type ReservationStatus } from "@/lib/reservation-status";
+import { STATUS_LABEL, STATUS_COLOR, type ReservationStatus } from "@/lib/reservation-status";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/reservations")({
@@ -23,6 +23,7 @@ type View = "day" | "week" | "month";
 function Reservations() {
   const { data: user } = useCurrentUser();
   const canCreate = hasRole(user, "admin", "manager");
+  const navigate = useNavigate();
   const [view, setView] = useState<View>("week");
   const [cursor, setCursor] = useState<Date>(new Date());
 
@@ -45,6 +46,13 @@ function Reservations() {
       return data as any[];
     },
   });
+
+  const openNewAt = (day: Date, hour = 9) => {
+    if (!canCreate) return;
+    const start = new Date(day);
+    start.setHours(hour, 0, 0, 0);
+    navigate({ to: "/reservations/new", search: { start: start.toISOString() } as any });
+  };
 
   const move = (dir: 1 | -1) => {
     if (view === "day") setCursor((d) => addDays(d, dir));
@@ -89,11 +97,11 @@ function Reservations() {
         </div>
 
         {view === "month" ? (
-          <MonthGrid cursor={cursor} reservations={reservations.data ?? []} />
+          <MonthGrid cursor={cursor} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} />
         ) : view === "week" ? (
-          <WeekList from={range.from} reservations={reservations.data ?? []} />
+          <WeekList from={range.from} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} />
         ) : (
-          <DayList day={cursor} reservations={reservations.data ?? []} />
+          <DayList day={cursor} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} />
         )}
       </div>
     </>
@@ -101,19 +109,20 @@ function Reservations() {
 }
 
 function ReservationCard({ r }: { r: any }) {
+  const cls = STATUS_COLOR[r.status as ReservationStatus] ?? "";
   return (
     <Link to="/reservations/$id" params={{ id: r.id }} className="block">
-      <Card className="hover:bg-muted/40 transition-colors">
+      <Card className={`transition-colors border-l-4 ${cls}`}>
         <CardContent className="p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="font-medium truncate text-sm">{r.event_name}</div>
-              <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name ?? "—"} · {r.venue ?? "—"}</div>
-              <div className="text-[11px] text-muted-foreground mt-1">
+              <div className="text-xs opacity-80 truncate">{r.clients?.company_name ?? "—"} · {r.venue ?? "—"}</div>
+              <div className="text-[11px] opacity-70 mt-1">
                 {format(new Date(r.event_start_at), "d.M. HH:mm")} → {format(new Date(r.event_end_at), "HH:mm")}
               </div>
             </div>
-            <Badge variant={STATUS_BADGE_VARIANT[r.status as ReservationStatus]} className="text-[10px] shrink-0">{STATUS_LABEL[r.status as ReservationStatus]}</Badge>
+            <Badge variant="outline" className="text-[10px] shrink-0 bg-background/60">{STATUS_LABEL[r.status as ReservationStatus]}</Badge>
           </div>
         </CardContent>
       </Card>
@@ -121,13 +130,33 @@ function ReservationCard({ r }: { r: any }) {
   );
 }
 
-function DayList({ day, reservations }: { day: Date; reservations: any[] }) {
+function DayList({ day, reservations, onSlot, canCreate }: { day: Date; reservations: any[]; onSlot: (d: Date, h?: number) => void; canCreate: boolean }) {
   const list = reservations.filter((r) => isSameDay(new Date(r.event_start_at), day));
-  if (list.length === 0) return <p className="text-sm text-muted-foreground py-12 text-center">Žiadne rezervácie pre tento deň.</p>;
-  return <div className="grid gap-2 sm:grid-cols-2">{list.map((r) => <ReservationCard key={r.id} r={r} />)}</div>;
+  const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 7..20
+  return (
+    <div className="rounded-lg border bg-card divide-y">
+      {hours.map((h) => {
+        const slotItems = list.filter((r) => new Date(r.event_start_at).getHours() === h);
+        return (
+          <div key={h} className="grid grid-cols-[60px_1fr] min-h-14">
+            <div className="text-xs text-muted-foreground p-2 border-r">{String(h).padStart(2, "0")}:00</div>
+            <button
+              type="button"
+              onClick={() => canCreate && slotItems.length === 0 && onSlot(day, h)}
+              className={`text-left p-1.5 space-y-1 ${canCreate && slotItems.length === 0 ? "hover:bg-muted/40 cursor-pointer" : ""}`}
+            >
+              {slotItems.length === 0 ? (
+                canCreate && <span className="text-[11px] text-muted-foreground/50">+ Nová rezervácia</span>
+              ) : slotItems.map((r) => <ReservationCard key={r.id} r={r} />)}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
-function WeekList({ from, reservations }: { from: Date; reservations: any[] }) {
+function WeekList({ from, reservations, onSlot, canCreate }: { from: Date; reservations: any[]; onSlot: (d: Date) => void; canCreate: boolean }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(from, i));
   return (
     <div className="grid gap-3 md:grid-cols-7">
@@ -136,7 +165,11 @@ function WeekList({ from, reservations }: { from: Date; reservations: any[] }) {
         return (
           <div key={d.toISOString()} className="space-y-2">
             <div className="text-xs font-medium text-muted-foreground uppercase">{format(d, "EEE d.M.", { locale: sk })}</div>
-            {list.length === 0 ? <div className="text-xs text-muted-foreground/60 border border-dashed rounded-md p-3 text-center">—</div> : list.map((r) => <ReservationCard key={r.id} r={r} />)}
+            {list.length === 0 ? (
+              <button type="button" onClick={() => canCreate && onSlot(d)} className={`w-full text-xs text-muted-foreground/60 border border-dashed rounded-md p-3 text-center ${canCreate ? "hover:bg-muted/40 hover:text-foreground" : ""}`}>
+                {canCreate ? "+ Pridať" : "—"}
+              </button>
+            ) : list.map((r) => <ReservationCard key={r.id} r={r} />)}
           </div>
         );
       })}
@@ -144,7 +177,7 @@ function WeekList({ from, reservations }: { from: Date; reservations: any[] }) {
   );
 }
 
-function MonthGrid({ cursor, reservations }: { cursor: Date; reservations: any[] }) {
+function MonthGrid({ cursor, reservations, onSlot, canCreate }: { cursor: Date; reservations: any[]; onSlot: (d: Date) => void; canCreate: boolean }) {
   const monthStart = startOfMonth(cursor);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 });
@@ -161,10 +194,18 @@ function MonthGrid({ cursor, reservations }: { cursor: Date; reservations: any[]
           const list = reservations.filter((r) => isSameDay(new Date(r.event_start_at), day));
           const isOtherMonth = !isSameMonth(day, cursor);
           return (
-            <div key={day.toISOString()} className={`min-h-24 p-1.5 border-b border-r text-[11px] ${isOtherMonth ? "bg-muted/30 text-muted-foreground" : ""}`}>
+            <div
+              key={day.toISOString()}
+              onClick={(e) => {
+                if (!canCreate) return;
+                if ((e.target as HTMLElement).closest("a")) return;
+                onSlot(day);
+              }}
+              className={`min-h-24 p-1.5 border-b border-r text-[11px] ${isOtherMonth ? "bg-muted/30 text-muted-foreground" : ""} ${canCreate ? "cursor-pointer hover:bg-muted/40" : ""}`}
+            >
               <div className="font-semibold mb-1">{format(day, "d")}</div>
               {list.slice(0, 3).map((r) => (
-                <Link key={r.id} to="/reservations/$id" params={{ id: r.id }} className="block truncate rounded bg-primary/10 text-primary px-1 py-0.5 mb-0.5 hover:bg-primary/20">
+                <Link key={r.id} to="/reservations/$id" params={{ id: r.id }} className={`block truncate rounded px-1 py-0.5 mb-0.5 border ${STATUS_COLOR[r.status as ReservationStatus] ?? ""}`}>
                   {format(new Date(r.event_start_at), "HH:mm")} {r.event_name}
                 </Link>
               ))}
