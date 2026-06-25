@@ -1,5 +1,4 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { createClientOnlyFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,8 +57,6 @@ interface LayoutData {
 interface ExportLayoutOptions {
   layout: LayoutData;
   filename: string;
-  width: number;
-  height: number;
 }
 
 const CANVAS_W = 1400;
@@ -102,8 +99,6 @@ function layoutToSvg(layout: LayoutData) {
   for (let y = 0; y <= layout.height; y += GRID) gridLines.push(`<line x1="0" y1="${y}" x2="${layout.width}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/>`);
 
   const elements = layout.elements.map((el) => {
-    const cx = el.x + el.w / 2;
-    const cy = el.y + el.h / 2;
     const label = escapeXml(el.label || (isZone(el.type) ? "Zóna" : el.type === "stage" ? "PÓDIUM" : el.type === "chair" ? "" : "Stôl"));
     const transform = `translate(${el.x} ${el.y}) rotate(${el.rotation} ${el.w / 2} ${el.h / 2})`;
 
@@ -140,7 +135,8 @@ function layoutToSvg(layout: LayoutData) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}"><rect width="100%" height="100%" fill="#ffffff"/>${gridLines.join("")}${elements}</svg>`;
 }
 
-const exportLayoutAsPng = createClientOnlyFn(async ({ layout, filename }: ExportLayoutOptions) => {
+async function exportLayoutAsPng({ layout, filename }: ExportLayoutOptions) {
+  if (typeof document === "undefined") return;
   const svg = layoutToSvg(layout);
   const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -172,15 +168,16 @@ const exportLayoutAsPng = createClientOnlyFn(async ({ layout, filename }: Export
   link.href = dataUrl;
   link.download = `${filename}.png`;
   link.click();
-});
+}
 
-const exportLayoutAsPdf = createClientOnlyFn(async ({ layout, filename, width, height }: ExportLayoutOptions) => {
+async function exportLayoutAsPdf({ layout, filename }: ExportLayoutOptions) {
+  if (typeof window === "undefined") return;
   const svg = layoutToSvg(layout);
   const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1200,height=800");
   if (!printWindow) throw new Error("Prehliadač zablokoval otvorenie okna pre PDF export.");
   printWindow.document.write(`<!doctype html><html><head><title>${escapeXml(filename)}</title><style>@page{size:landscape;margin:10mm}body{margin:0;background:#fff;font-family:Arial,sans-serif}.wrap{width:100vw;height:100vh;display:grid;place-items:center}svg{max-width:100%;max-height:100%;width:auto;height:auto}</style></head><body><div class="wrap">${svg}</div><script>window.onload=()=>{window.focus();window.print();};</script></body></html>`);
   printWindow.document.close();
-});
+}
 
 // ---------------- Component ----------------
 function LayoutEditor() {
@@ -346,10 +343,10 @@ function LayoutEditor() {
   const canvasRef = useRef<HTMLDivElement>(null);
 
   async function exportPng() {
-    await exportLayoutAsPng({ layout, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
+    await exportLayoutAsPng({ layout, filename: `plan-${reservation.data?.event_name ?? id}` });
   }
   async function exportPdf() {
-    await exportLayoutAsPdf({ layout, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
+    await exportLayoutAsPdf({ layout, filename: `plan-${reservation.data?.event_name ?? id}` });
   }
 
   // Drag from palette
