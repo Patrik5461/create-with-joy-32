@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   ArrowLeft, Save, Printer, FileImage, FileText, Trash2, RotateCw,
   Square, Circle, Armchair, Users, DoorOpen, Music, Crown, Plus, Minus,
-  AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater,
+  AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -78,7 +78,7 @@ const PALETTE: { type: ElType; label: string; icon: any; defaults: Partial<Layou
 ];
 
 function isZone(t: ElType) { return t.startsWith("zone_"); }
-function isResizable(t: ElType) { return isZone(t) || t === "stage" || t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
+function isResizable(_t: ElType) { return true; }
 function isTable(t: ElType) { return t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
 
 function snap(v: number) { return Math.round(v / GRID) * GRID; }
