@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   ArrowLeft, Save, Printer, FileImage, FileText, Trash2, RotateCw,
   Square, Circle, Armchair, Users, DoorOpen, Music, Crown, Plus, Minus,
+  AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -28,6 +29,7 @@ type ElType =
   | "chair"
   | "round_table"
   | "round_table_chairs"
+  | "stage"
   | "zone_podium"
   | "zone_entry"
   | "zone_vip"
@@ -68,6 +70,7 @@ const PALETTE: { type: ElType; label: string; icon: any; defaults: Partial<Layou
   { type: "round_table", label: "Okrúhly stôl", icon: Circle, defaults: { w: 100, h: 100 } },
   { type: "round_table_chairs", label: "Stôl so stoličkami", icon: Users, defaults: { w: 140, h: 140, chairCount: 8 } },
   { type: "chair", label: "Stolička", icon: Armchair, defaults: { w: 40, h: 40 } },
+  { type: "stage", label: "Pódium / Stage", icon: Theater, defaults: { w: 320, h: 140, label: "PÓDIUM" } },
   { type: "zone_podium", label: "Zóna: Pódium", icon: Music, defaults: { w: 280, h: 160, label: "Pódium" } },
   { type: "zone_entry", label: "Zóna: Vstup", icon: DoorOpen, defaults: { w: 200, h: 120, label: "Vstup" } },
   { type: "zone_vip", label: "Zóna: VIP sedenie", icon: Crown, defaults: { w: 280, h: 200, label: "VIP" } },
@@ -75,7 +78,8 @@ const PALETTE: { type: ElType; label: string; icon: any; defaults: Partial<Layou
 ];
 
 function isZone(t: ElType) { return t.startsWith("zone_"); }
-function isResizable(t: ElType) { return isZone(t) || t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
+function isResizable(t: ElType) { return isZone(t) || t === "stage" || t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
+function isTable(t: ElType) { return t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
 
 function snap(v: number) { return Math.round(v / GRID) * GRID; }
 function uid() { return Math.random().toString(36).slice(2, 10); }
