@@ -11,7 +11,7 @@ import { sk } from "date-fns/locale";
 import { STATUS_LABEL, STATUS_COLOR, type ReservationStatus } from "@/lib/reservation-status";
 
 export const Route = createFileRoute("/_authenticated/layouts")({
-  head: () => ({ meta: [{ title: "Plán eventu · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Plán rozloženia · MimaProduction CRM" }] }),
   component: LayoutsPage,
 });
 
@@ -31,7 +31,7 @@ function LayoutsPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <AppHeader title="Plán eventu" />
+      <AppHeader title="Plán rozloženia" />
       <main className="flex-1 p-6 space-y-4">
         <p className="text-sm text-muted-foreground">
           Vyberte rezerváciu pre otvorenie vizuálneho editora pôdorysu.
