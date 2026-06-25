@@ -89,8 +89,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "MimaProduction CRM" },
       { name: "twitter:description", content: "Interný systém pre správu eventového nábytku, skladu, rezervácií a logistiky." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/de2c6da4-db4c-482b-b4df-9e96adc755ef" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/de2c6da4-db4c-482b-b4df-9e96adc755ef" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/42b1c8b7-09d5-4632-b3e1-809d1d1e1943/id-preview-879d637e--43228b61-e6d5-4bdf-be6f-6d84060c13df.lovable.app-1782376680096.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/42b1c8b7-09d5-4632-b3e1-809d1d1e1943/id-preview-879d637e--43228b61-e6d5-4bdf-be6f-6d84060c13df.lovable.app-1782376680096.png" },
     ],
     links: [
       {
