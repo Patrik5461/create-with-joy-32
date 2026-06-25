@@ -315,7 +315,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
                   )}
                 </div>
                 <div className="col-span-1">
-                  <Button size="icon" variant="ghost" onClick={() => setItems((p) => p.filter((_, i) => i !== idx))}><Trash2 className="size-4" /></Button>
+                  <Button size="icon" variant="ghost" aria-label="Odstrániť položku" onClick={() => setItems((p) => p.filter((_, i) => i !== idx))}><Trash2 className="size-4" /></Button>
                 </div>
               </div>
             );

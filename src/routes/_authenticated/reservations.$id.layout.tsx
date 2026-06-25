@@ -495,9 +495,9 @@ function LayoutEditor() {
                       <div>
                         <Label className="text-xs">Počet stoličiek: {selected.chairCount ?? 0}</Label>
                         <div className="flex items-center gap-2">
-                          <Button size="icon" variant="outline" className="size-7" onClick={() => updateEl(selected.id, { chairCount: Math.max(2, (selected.chairCount ?? 8) - 1) })}><Minus className="size-3" /></Button>
+                          <Button size="icon" variant="outline" className="size-7" aria-label="Znížiť počet stoličiek" onClick={() => updateEl(selected.id, { chairCount: Math.max(2, (selected.chairCount ?? 8) - 1) })}><Minus className="size-3" /></Button>
                           <span className="text-sm">{selected.chairCount ?? 8}</span>
-                          <Button size="icon" variant="outline" className="size-7" onClick={() => updateEl(selected.id, { chairCount: Math.min(20, (selected.chairCount ?? 8) + 1) })}><Plus className="size-3" /></Button>
+                          <Button size="icon" variant="outline" className="size-7" aria-label="Zvýšiť počet stoličiek" onClick={() => updateEl(selected.id, { chairCount: Math.min(20, (selected.chairCount ?? 8) + 1) })}><Plus className="size-3" /></Button>
                         </div>
                       </div>
                     )}

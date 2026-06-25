@@ -73,7 +73,7 @@ function ReservationDetail() {
               </Button>
             )}
             {canEdit && !editing && <Button variant="outline" size="sm" onClick={() => setEditing(true)}><Edit3 className="size-4 mr-1" />Upraviť</Button>}
-            {canDelete && !editing && <Button variant="ghost" size="sm" onClick={() => { if (confirm("Naozaj zmazať rezerváciu?")) remove.mutate(); }}><Trash2 className="size-4" /></Button>}
+            {canDelete && !editing && <Button variant="ghost" size="sm" aria-label="Zmazať rezerváciu" onClick={() => { if (confirm("Naozaj zmazať rezerváciu?")) remove.mutate(); }}><Trash2 className="size-4" /></Button>}
           </div>
         </div>
 

@@ -64,9 +64,9 @@ function Logistics() {
             <p className="text-sm text-muted-foreground">Odvozy a návraty nábytku.</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => setDay((d) => addDays(d, -1))}><ChevronLeft className="size-4" /></Button>
+            <Button variant="outline" size="icon" aria-label="Predchádzajúci deň" onClick={() => setDay((d) => addDays(d, -1))}><ChevronLeft className="size-4" /></Button>
             <Input type="date" className="w-44" value={format(day, "yyyy-MM-dd")} onChange={(e) => setDay(new Date(e.target.value))} />
-            <Button variant="outline" size="icon" onClick={() => setDay((d) => addDays(d, 1))}><ChevronRight className="size-4" /></Button>
+            <Button variant="outline" size="icon" aria-label="Nasledujúci deň" onClick={() => setDay((d) => addDays(d, 1))}><ChevronRight className="size-4" /></Button>
             <Button variant="outline" size="sm" onClick={() => setDay(new Date())}>Dnes</Button>
           </div>
         </div>
