@@ -5,8 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const RoleEnum = z.enum(["admin", "manager", "warehouse"]);
 
 async function ensureAdmin(context: any) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await context.supabase
     .from("user_roles")
     .select("role")
     .eq("user_id", context.userId)
@@ -31,7 +30,6 @@ export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await ensureAdmin(context);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profiles, error } = await context.supabase
       .from("profiles")
       .select("id, email, full_name, active, created_at")
@@ -44,8 +42,6 @@ export const listUsers = createServerFn({ method: "GET" })
       arr.push(r.role);
       rolesByUser.set(r.user_id, arr);
     });
-    // touch admin client to validate access (no-op listing)
-    void supabaseAdmin;
     return (profiles ?? []).map((p: any) => ({ ...p, roles: rolesByUser.get(p.id) ?? [] }));
   });
 
