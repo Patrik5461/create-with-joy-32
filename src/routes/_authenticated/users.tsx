@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Power } from "lucide-react";
 import { toast } from "sonner";
-import { listUsers, createUser, setUserRole, setUserActive } from "@/lib/users.functions";
+import { listUsers, createUser, setUserRole, setUserActive, checkIsAdmin } from "@/lib/users.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 const ROLE_LABEL: Record<string, string> = { admin: "Administrátor", manager: "Manažér", warehouse: "Skladník" };
@@ -23,8 +23,8 @@ export const Route = createFileRoute("/_authenticated/users")({
   beforeLoad: async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw redirect({ to: "/auth" });
-    const { data } = await supabase.rpc("has_role", { _user_id: u.user.id, _role: "admin" });
-    if (!data) throw redirect({ to: "/dashboard" });
+    const { isAdmin } = await checkIsAdmin();
+    if (!isAdmin) throw redirect({ to: "/dashboard" });
   },
   component: UsersPage,
 });
