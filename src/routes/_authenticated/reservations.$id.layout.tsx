@@ -346,12 +346,10 @@ function LayoutEditor() {
   const canvasRef = useRef<HTMLDivElement>(null);
 
   async function exportPng() {
-    const node = canvasRef.current; if (!node) return;
-    await exportLayoutAsPng({ node, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
+    await exportLayoutAsPng({ layout, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
   }
   async function exportPdf() {
-    const node = canvasRef.current; if (!node) return;
-    await exportLayoutAsPdf({ node, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
+    await exportLayoutAsPdf({ layout, filename: `plan-${reservation.data?.event_name ?? id}`, width: layout.width, height: layout.height });
   }
 
   // Drag from palette
