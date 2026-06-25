@@ -28,7 +28,7 @@ function toLocalInput(iso: string | null) {
 }
 
 function fromLocalInput(v: string) {
-  return v ? new Date(v).toISOString() : "";
+  return v ? new Date(v).toISOString() : null;
 }
 
 function defaultStart(iso?: string) {
