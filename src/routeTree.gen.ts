@@ -22,6 +22,7 @@ import { Route as AuthenticatedReservationsIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedReservationsNewRouteImport } from './routes/_authenticated/reservations.new'
 import { Route as AuthenticatedReservationsIdRouteImport } from './routes/_authenticated/reservations.$id'
 import { Route as AuthenticatedClientsIdRouteImport } from './routes/_authenticated/clients.$id'
+import { Route as AuthenticatedReservationsIdIndexRouteImport } from './routes/_authenticated/reservations.$id.index'
 import { Route as AuthenticatedReservationsIdLayoutRouteImport } from './routes/_authenticated/reservations.$id.layout'
 
 const AuthRoute = AuthRouteImport.update({
@@ -91,6 +92,12 @@ const AuthenticatedClientsIdRoute = AuthenticatedClientsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedClientsRoute,
 } as any)
+const AuthenticatedReservationsIdIndexRoute =
+  AuthenticatedReservationsIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedReservationsIdRoute,
+  } as any)
 const AuthenticatedReservationsIdLayoutRoute =
   AuthenticatedReservationsIdLayoutRouteImport.update({
     id: '/layout',
@@ -112,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
+  '/reservations/$id/': typeof AuthenticatedReservationsIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -123,10 +131,10 @@ export interface FileRoutesByTo {
   '/users': typeof AuthenticatedUsersRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
-  '/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/reservations': typeof AuthenticatedReservationsIndexRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
+  '/reservations/$id': typeof AuthenticatedReservationsIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/_authenticated/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/_authenticated/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/_authenticated/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
+  '/_authenticated/reservations/$id/': typeof AuthenticatedReservationsIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/reservations/new'
     | '/reservations/'
     | '/reservations/$id/layout'
+    | '/reservations/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -172,10 +182,10 @@ export interface FileRouteTypes {
     | '/users'
     | '/warehouse'
     | '/clients/$id'
-    | '/reservations/$id'
     | '/reservations/new'
     | '/reservations'
     | '/reservations/$id/layout'
+    | '/reservations/$id'
   id:
     | '__root__'
     | '/'
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reservations/new'
     | '/_authenticated/reservations/'
     | '/_authenticated/reservations/$id/layout'
+    | '/_authenticated/reservations/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -293,6 +304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientsIdRouteImport
       parentRoute: typeof AuthenticatedClientsRoute
     }
+    '/_authenticated/reservations/$id/': {
+      id: '/_authenticated/reservations/$id/'
+      path: '/'
+      fullPath: '/reservations/$id/'
+      preLoaderRoute: typeof AuthenticatedReservationsIdIndexRouteImport
+      parentRoute: typeof AuthenticatedReservationsIdRoute
+    }
     '/_authenticated/reservations/$id/layout': {
       id: '/_authenticated/reservations/$id/layout'
       path: '/layout'
@@ -316,12 +334,15 @@ const AuthenticatedClientsRouteWithChildren =
 
 interface AuthenticatedReservationsIdRouteChildren {
   AuthenticatedReservationsIdLayoutRoute: typeof AuthenticatedReservationsIdLayoutRoute
+  AuthenticatedReservationsIdIndexRoute: typeof AuthenticatedReservationsIdIndexRoute
 }
 
 const AuthenticatedReservationsIdRouteChildren: AuthenticatedReservationsIdRouteChildren =
   {
     AuthenticatedReservationsIdLayoutRoute:
       AuthenticatedReservationsIdLayoutRoute,
+    AuthenticatedReservationsIdIndexRoute:
+      AuthenticatedReservationsIdIndexRoute,
   }
 
 const AuthenticatedReservationsIdRouteWithChildren =
