@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   ArrowLeft, Save, Printer, FileImage, FileText, Trash2, RotateCw,
   Square, Circle, Armchair, Users, DoorOpen, Music, Crown, Plus, Minus,
+  AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -28,6 +29,7 @@ type ElType =
   | "chair"
   | "round_table"
   | "round_table_chairs"
+  | "stage"
   | "zone_podium"
   | "zone_entry"
   | "zone_vip"
@@ -68,6 +70,7 @@ const PALETTE: { type: ElType; label: string; icon: any; defaults: Partial<Layou
   { type: "round_table", label: "Okrúhly stôl", icon: Circle, defaults: { w: 100, h: 100 } },
   { type: "round_table_chairs", label: "Stôl so stoličkami", icon: Users, defaults: { w: 140, h: 140, chairCount: 8 } },
   { type: "chair", label: "Stolička", icon: Armchair, defaults: { w: 40, h: 40 } },
+  { type: "stage", label: "Pódium / Stage", icon: Theater, defaults: { w: 320, h: 140, label: "PÓDIUM" } },
   { type: "zone_podium", label: "Zóna: Pódium", icon: Music, defaults: { w: 280, h: 160, label: "Pódium" } },
   { type: "zone_entry", label: "Zóna: Vstup", icon: DoorOpen, defaults: { w: 200, h: 120, label: "Vstup" } },
   { type: "zone_vip", label: "Zóna: VIP sedenie", icon: Crown, defaults: { w: 280, h: 200, label: "VIP" } },
@@ -75,7 +78,8 @@ const PALETTE: { type: ElType; label: string; icon: any; defaults: Partial<Layou
 ];
 
 function isZone(t: ElType) { return t.startsWith("zone_"); }
-function isResizable(t: ElType) { return isZone(t) || t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
+function isResizable(t: ElType) { return isZone(t) || t === "stage" || t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
+function isTable(t: ElType) { return t === "rect_table" || t === "round_table" || t === "round_table_chairs"; }
 
 function snap(v: number) { return Math.round(v / GRID) * GRID; }
 function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -143,6 +147,81 @@ function LayoutEditor() {
     setSelectedId(el.id);
   }
 
+  // ---- Alignment helpers (operate on tables) ----
+  function withTables(fn: (tables: LayoutElement[]) => LayoutElement[]) {
+    setLayout((l) => {
+      const tables = l.elements.filter((e) => isTable(e.type));
+      if (tables.length === 0) { toast.info("Žiadne stoly na zarovnanie."); return l; }
+      const updated = fn(tables);
+      const map = new Map(updated.map((e) => [e.id, e]));
+      return { ...l, elements: l.elements.map((e) => map.get(e.id) ?? e) };
+    });
+  }
+  function alignTables(mode: "left" | "right" | "top" | "bottom" | "hcenter" | "vcenter" | "distH" | "distV") {
+    withTables((tables) => {
+      if (mode === "left") {
+        const x = Math.min(...tables.map((t) => t.x));
+        return tables.map((t) => ({ ...t, x: snap(x) }));
+      }
+      if (mode === "right") {
+        const r = Math.max(...tables.map((t) => t.x + t.w));
+        return tables.map((t) => ({ ...t, x: snap(r - t.w) }));
+      }
+      if (mode === "top") {
+        const y = Math.min(...tables.map((t) => t.y));
+        return tables.map((t) => ({ ...t, y: snap(y) }));
+      }
+      if (mode === "bottom") {
+        const b = Math.max(...tables.map((t) => t.y + t.h));
+        return tables.map((t) => ({ ...t, y: snap(b - t.h) }));
+      }
+      if (mode === "hcenter") {
+        const cx = tables.reduce((s, t) => s + t.x + t.w / 2, 0) / tables.length;
+        return tables.map((t) => ({ ...t, x: snap(cx - t.w / 2) }));
+      }
+      if (mode === "vcenter") {
+        const cy = tables.reduce((s, t) => s + t.y + t.h / 2, 0) / tables.length;
+        return tables.map((t) => ({ ...t, y: snap(cy - t.h / 2) }));
+      }
+      if (mode === "distH" && tables.length >= 3) {
+        const sorted = [...tables].sort((a, b) => a.x - b.x);
+        const first = sorted[0], last = sorted[sorted.length - 1];
+        const totalW = sorted.reduce((s, t) => s + t.w, 0);
+        const span = (last.x + last.w) - first.x;
+        const gap = (span - totalW) / (sorted.length - 1);
+        let cursor = first.x;
+        return sorted.map((t) => { const nt = { ...t, x: snap(cursor) }; cursor += t.w + gap; return nt; });
+      }
+      if (mode === "distV" && tables.length >= 3) {
+        const sorted = [...tables].sort((a, b) => a.y - b.y);
+        const first = sorted[0], last = sorted[sorted.length - 1];
+        const totalH = sorted.reduce((s, t) => s + t.h, 0);
+        const span = (last.y + last.h) - first.y;
+        const gap = (span - totalH) / (sorted.length - 1);
+        let cursor = first.y;
+        return sorted.map((t) => { const nt = { ...t, y: snap(cursor) }; cursor += t.h + gap; return nt; });
+      }
+      return tables;
+    });
+  }
+  function arrangeTablesGrid() {
+    withTables((tables) => {
+      const maxW = Math.max(...tables.map((t) => t.w));
+      const maxH = Math.max(...tables.map((t) => t.h));
+      const gap = 40;
+      const cellW = maxW + gap, cellH = maxH + gap;
+      const cols = Math.max(1, Math.floor((layout.width - gap) / cellW));
+      const startX = snap((layout.width - (Math.min(tables.length, cols) * cellW - gap)) / 2);
+      const startY = 80;
+      return tables.map((t, i) => ({
+        ...t,
+        x: snap(startX + (i % cols) * cellW + (maxW - t.w) / 2),
+        y: snap(startY + Math.floor(i / cols) * cellH + (maxH - t.h) / 2),
+      }));
+    });
+    toast.success("Stoly zarovnané do mriežky");
+  }
+
   // Delete key
   useEffect(() => {
     if (readOnly) return;
@@ -206,6 +285,23 @@ function LayoutEditor() {
                 <Save className="size-4 mr-1" />{save.isPending ? "Ukladám…" : "Uložiť plán"}
               </Button>
             </div>
+          </div>
+        )}
+        {!readOnly && (
+          <div className="flex flex-wrap items-center gap-1 rounded-md border bg-muted/40 p-2 print:hidden">
+            <span className="text-xs text-muted-foreground mr-2 px-1">Zarovnať stoly:</span>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("left")} title="Zarovnať vľavo"><AlignStartVertical className="size-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("hcenter")} title="Centrovať horizontálne"><AlignHorizontalJustifyCenter className="size-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("right")} title="Zarovnať vpravo"><AlignStartVertical className="size-4 rotate-180" /></Button>
+            <span className="mx-1 h-5 w-px bg-border" />
+            <Button variant="ghost" size="sm" onClick={() => alignTables("top")} title="Zarovnať hore"><AlignStartHorizontal className="size-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("vcenter")} title="Centrovať vertikálne"><AlignVerticalJustifyCenter className="size-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("bottom")} title="Zarovnať dole"><AlignStartHorizontal className="size-4 rotate-180" /></Button>
+            <span className="mx-1 h-5 w-px bg-border" />
+            <Button variant="ghost" size="sm" onClick={() => alignTables("distH")} title="Rovnomerne horizontálne">↔ rozložiť</Button>
+            <Button variant="ghost" size="sm" onClick={() => alignTables("distV")} title="Rovnomerne vertikálne">↕ rozložiť</Button>
+            <span className="mx-1 h-5 w-px bg-border" />
+            <Button variant="outline" size="sm" onClick={arrangeTablesGrid} title="Usporiadať do mriežky"><LayoutGrid className="size-4 mr-1" />Mriežka</Button>
           </div>
         )}
         {readOnly && (
@@ -448,6 +544,21 @@ function ElementVisual({ el }: { el: LayoutElement }) {
         >
           {el.label || "Stôl"}
         </div>
+      </div>
+    );
+  }
+  if (el.type === "stage") {
+    return (
+      <div
+        className="w-full h-full rounded-md grid place-items-center text-white font-bold tracking-widest shadow-md"
+        style={{
+          background: "repeating-linear-gradient(90deg, #1f2937 0 24px, #111827 24px 48px)",
+          border: "3px solid #f59e0b",
+          fontSize: 14,
+          letterSpacing: 3,
+        }}
+      >
+        🎤 {el.label || "PÓDIUM"}
       </div>
     );
   }
