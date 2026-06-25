@@ -14,7 +14,7 @@ import { STATUS_LABEL, STATUS_COLOR, type ReservationStatus } from "@/lib/reserv
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/reservations/")({
-  head: () => ({ meta: [{ title: "Rezervácie · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Rezervácie · Mima Production CRM" }] }),
   component: Reservations,
 });
 

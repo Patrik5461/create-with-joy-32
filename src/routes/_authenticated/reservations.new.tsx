@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/app-header";
 import { ReservationForm } from "@/components/reservation-form";
 
 export const Route = createFileRoute("/_authenticated/reservations/new")({
-  head: () => ({ meta: [{ title: "Nová rezervácia · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Nová rezervácia · Mima Production CRM" }] }),
   validateSearch: (s: Record<string, unknown>) => ({ start: typeof s.start === "string" ? s.start : undefined }),
   component: NewReservation,
 });

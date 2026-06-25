@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/clients")({
-  head: () => ({ meta: [{ title: "Klienti · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Klienti · Mima Production CRM" }] }),
   component: Clients,
 });
 

@@ -13,7 +13,7 @@ import { sk } from "date-fns/locale";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/logistics")({
-  head: () => ({ meta: [{ title: "Logistika · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Logistika · Mima Production CRM" }] }),
   component: Logistics,
 });
 

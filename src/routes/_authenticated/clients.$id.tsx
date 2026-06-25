@@ -10,7 +10,7 @@ import { format } from "date-fns";
 import { STATUS_LABEL, STATUS_BADGE_VARIANT, type ReservationStatus } from "@/lib/reservation-status";
 
 export const Route = createFileRoute("/_authenticated/clients/$id")({
-  head: () => ({ meta: [{ title: "Klient · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Klient · Mima Production CRM" }] }),
   component: ClientDetail,
 });
 

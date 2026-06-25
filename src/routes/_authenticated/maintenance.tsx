@@ -17,7 +17,7 @@ import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { PhotoThumb } from "@/components/damage-report-dialog";
 
 export const Route = createFileRoute("/_authenticated/maintenance")({
-  head: () => ({ meta: [{ title: "Údržba nábytku · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Údržba nábytku · Mima Production CRM" }] }),
   component: MaintenancePage,
 });
 
