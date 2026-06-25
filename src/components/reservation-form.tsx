@@ -31,9 +31,29 @@ function fromLocalInput(v: string) {
   return v ? new Date(v).toISOString() : "";
 }
 
-export function ReservationForm({ existingId, initial }: { existingId?: string; initial?: any }) {
+function defaultStart(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function plusHours(localInput: string, hours: number) {
+  if (!localInput) return "";
+  const d = new Date(localInput);
+  d.setHours(d.getHours() + hours);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function ReservationForm({ existingId, initial, initialStart }: { existingId?: string; initial?: any; initialStart?: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+
+  const seedLoad = toLocalInput(initial?.load_at ?? null) || defaultStart(initialStart);
+  const seedEventStart = toLocalInput(initial?.event_start_at ?? null) || (seedLoad ? plusHours(seedLoad, 3) : "");
+  const seedEventEnd = toLocalInput(initial?.event_end_at ?? null) || (seedEventStart ? plusHours(seedEventStart, 5) : "");
+  const seedReturn = toLocalInput(initial?.return_at ?? null) || (seedEventEnd ? plusHours(seedEventEnd, 2) : "");
+  const seedAvailable = toLocalInput(initial?.available_from_at ?? null) || (seedReturn ? plusHours(seedReturn, 1) : "");
 
   const [form, setForm] = useState({
     client_id: initial?.client_id ?? "",
@@ -45,13 +65,15 @@ export function ReservationForm({ existingId, initial }: { existingId?: string; 
     address: initial?.address ?? "",
     note: initial?.note ?? "",
     status: (initial?.status ?? "inquiry") as ReservationStatus,
-    load_at: toLocalInput(initial?.load_at ?? null),
+    load_at: seedLoad,
     depart_at: toLocalInput(initial?.depart_at ?? null),
-    event_start_at: toLocalInput(initial?.event_start_at ?? null),
-    event_end_at: toLocalInput(initial?.event_end_at ?? null),
-    return_at: toLocalInput(initial?.return_at ?? null),
-    available_from_at: toLocalInput(initial?.available_from_at ?? null),
+    event_start_at: seedEventStart,
+    event_end_at: seedEventEnd,
+    return_at: seedReturn,
+    available_from_at: seedAvailable,
   });
+  const [newClientOpen, setNewClientOpen] = useState(false);
+  const [newClient, setNewClient] = useState({ company_name: "", contact_person: "", phone: "", email: "" });
   const [items, setItems] = useState<ItemRow[]>(
     initial?.reservation_items?.map((ri: any) => ({ furniture_item_id: ri.furniture_item_id, qty: ri.qty })) ?? [],
   );
@@ -153,18 +175,52 @@ export function ReservationForm({ existingId, initial }: { existingId?: string; 
     }));
   };
 
+  const createClient = useMutation({
+    mutationFn: async () => {
+      if (!newClient.company_name) throw new Error("Zadajte názov firmy");
+      const { data, error } = await supabase.from("clients").insert(newClient).select("id,company_name,contact_person,phone,email").single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (c: any) => {
+      qc.invalidateQueries({ queryKey: ["clients-min"] });
+      setForm((f) => ({ ...f, client_id: c.id, contact_person: c.contact_person ?? f.contact_person, phone: c.phone ?? f.phone, email: c.email ?? f.email }));
+      setNewClientOpen(false);
+      setNewClient({ company_name: "", contact_person: "", phone: "", email: "" });
+      toast.success("Klient vytvorený");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Chyba"),
+  });
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader><CardTitle className="text-base">Klient a event</CardTitle></CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-3">
           <div className="space-y-1.5 md:col-span-2"><Label>Klient</Label>
-            <Select value={form.client_id} onValueChange={setClient}>
-              <SelectTrigger><SelectValue placeholder="Vyberte klienta" /></SelectTrigger>
-              <SelectContent>
-                {clients.data?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={form.client_id} onValueChange={setClient}>
+                <SelectTrigger className="flex-1"><SelectValue placeholder="Vyberte klienta" /></SelectTrigger>
+                <SelectContent>
+                  {clients.data?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" size="sm" onClick={() => setNewClientOpen((v) => !v)}>
+                <Plus className="size-3.5 mr-1" />Nový
+              </Button>
+            </div>
+            {newClientOpen && (
+              <div className="mt-2 grid sm:grid-cols-2 gap-2 p-3 rounded-md border bg-muted/30">
+                <Input placeholder="Názov firmy *" value={newClient.company_name} onChange={(e) => setNewClient({ ...newClient, company_name: e.target.value })} />
+                <Input placeholder="Kontaktná osoba" value={newClient.contact_person} onChange={(e) => setNewClient({ ...newClient, contact_person: e.target.value })} />
+                <Input placeholder="Telefón" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} />
+                <Input placeholder="Email" type="email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} />
+                <div className="sm:col-span-2 flex justify-end gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setNewClientOpen(false)}>Zrušiť</Button>
+                  <Button type="button" size="sm" onClick={() => createClient.mutate()} disabled={createClient.isPending}>Vytvoriť klienta</Button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="space-y-1.5"><Label>Kontaktná osoba</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Telefón</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
