@@ -147,6 +147,81 @@ function LayoutEditor() {
     setSelectedId(el.id);
   }
 
+  // ---- Alignment helpers (operate on tables) ----
+  function withTables(fn: (tables: LayoutElement[]) => LayoutElement[]) {
+    setLayout((l) => {
+      const tables = l.elements.filter((e) => isTable(e.type));
+      if (tables.length === 0) { toast.info("Žiadne stoly na zarovnanie."); return l; }
+      const updated = fn(tables);
+      const map = new Map(updated.map((e) => [e.id, e]));
+      return { ...l, elements: l.elements.map((e) => map.get(e.id) ?? e) };
+    });
+  }
+  function alignTables(mode: "left" | "right" | "top" | "bottom" | "hcenter" | "vcenter" | "distH" | "distV") {
+    withTables((tables) => {
+      if (mode === "left") {
+        const x = Math.min(...tables.map((t) => t.x));
+        return tables.map((t) => ({ ...t, x: snap(x) }));
+      }
+      if (mode === "right") {
+        const r = Math.max(...tables.map((t) => t.x + t.w));
+        return tables.map((t) => ({ ...t, x: snap(r - t.w) }));
+      }
+      if (mode === "top") {
+        const y = Math.min(...tables.map((t) => t.y));
+        return tables.map((t) => ({ ...t, y: snap(y) }));
+      }
+      if (mode === "bottom") {
+        const b = Math.max(...tables.map((t) => t.y + t.h));
+        return tables.map((t) => ({ ...t, y: snap(b - t.h) }));
+      }
+      if (mode === "hcenter") {
+        const cx = tables.reduce((s, t) => s + t.x + t.w / 2, 0) / tables.length;
+        return tables.map((t) => ({ ...t, x: snap(cx - t.w / 2) }));
+      }
+      if (mode === "vcenter") {
+        const cy = tables.reduce((s, t) => s + t.y + t.h / 2, 0) / tables.length;
+        return tables.map((t) => ({ ...t, y: snap(cy - t.h / 2) }));
+      }
+      if (mode === "distH" && tables.length >= 3) {
+        const sorted = [...tables].sort((a, b) => a.x - b.x);
+        const first = sorted[0], last = sorted[sorted.length - 1];
+        const totalW = sorted.reduce((s, t) => s + t.w, 0);
+        const span = (last.x + last.w) - first.x;
+        const gap = (span - totalW) / (sorted.length - 1);
+        let cursor = first.x;
+        return sorted.map((t) => { const nt = { ...t, x: snap(cursor) }; cursor += t.w + gap; return nt; });
+      }
+      if (mode === "distV" && tables.length >= 3) {
+        const sorted = [...tables].sort((a, b) => a.y - b.y);
+        const first = sorted[0], last = sorted[sorted.length - 1];
+        const totalH = sorted.reduce((s, t) => s + t.h, 0);
+        const span = (last.y + last.h) - first.y;
+        const gap = (span - totalH) / (sorted.length - 1);
+        let cursor = first.y;
+        return sorted.map((t) => { const nt = { ...t, y: snap(cursor) }; cursor += t.h + gap; return nt; });
+      }
+      return tables;
+    });
+  }
+  function arrangeTablesGrid() {
+    withTables((tables) => {
+      const maxW = Math.max(...tables.map((t) => t.w));
+      const maxH = Math.max(...tables.map((t) => t.h));
+      const gap = 40;
+      const cellW = maxW + gap, cellH = maxH + gap;
+      const cols = Math.max(1, Math.floor((layout.width - gap) / cellW));
+      const startX = snap((layout.width - (Math.min(tables.length, cols) * cellW - gap)) / 2);
+      const startY = 80;
+      return tables.map((t, i) => ({
+        ...t,
+        x: snap(startX + (i % cols) * cellW + (maxW - t.w) / 2),
+        y: snap(startY + Math.floor(i / cols) * cellH + (maxH - t.h) / 2),
+      }));
+    });
+    toast.success("Stoly zarovnané do mriežky");
+  }
+
   // Delete key
   useEffect(() => {
     if (readOnly) return;
