@@ -305,16 +305,16 @@ export type Database = {
           contact_person: string | null
           created_at: string
           created_by: string | null
-          depart_at: string
+          depart_at: string | null
           email: string | null
-          event_end_at: string
+          event_end_at: string | null
           event_name: string
-          event_start_at: string
+          event_start_at: string | null
           id: string
           load_at: string
           note: string | null
           phone: string | null
-          return_at: string
+          return_at: string | null
           status: Database["public"]["Enums"]["reservation_status"]
           updated_at: string
           venue: string | null
@@ -326,16 +326,16 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
-          depart_at: string
+          depart_at?: string | null
           email?: string | null
-          event_end_at: string
+          event_end_at?: string | null
           event_name: string
-          event_start_at: string
+          event_start_at?: string | null
           id?: string
           load_at: string
           note?: string | null
           phone?: string | null
-          return_at: string
+          return_at?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
           updated_at?: string
           venue?: string | null
@@ -347,16 +347,16 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
-          depart_at?: string
+          depart_at?: string | null
           email?: string | null
-          event_end_at?: string
+          event_end_at?: string | null
           event_name?: string
-          event_start_at?: string
+          event_start_at?: string | null
           id?: string
           load_at?: string
           note?: string | null
           phone?: string | null
-          return_at?: string
+          return_at?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
           updated_at?: string
           venue?: string | null
