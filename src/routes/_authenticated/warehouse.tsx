@@ -248,10 +248,10 @@ function Warehouse() {
                         <Button size="sm" className="flex-1" onClick={() => { setEditing(i); setOpen(true); }}>
                           <Pencil className="size-3.5 mr-1" />Upraviť
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setDamageFor(i)} title="Nahlásiť poškodenie">
+                        <Button size="sm" variant="ghost" aria-label="Nahlásiť poškodenie" onClick={() => setDamageFor(i)} title="Nahlásiť poškodenie">
                           <AlertTriangle className="size-3.5 text-rose-600" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => toggleActive.mutate(i)} title={i.active ? "Deaktivovať" : "Aktivovať"}>
+                        <Button size="sm" variant="ghost" aria-label={i.active ? "Deaktivovať položku" : "Aktivovať položku"} onClick={() => toggleActive.mutate(i)} title={i.active ? "Deaktivovať" : "Aktivovať"}>
                           <Power className="size-3.5" />
                         </Button>
                       </>

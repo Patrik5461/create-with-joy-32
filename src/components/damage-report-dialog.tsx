@@ -212,6 +212,7 @@ function Inner({ item, reservedNow, onClose }: { item: DamageReportTarget; reser
                 <PhotoThumb path={p} />
                 <button
                   type="button"
+                  aria-label="Odstrániť fotku"
                   onClick={() => removePhoto(p)}
                   className="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100"
                 >
@@ -250,5 +251,5 @@ export function PhotoThumb({ path }: { path: string }) {
     },
   });
   if (!data) return <div className="size-20 rounded-md bg-muted animate-pulse" />;
-  return <img src={data} alt="" className="size-20 rounded-md object-cover border" />;
+  return <img src={data} alt="Fotka poškodenia" className="size-20 rounded-md object-cover border" />;
 }
