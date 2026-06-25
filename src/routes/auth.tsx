@@ -10,47 +10,23 @@ import { toast } from "sonner";
 const mimaLogo = "/mima-logo.png";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Prihlásenie · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Prihlásenie · Mima Production CRM" }] }),
   component: AuthPage,
 });
 
 function AuthPage() {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard", replace: true });
-    });
-  }, [navigate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      toast.error("Nesprávne prihlasovacie údaje");
-      return;
-    }
-    toast.success("Prihlásenie úspešné");
-    navigate({ to: "/dashboard", replace: true });
-  };
-
-  return (
+...
     <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--color-primary)/10,_transparent_60%),_radial-gradient(ellipse_at_bottom_right,_var(--color-accent)/15,_transparent_50%)] bg-background">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <img src={mimaLogo} alt="MimaProduction" className="w-64 h-auto mb-4" />
-          <h1 className="text-xl font-semibold tracking-tight">MimaProduction CRM</h1>
+          <img src={mimaLogo} alt="Mima Production" className="w-64 h-auto mb-4" />
+          <h1 className="text-xl font-semibold tracking-tight">Mima Production CRM</h1>
           <p className="text-sm text-muted-foreground">Interný systém</p>
         </div>
         <Card className="border-border/60 shadow-xl">
           <CardHeader>
             <CardTitle>Prihlásenie</CardTitle>
-            <CardDescription>Prístup len pre zamestnancov MimaProduction.</CardDescription>
+            <CardDescription>Prístup len pre zamestnancov Mima Production.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
