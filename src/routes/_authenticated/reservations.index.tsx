@@ -13,7 +13,7 @@ import { sk } from "date-fns/locale";
 import { STATUS_LABEL, STATUS_COLOR, type ReservationStatus } from "@/lib/reservation-status";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
-export const Route = createFileRoute("/_authenticated/reservations")({
+export const Route = createFileRoute("/_authenticated/reservations/")({
   head: () => ({ meta: [{ title: "Rezervácie · MimaProduction CRM" }] }),
   component: Reservations,
 });
