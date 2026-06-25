@@ -59,33 +59,57 @@ export type Database = {
       damaged_items: {
         Row: {
           created_at: string
+          description: string | null
           furniture_item_id: string
           id: string
+          photo_paths: string[]
           qty: number
           reason: string | null
           reported_at: string
           reported_by: string | null
           reservation_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string
+          stock_applied: boolean
+          updated_at: string
         }
         Insert: {
           created_at?: string
+          description?: string | null
           furniture_item_id: string
           id?: string
+          photo_paths?: string[]
           qty: number
           reason?: string | null
           reported_at?: string
           reported_by?: string | null
           reservation_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          stock_applied?: boolean
+          updated_at?: string
         }
         Update: {
           created_at?: string
+          description?: string | null
           furniture_item_id?: string
           id?: string
+          photo_paths?: string[]
           qty?: number
           reason?: string | null
           reported_at?: string
           reported_by?: string | null
           reservation_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          stock_applied?: boolean
+          updated_at?: string
         }
         Relationships: [
           {
