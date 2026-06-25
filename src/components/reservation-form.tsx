@@ -13,6 +13,17 @@ import { Plus, Trash2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { RESERVATION_STATUSES, STATUS_LABEL, type ReservationStatus } from "@/lib/reservation-status";
 
+const EVENT_COLORS: { value: string; label: string }[] = [
+  { value: "#3b82f6", label: "Modrá" },
+  { value: "#10b981", label: "Zelená" },
+  { value: "#f59e0b", label: "Oranžová" },
+  { value: "#ef4444", label: "Červená" },
+  { value: "#8b5cf6", label: "Fialová" },
+  { value: "#ec4899", label: "Ružová" },
+  { value: "#14b8a6", label: "Tyrkysová" },
+  { value: "#64748b", label: "Sivá" },
+];
+
 interface ItemRow {
   furniture_item_id: string;
   qty: number;
@@ -65,6 +76,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
     address: initial?.address ?? "",
     note: initial?.note ?? "",
     status: (initial?.status ?? "inquiry") as ReservationStatus,
+    color: (initial?.color ?? "#3b82f6") as string,
     load_at: seedLoad,
     depart_at: toLocalInput(initial?.depart_at ?? null),
     event_start_at: seedEventStart,
@@ -118,6 +130,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
         address: form.address || null,
         note: form.note || null,
         status: form.status,
+        color: form.color || null,
         load_at: fromLocalInput(form.load_at),
         depart_at: fromLocalInput(form.depart_at),
         event_start_at: fromLocalInput(form.event_start_at),
@@ -232,6 +245,21 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
                 {RESERVATION_STATUSES.map((s) => <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5"><Label>Farba eventu</Label>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {EVENT_COLORS.map((c) => (
+                <button
+                  type="button"
+                  key={c.value}
+                  onClick={() => setForm({ ...form, color: c.value })}
+                  title={c.label}
+                  aria-label={c.label}
+                  className={`size-7 rounded-full border-2 transition-all ${form.color === c.value ? "border-foreground scale-110" : "border-transparent hover:scale-105"}`}
+                  style={{ backgroundColor: c.value }}
+                />
+              ))}
+            </div>
           </div>
           <div className="space-y-1.5 md:col-span-2"><Label>Názov eventu</Label><Input value={form.event_name} onChange={(e) => setForm({ ...form, event_name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Miesto konania</Label><Input value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} /></div>

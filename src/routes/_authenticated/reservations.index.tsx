@@ -38,7 +38,7 @@ function Reservations() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservations")
-        .select("id, event_name, venue, status, load_at, event_start_at, event_end_at, return_at, clients(company_name)")
+        .select("id, event_name, venue, status, color, load_at, event_start_at, event_end_at, return_at, clients(company_name)")
         .gte("event_start_at", range.from.toISOString())
         .lte("event_start_at", range.to.toISOString())
         .order("event_start_at");
@@ -110,9 +110,13 @@ function Reservations() {
 
 function ReservationCard({ r }: { r: any }) {
   const cls = STATUS_COLOR[r.status as ReservationStatus] ?? "";
+  const color = r.color as string | null;
   return (
     <Link to="/reservations/$id" params={{ id: r.id }} className="block">
-      <Card className={`transition-colors border-l-4 ${cls}`}>
+      <Card
+        className={`transition-colors border-l-4 ${color ? "" : cls}`}
+        style={color ? { borderLeftColor: color } : undefined}
+      >
         <CardContent className="p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -205,9 +209,15 @@ function MonthGrid({ cursor, reservations, onSlot, canCreate }: { cursor: Date; 
             >
               <div className="font-semibold mb-1">{format(day, "d")}</div>
               {list.slice(0, 3).map((r) => (
-                <Link key={r.id} to="/reservations/$id" params={{ id: r.id }} className={`block truncate rounded px-1 py-0.5 mb-0.5 border ${STATUS_COLOR[r.status as ReservationStatus] ?? ""}`}>
-                  {format(new Date(r.event_start_at), "HH:mm")} {r.event_name}
-                </Link>
+              <Link
+                key={r.id}
+                to="/reservations/$id"
+                params={{ id: r.id }}
+                className={`block truncate rounded px-1 py-0.5 mb-0.5 border ${r.color ? "text-white border-transparent" : STATUS_COLOR[r.status as ReservationStatus] ?? ""}`}
+                style={r.color ? { backgroundColor: r.color } : undefined}
+              >
+                {format(new Date(r.event_start_at), "HH:mm")} {r.event_name}
+              </Link>
               ))}
               {list.length > 3 && <div className="text-muted-foreground">+{list.length - 3}</div>}
             </div>

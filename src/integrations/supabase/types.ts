@@ -329,6 +329,7 @@ export type Database = {
           address: string | null
           available_from_at: string
           client_id: string | null
+          color: string | null
           contact_person: string | null
           created_at: string
           created_by: string | null
@@ -351,6 +352,7 @@ export type Database = {
           address?: string | null
           available_from_at: string
           client_id?: string | null
+          color?: string | null
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
@@ -373,6 +375,7 @@ export type Database = {
           address?: string | null
           available_from_at?: string
           client_id?: string | null
+          color?: string | null
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
