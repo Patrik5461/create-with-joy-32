@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, Building2, LayoutPanelTop } from "lucide-react";
+import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, Building2, LayoutPanelTop, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -75,6 +75,21 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+        <SidebarGroup>
+          <SidebarGroupLabel>Nastavenia</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive("/settings")} tooltip="Nastavenia">
+                  <Link to="/settings/calendar" className="flex items-center gap-2">
+                    <Settings className="size-4" />
+                    <span>Prepojenie kalendára</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
     </Sidebar>
   );

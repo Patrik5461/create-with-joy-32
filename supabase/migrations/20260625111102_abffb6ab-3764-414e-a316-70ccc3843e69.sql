@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.rotate_my_ics_token();
