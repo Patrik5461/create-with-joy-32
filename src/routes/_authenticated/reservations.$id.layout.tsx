@@ -56,7 +56,7 @@ interface LayoutData {
 }
 
 interface ExportLayoutOptions {
-  node: HTMLElement;
+  layout: LayoutData;
   filename: string;
   width: number;
   height: number;
@@ -92,21 +92,94 @@ function isTable(t: ElType) { return t === "rect_table" || t === "round_table" |
 function snap(v: number) { return Math.round(v / GRID) * GRID; }
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
-const exportLayoutAsPng = createClientOnlyFn(async ({ node, filename }: ExportLayoutOptions) => {
-  const { toPng } = await import("html-to-image");
-  const dataUrl = await toPng(node, { backgroundColor: "#ffffff", pixelRatio: 2 });
+function escapeXml(value: string) {
+  return value.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char] ?? char);
+}
+
+function layoutToSvg(layout: LayoutData) {
+  const gridLines: string[] = [];
+  for (let x = 0; x <= layout.width; x += GRID) gridLines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${layout.height}" stroke="#e5e7eb" stroke-width="1"/>`);
+  for (let y = 0; y <= layout.height; y += GRID) gridLines.push(`<line x1="0" y1="${y}" x2="${layout.width}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/>`);
+
+  const elements = layout.elements.map((el) => {
+    const cx = el.x + el.w / 2;
+    const cy = el.y + el.h / 2;
+    const label = escapeXml(el.label || (isZone(el.type) ? "Zóna" : el.type === "stage" ? "PÓDIUM" : el.type === "chair" ? "" : "Stôl"));
+    const transform = `translate(${el.x} ${el.y}) rotate(${el.rotation} ${el.w / 2} ${el.h / 2})`;
+
+    if (el.type === "chair") {
+      return `<g transform="${transform}"><rect width="${el.w}" height="${el.h}" rx="6" fill="#e2e8f0" stroke="#94a3b8"/><text x="${el.w / 2}" y="${el.h / 2 + 4}" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2937">${label}</text></g>`;
+    }
+    if (el.type === "rect_table") {
+      return `<g transform="${transform}"><rect width="${el.w}" height="${el.h}" rx="6" fill="#fef3c7" stroke="#b45309" stroke-width="2"/><text x="${el.w / 2}" y="${el.h / 2 + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2937">${label}</text></g>`;
+    }
+    if (el.type === "round_table") {
+      return `<g transform="${transform}"><ellipse cx="${el.w / 2}" cy="${el.h / 2}" rx="${el.w / 2}" ry="${el.h / 2}" fill="#fef3c7" stroke="#b45309" stroke-width="2"/><text x="${el.w / 2}" y="${el.h / 2 + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2937">${label}</text></g>`;
+    }
+    if (el.type === "round_table_chairs") {
+      const n = el.chairCount ?? 8;
+      const tableSize = Math.min(el.w, el.h) * 0.55;
+      const chairSize = Math.min(el.w, el.h) * 0.18;
+      const radius = Math.min(el.w, el.h) / 2 - chairSize / 2;
+      const chairs = Array.from({ length: n }).map((_, i) => {
+        const angle = (i / n) * Math.PI * 2;
+        const x = el.w / 2 + Math.cos(angle) * radius - chairSize / 2;
+        const y = el.h / 2 + Math.sin(angle) * radius - chairSize / 2;
+        return `<rect x="${x}" y="${y}" width="${chairSize}" height="${chairSize}" rx="4" fill="#e2e8f0" stroke="#94a3b8"/>`;
+      }).join("");
+      return `<g transform="${transform}">${chairs}<circle cx="${el.w / 2}" cy="${el.h / 2}" r="${tableSize / 2}" fill="#fef3c7" stroke="#b45309" stroke-width="2"/><text x="${el.w / 2}" y="${el.h / 2 + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2937">${label}</text></g>`;
+    }
+    if (el.type === "stage") {
+      return `<g transform="${transform}"><rect width="${el.w}" height="${el.h}" rx="6" fill="#111827" stroke="#f59e0b" stroke-width="3"/><path d="${Array.from({ length: Math.ceil(el.w / 48) }).map((_, i) => `M ${i * 48 + 24} 0 V ${el.h}`).join(" ")}" stroke="#1f2937" stroke-width="24"/><text x="${el.w / 2}" y="${el.h / 2 + 5}" text-anchor="middle" font-size="14" font-weight="800" letter-spacing="3" fill="#ffffff">${label}</text></g>`;
+    }
+
+    const color = el.color ?? "#0ea5e9";
+    return `<g transform="${transform}"><rect width="${el.w}" height="${el.h}" rx="8" fill="${color}33" stroke="${color}" stroke-width="2" stroke-dasharray="8 6"/><text x="${el.w / 2}" y="${el.h / 2 + 5}" text-anchor="middle" font-size="14" font-weight="700" fill="${color}">${label}</text></g>`;
+  }).join("");
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}"><rect width="100%" height="100%" fill="#ffffff"/>${gridLines.join("")}${elements}</svg>`;
+}
+
+const exportLayoutAsPng = createClientOnlyFn(async ({ layout, filename }: ExportLayoutOptions) => {
+  const svg = layoutToSvg(layout);
+  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = layout.width * 2;
+      canvas.height = layout.height * 2;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        reject(new Error("Canvas export nie je dostupný."));
+        return;
+      }
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.scale(2, 2);
+      context.drawImage(image, 0, 0);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Export obrázka zlyhal."));
+    };
+    image.src = url;
+  });
   const link = document.createElement("a");
   link.href = dataUrl;
   link.download = `${filename}.png`;
   link.click();
 });
 
-const exportLayoutAsPdf = createClientOnlyFn(async ({ node, filename, width, height }: ExportLayoutOptions) => {
-  const [{ toPng }, { jsPDF }] = await Promise.all([import("html-to-image"), import("jspdf")]);
-  const dataUrl = await toPng(node, { backgroundColor: "#ffffff", pixelRatio: 2 });
-  const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: [width, height] });
-  pdf.addImage(dataUrl, "PNG", 0, 0, width, height);
-  pdf.save(`${filename}.pdf`);
+const exportLayoutAsPdf = createClientOnlyFn(async ({ layout, filename, width, height }: ExportLayoutOptions) => {
+  const svg = layoutToSvg(layout);
+  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1200,height=800");
+  if (!printWindow) throw new Error("Prehliadač zablokoval otvorenie okna pre PDF export.");
+  printWindow.document.write(`<!doctype html><html><head><title>${escapeXml(filename)}</title><style>@page{size:landscape;margin:10mm}body{margin:0;background:#fff;font-family:Arial,sans-serif}.wrap{width:100vw;height:100vh;display:grid;place-items:center}svg{max-width:100%;max-height:100%;width:auto;height:auto}</style></head><body><div class="wrap">${svg}</div><script>window.onload=()=>{window.focus();window.print();};</script></body></html>`);
+  printWindow.document.close();
 });
 
 // ---------------- Component ----------------
