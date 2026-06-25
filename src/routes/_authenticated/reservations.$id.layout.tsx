@@ -135,6 +135,15 @@ function LayoutEditor() {
     setLayout((l) => ({ ...l, elements: l.elements.filter((e) => e.id !== id) }));
     setSelectedId(null);
   }
+  function duplicateEl(id: string) {
+    setLayout((l) => {
+      const src = l.elements.find((e) => e.id === id);
+      if (!src) return l;
+      const copy: LayoutElement = { ...src, id: uid(), x: snap(src.x + 30), y: snap(src.y + 30) };
+      setSelectedId(copy.id);
+      return { ...l, elements: [...l.elements, copy] };
+    });
+  }
   function addEl(type: ElType, x = 100, y = 100) {
     const def = PALETTE.find((p) => p.type === type)!;
     const el: LayoutElement = {
@@ -230,6 +239,7 @@ function LayoutEditor() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); removeEl(selectedId); }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateEl(selectedId); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
