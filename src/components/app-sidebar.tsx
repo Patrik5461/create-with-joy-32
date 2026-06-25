@@ -19,7 +19,7 @@ const mainItems = [
   { title: "Sklad", url: "/warehouse", icon: Package },
   { title: "Klienti", url: "/clients", icon: Users },
   { title: "Logistika", url: "/logistics", icon: Truck },
-  { title: "Plán eventu", url: "/layouts", icon: LayoutPanelTop },
+  { title: "Plán rozloženia", url: "/layouts", icon: LayoutPanelTop },
 ] as const;
 
 export function AppSidebar() {
