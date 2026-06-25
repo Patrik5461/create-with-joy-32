@@ -23,6 +23,7 @@ import { Route as AuthenticatedReservationsNewRouteImport } from './routes/_auth
 import { Route as AuthenticatedReservationsIdRouteImport } from './routes/_authenticated/reservations.$id'
 import { Route as AuthenticatedClientsIdRouteImport } from './routes/_authenticated/clients.$id'
 import { Route as AuthenticatedReservationsIdIndexRouteImport } from './routes/_authenticated/reservations.$id.index'
+import { Route as ApiPublicCalendarTokenRouteImport } from './routes/api/public/calendar.$token'
 import { Route as AuthenticatedReservationsIdLayoutRouteImport } from './routes/_authenticated/reservations.$id.layout'
 
 const AuthRoute = AuthRouteImport.update({
@@ -98,6 +99,11 @@ const AuthenticatedReservationsIdIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedReservationsIdRoute,
   } as any)
+const ApiPublicCalendarTokenRoute = ApiPublicCalendarTokenRouteImport.update({
+  id: '/api/public/calendar/$token',
+  path: '/api/public/calendar/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedReservationsIdLayoutRoute =
   AuthenticatedReservationsIdLayoutRouteImport.update({
     id: '/layout',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
+  '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
   '/reservations/$id/': typeof AuthenticatedReservationsIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/reservations': typeof AuthenticatedReservationsIndexRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
+  '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
   '/reservations/$id': typeof AuthenticatedReservationsIdIndexRoute
 }
 export interface FileRoutesById {
@@ -152,6 +160,7 @@ export interface FileRoutesById {
   '/_authenticated/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/_authenticated/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/_authenticated/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
+  '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
   '/_authenticated/reservations/$id/': typeof AuthenticatedReservationsIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/reservations/new'
     | '/reservations/'
     | '/reservations/$id/layout'
+    | '/api/public/calendar/$token'
     | '/reservations/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
     | '/reservations/new'
     | '/reservations'
     | '/reservations/$id/layout'
+    | '/api/public/calendar/$token'
     | '/reservations/$id'
   id:
     | '__root__'
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reservations/new'
     | '/_authenticated/reservations/'
     | '/_authenticated/reservations/$id/layout'
+    | '/api/public/calendar/$token'
     | '/_authenticated/reservations/$id/'
   fileRoutesById: FileRoutesById
 }
@@ -209,6 +221,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicCalendarTokenRoute: typeof ApiPublicCalendarTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -311,6 +324,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReservationsIdIndexRouteImport
       parentRoute: typeof AuthenticatedReservationsIdRoute
     }
+    '/api/public/calendar/$token': {
+      id: '/api/public/calendar/$token'
+      path: '/api/public/calendar/$token'
+      fullPath: '/api/public/calendar/$token'
+      preLoaderRoute: typeof ApiPublicCalendarTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/reservations/$id/layout': {
       id: '/_authenticated/reservations/$id/layout'
       path: '/layout'
@@ -382,6 +402,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicCalendarTokenRoute: ApiPublicCalendarTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
