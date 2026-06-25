@@ -73,8 +73,8 @@ function Logistics() {
         <p className="text-sm text-muted-foreground capitalize">{format(day, "EEEE d. MMMM yyyy", { locale: sk })}</p>
 
         <div className="grid lg:grid-cols-2 gap-4">
-          <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p) => saveNote.mutate(p)} />
-          <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p) => saveNote.mutate(p)} />
+          <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
+          <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
         </div>
       </div>
     </>
