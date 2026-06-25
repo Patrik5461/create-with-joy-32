@@ -421,9 +421,15 @@ function LayoutEditor() {
                         <input type="color" value={selected.color ?? "#0ea5e9"} onChange={(e) => updateEl(selected.id, { color: e.target.value })} className="w-full h-8 rounded border" />
                       </div>
                     )}
-                    <Button variant="destructive" size="sm" className="w-full" onClick={() => removeEl(selected.id)}>
-                      <Trash2 className="size-4 mr-1" />Vymazať
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" size="sm" onClick={() => duplicateEl(selected.id)}>
+                        <Copy className="size-4 mr-1" />Kopírovať
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => removeEl(selected.id)}>
+                        <Trash2 className="size-4 mr-1" />Vymazať
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Tip: Ctrl/Cmd + D duplikuje označený prvok.</p>
                   </div>
                 )}
 
