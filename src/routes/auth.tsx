@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Building2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import mimaLogo from "@/assets/mima-logo.png.asset.json";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Prihlásenie · MimaProduction CRM" }] }),
@@ -41,14 +42,10 @@ function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--color-primary)/10,_transparent_60%),_radial-gradient(ellipse_at_bottom_right,_var(--color-accent)/15,_transparent_50%)] bg-background">
       <div className="w-full max-w-md">
-        <div className="flex items-center gap-3 justify-center mb-8">
-          <div className="size-12 rounded-xl bg-sidebar grid place-items-center text-sidebar-primary">
-            <Building2 className="size-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">MimaProduction CRM</h1>
-            <p className="text-sm text-muted-foreground">Interný systém</p>
-          </div>
+        <div className="flex flex-col items-center mb-8">
+          <img src={mimaLogo.url} alt="MimaProduction" className="w-64 h-auto mb-4" />
+          <h1 className="text-xl font-semibold tracking-tight">MimaProduction CRM</h1>
+          <p className="text-sm text-muted-foreground">Interný systém</p>
         </div>
         <Card className="border-border/60 shadow-xl">
           <CardHeader>
