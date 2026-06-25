@@ -20,6 +20,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedReservationsIndexRouteImport } from './routes/_authenticated/reservations.index'
 import { Route as AuthenticatedReservationsNewRouteImport } from './routes/_authenticated/reservations.new'
+import { Route as AuthenticatedReservationsIdRouteImport } from './routes/_authenticated/reservations.$id'
 import { Route as AuthenticatedClientsIdRouteImport } from './routes/_authenticated/clients.$id'
 import { Route as AuthenticatedReservationsIdIndexRouteImport } from './routes/_authenticated/reservations.$id.index'
 import { Route as AuthenticatedReservationsIdLayoutRouteImport } from './routes/_authenticated/reservations.$id.layout'
@@ -80,6 +81,12 @@ const AuthenticatedReservationsNewRoute =
     path: '/reservations/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedReservationsIdRoute =
+  AuthenticatedReservationsIdRouteImport.update({
+    id: '/reservations/$id',
+    path: '/reservations/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClientsIdRoute = AuthenticatedClientsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -87,15 +94,15 @@ const AuthenticatedClientsIdRoute = AuthenticatedClientsIdRouteImport.update({
 } as any)
 const AuthenticatedReservationsIdIndexRoute =
   AuthenticatedReservationsIdIndexRouteImport.update({
-    id: '/reservations/$id/',
-    path: '/reservations/$id/',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedReservationsIdRoute,
   } as any)
 const AuthenticatedReservationsIdLayoutRoute =
   AuthenticatedReservationsIdLayoutRouteImport.update({
-    id: '/reservations/$id/layout',
-    path: '/reservations/$id/layout',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/layout',
+    path: '/layout',
+    getParentRoute: () => AuthenticatedReservationsIdRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -108,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/users': typeof AuthenticatedUsersRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
+  '/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/warehouse': typeof AuthenticatedWarehouseRoute
   '/_authenticated/clients/$id': typeof AuthenticatedClientsIdRoute
+  '/_authenticated/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/_authenticated/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/_authenticated/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/_authenticated/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/warehouse'
     | '/clients/$id'
+    | '/reservations/$id'
     | '/reservations/new'
     | '/reservations/'
     | '/reservations/$id/layout'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/_authenticated/users'
     | '/_authenticated/warehouse'
     | '/_authenticated/clients/$id'
+    | '/_authenticated/reservations/$id'
     | '/_authenticated/reservations/new'
     | '/_authenticated/reservations/'
     | '/_authenticated/reservations/$id/layout'
@@ -279,6 +290,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReservationsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/reservations/$id': {
+      id: '/_authenticated/reservations/$id'
+      path: '/reservations/$id'
+      fullPath: '/reservations/$id'
+      preLoaderRoute: typeof AuthenticatedReservationsIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/clients/$id': {
       id: '/_authenticated/clients/$id'
       path: '/$id'
@@ -288,17 +306,17 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/reservations/$id/': {
       id: '/_authenticated/reservations/$id/'
-      path: '/reservations/$id'
+      path: '/'
       fullPath: '/reservations/$id/'
       preLoaderRoute: typeof AuthenticatedReservationsIdIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedReservationsIdRoute
     }
     '/_authenticated/reservations/$id/layout': {
       id: '/_authenticated/reservations/$id/layout'
-      path: '/reservations/$id/layout'
+      path: '/layout'
       fullPath: '/reservations/$id/layout'
       preLoaderRoute: typeof AuthenticatedReservationsIdLayoutRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedReservationsIdRoute
     }
   }
 }
@@ -314,6 +332,24 @@ const AuthenticatedClientsRouteChildren: AuthenticatedClientsRouteChildren = {
 const AuthenticatedClientsRouteWithChildren =
   AuthenticatedClientsRoute._addFileChildren(AuthenticatedClientsRouteChildren)
 
+interface AuthenticatedReservationsIdRouteChildren {
+  AuthenticatedReservationsIdLayoutRoute: typeof AuthenticatedReservationsIdLayoutRoute
+  AuthenticatedReservationsIdIndexRoute: typeof AuthenticatedReservationsIdIndexRoute
+}
+
+const AuthenticatedReservationsIdRouteChildren: AuthenticatedReservationsIdRouteChildren =
+  {
+    AuthenticatedReservationsIdLayoutRoute:
+      AuthenticatedReservationsIdLayoutRoute,
+    AuthenticatedReservationsIdIndexRoute:
+      AuthenticatedReservationsIdIndexRoute,
+  }
+
+const AuthenticatedReservationsIdRouteWithChildren =
+  AuthenticatedReservationsIdRoute._addFileChildren(
+    AuthenticatedReservationsIdRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -321,10 +357,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLogisticsRoute: typeof AuthenticatedLogisticsRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedWarehouseRoute: typeof AuthenticatedWarehouseRoute
+  AuthenticatedReservationsIdRoute: typeof AuthenticatedReservationsIdRouteWithChildren
   AuthenticatedReservationsNewRoute: typeof AuthenticatedReservationsNewRoute
   AuthenticatedReservationsIndexRoute: typeof AuthenticatedReservationsIndexRoute
-  AuthenticatedReservationsIdLayoutRoute: typeof AuthenticatedReservationsIdLayoutRoute
-  AuthenticatedReservationsIdIndexRoute: typeof AuthenticatedReservationsIdIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -334,11 +369,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLogisticsRoute: AuthenticatedLogisticsRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedWarehouseRoute: AuthenticatedWarehouseRoute,
+  AuthenticatedReservationsIdRoute:
+    AuthenticatedReservationsIdRouteWithChildren,
   AuthenticatedReservationsNewRoute: AuthenticatedReservationsNewRoute,
   AuthenticatedReservationsIndexRoute: AuthenticatedReservationsIndexRoute,
-  AuthenticatedReservationsIdLayoutRoute:
-    AuthenticatedReservationsIdLayoutRoute,
-  AuthenticatedReservationsIdIndexRoute: AuthenticatedReservationsIdIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -352,3 +386,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
