@@ -17,7 +17,7 @@ import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { PhotoThumb } from "@/components/damage-report-dialog";
 
 export const Route = createFileRoute("/_authenticated/maintenance")({
-  head: () => ({ meta: [{ title: "Údržba · MimaProduction CRM" }] }),
+  head: () => ({ meta: [{ title: "Údržba nábytku · MimaProduction CRM" }] }),
   component: MaintenancePage,
 });
 
@@ -123,7 +123,7 @@ function MaintenancePage() {
 
   return (
     <>
-      <AppHeader title="Údržba" />
+      <AppHeader title="Údržba nábytku" />
       <div className="p-4 md:p-6 space-y-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
