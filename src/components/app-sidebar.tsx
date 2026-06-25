@@ -19,7 +19,7 @@ const mainItems = [
   { title: "Sklad", url: "/warehouse", icon: Package },
   { title: "Klienti", url: "/clients", icon: Users },
   { title: "Logistika", url: "/logistics", icon: Truck },
-  { title: "Údržba", url: "/maintenance", icon: Wrench },
+  { title: "Údržba nábytku", url: "/maintenance", icon: Wrench },
   { title: "Plán rozloženia", url: "/layouts", icon: LayoutPanelTop },
 ] as const;
 
