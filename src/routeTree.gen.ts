@@ -13,8 +13,11 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedWarehouseRouteImport } from './routes/_authenticated/warehouse'
+import { Route as AuthenticatedReservationsRouteImport } from './routes/_authenticated/reservations'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
+import { Route as AuthenticatedReservationsNewRouteImport } from './routes/_authenticated/reservations.new'
+import { Route as AuthenticatedReservationsIdRouteImport } from './routes/_authenticated/reservations.$id'
 import { Route as AuthenticatedClientsIdRouteImport } from './routes/_authenticated/clients.$id'
 
 const AuthRoute = AuthRouteImport.update({
@@ -36,6 +39,12 @@ const AuthenticatedWarehouseRoute = AuthenticatedWarehouseRouteImport.update({
   path: '/warehouse',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedReservationsRoute =
+  AuthenticatedReservationsRouteImport.update({
+    id: '/reservations',
+    path: '/reservations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -46,6 +55,18 @@ const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedReservationsNewRoute =
+  AuthenticatedReservationsNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AuthenticatedReservationsRoute,
+  } as any)
+const AuthenticatedReservationsIdRoute =
+  AuthenticatedReservationsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedReservationsRoute,
+  } as any)
 const AuthenticatedClientsIdRoute = AuthenticatedClientsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -57,16 +78,22 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/clients': typeof AuthenticatedClientsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/reservations': typeof AuthenticatedReservationsRouteWithChildren
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
+  '/reservations/$id': typeof AuthenticatedReservationsIdRoute
+  '/reservations/new': typeof AuthenticatedReservationsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/clients': typeof AuthenticatedClientsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/reservations': typeof AuthenticatedReservationsRouteWithChildren
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
+  '/reservations/$id': typeof AuthenticatedReservationsIdRoute
+  '/reservations/new': typeof AuthenticatedReservationsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -75,8 +102,11 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/reservations': typeof AuthenticatedReservationsRouteWithChildren
   '/_authenticated/warehouse': typeof AuthenticatedWarehouseRoute
   '/_authenticated/clients/$id': typeof AuthenticatedClientsIdRoute
+  '/_authenticated/reservations/$id': typeof AuthenticatedReservationsIdRoute
+  '/_authenticated/reservations/new': typeof AuthenticatedReservationsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -85,10 +115,22 @@ export interface FileRouteTypes {
     | '/auth'
     | '/clients'
     | '/dashboard'
+    | '/reservations'
     | '/warehouse'
     | '/clients/$id'
+    | '/reservations/$id'
+    | '/reservations/new'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/clients' | '/dashboard' | '/warehouse' | '/clients/$id'
+  to:
+    | '/'
+    | '/auth'
+    | '/clients'
+    | '/dashboard'
+    | '/reservations'
+    | '/warehouse'
+    | '/clients/$id'
+    | '/reservations/$id'
+    | '/reservations/new'
   id:
     | '__root__'
     | '/'
@@ -96,8 +138,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/clients'
     | '/_authenticated/dashboard'
+    | '/_authenticated/reservations'
     | '/_authenticated/warehouse'
     | '/_authenticated/clients/$id'
+    | '/_authenticated/reservations/$id'
+    | '/_authenticated/reservations/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -136,6 +181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWarehouseRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/reservations': {
+      id: '/_authenticated/reservations'
+      path: '/reservations'
+      fullPath: '/reservations'
+      preLoaderRoute: typeof AuthenticatedReservationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -149,6 +201,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/clients'
       preLoaderRoute: typeof AuthenticatedClientsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reservations/new': {
+      id: '/_authenticated/reservations/new'
+      path: '/new'
+      fullPath: '/reservations/new'
+      preLoaderRoute: typeof AuthenticatedReservationsNewRouteImport
+      parentRoute: typeof AuthenticatedReservationsRoute
+    }
+    '/_authenticated/reservations/$id': {
+      id: '/_authenticated/reservations/$id'
+      path: '/$id'
+      fullPath: '/reservations/$id'
+      preLoaderRoute: typeof AuthenticatedReservationsIdRouteImport
+      parentRoute: typeof AuthenticatedReservationsRoute
     }
     '/_authenticated/clients/$id': {
       id: '/_authenticated/clients/$id'
@@ -171,15 +237,33 @@ const AuthenticatedClientsRouteChildren: AuthenticatedClientsRouteChildren = {
 const AuthenticatedClientsRouteWithChildren =
   AuthenticatedClientsRoute._addFileChildren(AuthenticatedClientsRouteChildren)
 
+interface AuthenticatedReservationsRouteChildren {
+  AuthenticatedReservationsIdRoute: typeof AuthenticatedReservationsIdRoute
+  AuthenticatedReservationsNewRoute: typeof AuthenticatedReservationsNewRoute
+}
+
+const AuthenticatedReservationsRouteChildren: AuthenticatedReservationsRouteChildren =
+  {
+    AuthenticatedReservationsIdRoute: AuthenticatedReservationsIdRoute,
+    AuthenticatedReservationsNewRoute: AuthenticatedReservationsNewRoute,
+  }
+
+const AuthenticatedReservationsRouteWithChildren =
+  AuthenticatedReservationsRoute._addFileChildren(
+    AuthenticatedReservationsRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedReservationsRoute: typeof AuthenticatedReservationsRouteWithChildren
   AuthenticatedWarehouseRoute: typeof AuthenticatedWarehouseRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedClientsRoute: AuthenticatedClientsRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedReservationsRoute: AuthenticatedReservationsRouteWithChildren,
   AuthenticatedWarehouseRoute: AuthenticatedWarehouseRoute,
 }
 
