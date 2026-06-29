@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DotaznikTokenRouteImport } from './routes/dotaznik.$token'
 import { Route as AuthenticatedWarehouseRouteImport } from './routes/_authenticated/warehouse'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -45,6 +46,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DotaznikTokenRoute = DotaznikTokenRouteImport.update({
+  id: '/dotaznik/$token',
+  path: '/dotaznik/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedWarehouseRoute = AuthenticatedWarehouseRouteImport.update({
@@ -168,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/users': typeof AuthenticatedUsersRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
+  '/dotaznik/$token': typeof DotaznikTokenRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/quotes/$id': typeof AuthenticatedQuotesIdRoute
   '/quotes/new': typeof AuthenticatedQuotesNewRoute
@@ -191,6 +198,7 @@ export interface FileRoutesByTo {
   '/maintenance': typeof AuthenticatedMaintenanceRoute
   '/users': typeof AuthenticatedUsersRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
+  '/dotaznik/$token': typeof DotaznikTokenRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/quotes/$id': typeof AuthenticatedQuotesIdRoute
   '/quotes/new': typeof AuthenticatedQuotesNewRoute
@@ -216,6 +224,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/warehouse': typeof AuthenticatedWarehouseRoute
+  '/dotaznik/$token': typeof DotaznikTokenRoute
   '/_authenticated/clients/$id': typeof AuthenticatedClientsIdRoute
   '/_authenticated/quotes/$id': typeof AuthenticatedQuotesIdRoute
   '/_authenticated/quotes/new': typeof AuthenticatedQuotesNewRoute
@@ -242,6 +251,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/users'
     | '/warehouse'
+    | '/dotaznik/$token'
     | '/clients/$id'
     | '/quotes/$id'
     | '/quotes/new'
@@ -265,6 +275,7 @@ export interface FileRouteTypes {
     | '/maintenance'
     | '/users'
     | '/warehouse'
+    | '/dotaznik/$token'
     | '/clients/$id'
     | '/quotes/$id'
     | '/quotes/new'
@@ -289,6 +300,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/users'
     | '/_authenticated/warehouse'
+    | '/dotaznik/$token'
     | '/_authenticated/clients/$id'
     | '/_authenticated/quotes/$id'
     | '/_authenticated/quotes/new'
@@ -307,6 +319,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  DotaznikTokenRoute: typeof DotaznikTokenRoute
   ApiPublicCalendarTokenRoute: typeof ApiPublicCalendarTokenRoute
 }
 
@@ -331,6 +344,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dotaznik/$token': {
+      id: '/dotaznik/$token'
+      path: '/dotaznik/$token'
+      fullPath: '/dotaznik/$token'
+      preLoaderRoute: typeof DotaznikTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/warehouse': {
@@ -562,6 +582,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  DotaznikTokenRoute: DotaznikTokenRoute,
   ApiPublicCalendarTokenRoute: ApiPublicCalendarTokenRoute,
 }
 export const routeTree = rootRouteImport

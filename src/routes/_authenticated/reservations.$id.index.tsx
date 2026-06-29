@@ -14,6 +14,7 @@ import { sk } from "date-fns/locale";
 import { RESERVATION_STATUSES, STATUS_LABEL, STATUS_BADGE_VARIANT, type ReservationStatus } from "@/lib/reservation-status";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
+import { SurveyCard } from "@/components/survey-card";
 
 export const Route = createFileRoute("/_authenticated/reservations/$id/")({
   head: () => ({ meta: [{ title: "Rezervácia · Mima Production CRM" }] }),
@@ -142,6 +143,10 @@ function ReservationDetail() {
                 ))}
               </CardContent>
             </Card>
+
+            <div className="lg:col-span-3">
+              <SurveyCard reservationId={r.id} email={r.email} canGenerate={canEdit} />
+            </div>
           </div>
         )}
       </div>

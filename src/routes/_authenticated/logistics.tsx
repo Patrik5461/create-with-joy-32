@@ -29,7 +29,7 @@ function Logistics() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservations")
-        .select("id,event_name,venue,address,load_at,depart_at,return_at,event_start_at,event_end_at,available_from_at,note,clients(company_name),logistics(id,internal_note,load_time,unload_time,return_time)")
+        .select("id,event_name,venue,address,load_at,depart_at,return_at,event_start_at,event_end_at,available_from_at,note,clients(company_name),logistics(id,internal_note,load_time,unload_time,return_time),logistics_surveys(status,floor,has_elevator,elevator_info,access_type,access_note,parking_note,distance_info,onsite_contact_name,onsite_contact_phone,time_restrictions)")
         .or(`and(load_at.gte.${from.toISOString()},load_at.lte.${to.toISOString()}),and(return_at.gte.${from.toISOString()},return_at.lte.${to.toISOString()})`)
         .neq("status", "cancelled");
       if (error) throw error;
@@ -103,6 +103,7 @@ function LogColumn({ title, icon: Icon, list, type, onSave }: any) {
                 </div>
               </div>
               <NoteEditor reservationId={r.id} logisticsId={log?.id} initial={log?.internal_note ?? ""} onSave={onSave} />
+              <SurveySummary survey={r.logistics_surveys?.[0]} />
             </div>
           );
         })}
@@ -118,6 +119,30 @@ function NoteEditor({ reservationId, logisticsId, initial, onSave }: any) {
     <div className="space-y-1">
       <Textarea rows={2} placeholder="Interná poznámka pre tím…" value={val} onChange={(e) => { setVal(e.target.value); setDirty(true); }} />
       {dirty && <Button size="sm" variant="outline" onClick={() => { onSave({ reservationId, note: val, logisticsId }); setDirty(false); }}>Uložiť poznámku</Button>}
+    </div>
+  );
+}
+
+const ACCESS_LABEL: Record<string, string> = { direct: "Priamy vjazd", ramp: "Rampa", stairs: "Schody", other: "Iné" };
+
+function SurveySummary({ survey }: { survey?: any }) {
+  if (!survey || survey.status !== "filled") {
+    return <div className="text-xs text-muted-foreground italic">Dotazník: {survey ? "odoslaný klientovi, čaká na vyplnenie" : "nevyplnený"}</div>;
+  }
+  const lines: string[] = [];
+  if (survey.floor) lines.push(`Poschodie: ${survey.floor}`);
+  if (survey.has_elevator !== null) lines.push(`Výťah: ${survey.has_elevator ? (survey.elevator_info ? `áno (${survey.elevator_info})` : "áno") : "nie"}`);
+  if (survey.access_type) lines.push(`Prístup: ${ACCESS_LABEL[survey.access_type] ?? survey.access_type}`);
+  if (survey.parking_note) lines.push(`Parkovanie: ${survey.parking_note}`);
+  if (survey.distance_info) lines.push(`Vzdialenosť: ${survey.distance_info}`);
+  if (survey.time_restrictions) lines.push(`Čas: ${survey.time_restrictions}`);
+  if (survey.access_note) lines.push(survey.access_note);
+  const contact = [survey.onsite_contact_name, survey.onsite_contact_phone].filter(Boolean).join(" · ");
+  return (
+    <div className="rounded bg-muted/50 p-2 text-xs space-y-0.5 border">
+      <div className="font-medium text-foreground">Dotazník od klienta:</div>
+      {contact && <div>Kontakt na mieste: <strong>{contact}</strong></div>}
+      {lines.map((l, i) => <div key={i}>{l}</div>)}
     </div>
   );
 }
