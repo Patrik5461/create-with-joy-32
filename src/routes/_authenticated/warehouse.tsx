@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X, AlertTriangle, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X, AlertTriangle, Trash2, Database, Download, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { DamageReportDialog } from "@/components/damage-report-dialog";
@@ -202,6 +202,8 @@ function Warehouse() {
             <p className="text-sm text-muted-foreground">Evidencia všetkého eventového nábytku.</p>
           </div>
           {canManage && (
+            <div className="flex gap-2">
+            <BackupsButton />
             <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
               <DialogTrigger asChild>
                 <Button><Plus className="size-4 mr-1" />Pridať položku</Button>
@@ -213,6 +215,7 @@ function Warehouse() {
                 onClose={() => { setOpen(false); setEditing(null); }}
               />
             </Dialog>
+            </div>
           )}
         </div>
 
