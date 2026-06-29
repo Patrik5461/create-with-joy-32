@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, ShieldCheck, LayoutPanelTop, Settings, Wrench, Calculator, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, ShieldCheck, LayoutPanelTop, Settings, Wrench, Calculator, ClipboardCheck, MessageSquare } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -11,7 +11,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
+import { useUnreadTotal } from "@/hooks/use-chat-conversations";
+import { ChatNotifications } from "@/components/chat/chat-notifications";
 
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -23,6 +26,7 @@ const mainItems = [
   { title: "Plán rozloženia", url: "/layouts", icon: LayoutPanelTop },
   { title: "Kalkulácie", url: "/quotes", icon: Calculator },
   { title: "Logistické dotazníky", url: "/surveys", icon: ClipboardCheck },
+  { title: "Chat", url: "/chat", icon: MessageSquare },
 ] as const;
 
 const itemClass =
@@ -32,6 +36,7 @@ export function AppSidebar() {
   const { data: user } = useCurrentUser();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (url: string) => pathname === url || pathname.startsWith(url + "/");
+  const { total: unread } = useUnreadTotal(user?.id);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -56,7 +61,10 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title} className={itemClass}>
                     <Link to={item.url} className="flex items-center gap-3">
                       <item.icon className="size-[18px]" />
-                      <span>{item.title}</span>
+                      <span className="flex-1">{item.title}</span>
+                      {item.url === "/chat" && unread > 0 && (
+                        <Badge className="h-5 min-w-5 px-1.5 text-[10px]">{unread > 99 ? "99+" : unread}</Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -97,6 +105,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <ChatNotifications />
     </Sidebar>
   );
 }
