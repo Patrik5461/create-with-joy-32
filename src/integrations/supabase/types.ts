@@ -261,6 +261,92 @@ export type Database = {
           },
         ]
       }
+      logistics_surveys: {
+        Row: {
+          access_note: string | null
+          access_type: string | null
+          address_override: string | null
+          created_at: string
+          distance_info: string | null
+          door_width: string | null
+          elevator_info: string | null
+          floor: string | null
+          has_elevator: boolean | null
+          id: string
+          notes: string | null
+          onsite_contact_name: string | null
+          onsite_contact_phone: string | null
+          parking_available: boolean | null
+          parking_note: string | null
+          prearrival_contact_name: string | null
+          prearrival_contact_phone: string | null
+          reservation_id: string
+          status: string
+          submitted_at: string | null
+          time_restrictions: string | null
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          access_note?: string | null
+          access_type?: string | null
+          address_override?: string | null
+          created_at?: string
+          distance_info?: string | null
+          door_width?: string | null
+          elevator_info?: string | null
+          floor?: string | null
+          has_elevator?: boolean | null
+          id?: string
+          notes?: string | null
+          onsite_contact_name?: string | null
+          onsite_contact_phone?: string | null
+          parking_available?: boolean | null
+          parking_note?: string | null
+          prearrival_contact_name?: string | null
+          prearrival_contact_phone?: string | null
+          reservation_id: string
+          status?: string
+          submitted_at?: string | null
+          time_restrictions?: string | null
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          access_note?: string | null
+          access_type?: string | null
+          address_override?: string | null
+          created_at?: string
+          distance_info?: string | null
+          door_width?: string | null
+          elevator_info?: string | null
+          floor?: string | null
+          has_elevator?: boolean | null
+          id?: string
+          notes?: string | null
+          onsite_contact_name?: string | null
+          onsite_contact_phone?: string | null
+          parking_available?: boolean | null
+          parking_note?: string | null
+          prearrival_contact_name?: string | null
+          prearrival_contact_phone?: string | null
+          reservation_id?: string
+          status?: string
+          submitted_at?: string | null
+          time_restrictions?: string | null
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_surveys_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: true
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           active: boolean
