@@ -161,8 +161,8 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
   const removeContact = (id: string) => {
     setContacts((current) => {
       const next = current.filter((contact) => contact.id !== id);
-      if (next.length > 0 && !next.some((contact) => contact.is_primary)) next[0].is_primary = true;
-      return next;
+      if (next.length === 0 || next.some((contact) => contact.is_primary)) return next;
+      return next.map((contact, index) => ({ ...contact, is_primary: index === 0 }));
     });
   };
 
@@ -178,6 +178,16 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
           is_primary: contact.is_primary,
         }))
         .filter((contact) => contact.full_name);
+      if (preparedContacts.length === 0 && form.contact_person.trim()) {
+        preparedContacts.push({
+          full_name: form.contact_person.trim(),
+          role: null,
+          phone: form.phone.trim() || null,
+          email: form.email.trim() || null,
+          note: null,
+          is_primary: true,
+        });
+      }
 
       if (item) {
         const { error } = await supabase.from("clients").update(form).eq("id", item.id);
