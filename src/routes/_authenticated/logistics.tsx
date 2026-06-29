@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Truck, Package } from "lucide-react";
+import { ChevronLeft, ChevronRight, Truck, Package, Plus, Pencil, Trash2, Car } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { addDays, format, isSameDay } from "date-fns";
 import { sk } from "date-fns/locale";
 import { toast } from "sonner";
@@ -76,8 +81,211 @@ function Logistics() {
           <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
           <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
         </div>
+
+        <VehicleFleet />
       </div>
     </>
+  );
+}
+
+type Vehicle = {
+  id: string;
+  name: string;
+  license_plate: string | null;
+  vehicle_type: string | null;
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  capacity_kg: number | null;
+  volume_m3: number | null;
+  note: string | null;
+  status: string;
+};
+
+const STATUS_LABEL: Record<string, string> = { active: "Aktívne", service: "V servise", retired: "Vyradené" };
+const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = { active: "default", service: "secondary", retired: "outline" };
+
+function VehicleFleet() {
+  const qc = useQueryClient();
+  const { data: vehicles = [] } = useQuery({
+    queryKey: ["vehicles"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("vehicles").select("*").order("name");
+      if (error) throw error;
+      return data as Vehicle[];
+    },
+  });
+
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Vehicle | null>(null);
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("vehicles").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vehicles"] }); toast.success("Vozidlo odstránené"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-base flex items-center gap-2"><Car className="size-4" />Vozový park</CardTitle>
+        <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" /> Pridať vozidlo</Button>
+      </CardHeader>
+      <CardContent>
+        {vehicles.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Zatiaľ žiadne vozidlá. Pridajte prvé vozidlo do vozového parku.</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {vehicles.map((v) => (
+              <div key={v.id} className="rounded-md border p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{v.name}</div>
+                    <div className="text-xs text-muted-foreground">{[v.brand, v.model, v.year].filter(Boolean).join(" · ")}</div>
+                  </div>
+                  <Badge variant={STATUS_VARIANT[v.status] ?? "outline"}>{STATUS_LABEL[v.status] ?? v.status}</Badge>
+                </div>
+                <div className="text-xs space-y-0.5 text-muted-foreground">
+                  {v.license_plate && <div>ŠPZ: <span className="font-mono text-foreground">{v.license_plate}</span></div>}
+                  {v.vehicle_type && <div>Typ: {v.vehicle_type}</div>}
+                  {(v.capacity_kg || v.volume_m3) && (
+                    <div>
+                      {v.capacity_kg ? `${v.capacity_kg} kg` : ""}{v.capacity_kg && v.volume_m3 ? " · " : ""}{v.volume_m3 ? `${v.volume_m3} m³` : ""}
+                    </div>
+                  )}
+                  {v.note && <div className="italic">{v.note}</div>}
+                </div>
+                <div className="flex justify-end gap-1">
+                  <Button size="icon" variant="ghost" aria-label="Upraviť" onClick={() => { setEditing(v); setOpen(true); }}><Pencil className="size-4" /></Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="icon" variant="ghost" aria-label="Odstrániť"><Trash2 className="size-4" /></Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Odstrániť vozidlo?</AlertDialogTitle>
+                        <AlertDialogDescription>Vozidlo „{v.name}" bude trvalo odstránené.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Zrušiť</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => remove.mutate(v.id)}>Odstrániť</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+      <VehicleDialog open={open} onOpenChange={setOpen} vehicle={editing} />
+    </Card>
+  );
+}
+
+function VehicleDialog({ open, onOpenChange, vehicle }: { open: boolean; onOpenChange: (o: boolean) => void; vehicle: Vehicle | null }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState<Partial<Vehicle>>({});
+
+  useMemo(() => {
+    setForm(vehicle ?? { status: "active" });
+  }, [vehicle, open]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        name: form.name?.trim() ?? "",
+        license_plate: form.license_plate || null,
+        vehicle_type: form.vehicle_type || null,
+        brand: form.brand || null,
+        model: form.model || null,
+        year: form.year ? Number(form.year) : null,
+        capacity_kg: form.capacity_kg ? Number(form.capacity_kg) : null,
+        volume_m3: form.volume_m3 ? Number(form.volume_m3) : null,
+        note: form.note || null,
+        status: form.status || "active",
+      };
+      if (!payload.name) throw new Error("Názov vozidla je povinný");
+      if (vehicle) {
+        const { error } = await supabase.from("vehicles").update(payload).eq("id", vehicle.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("vehicles").insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vehicles"] });
+      toast.success(vehicle ? "Vozidlo upravené" : "Vozidlo pridané");
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{vehicle ? "Upraviť vozidlo" : "Nové vozidlo"}</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 space-y-1">
+            <Label>Názov *</Label>
+            <Input value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="napr. Dodávka 1" />
+          </div>
+          <div className="space-y-1">
+            <Label>ŠPZ</Label>
+            <Input value={form.license_plate ?? ""} onChange={(e) => setForm({ ...form, license_plate: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Typ</Label>
+            <Input value={form.vehicle_type ?? ""} onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })} placeholder="dodávka, ťahač…" />
+          </div>
+          <div className="space-y-1">
+            <Label>Značka</Label>
+            <Input value={form.brand ?? ""} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Model</Label>
+            <Input value={form.model ?? ""} onChange={(e) => setForm({ ...form, model: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Rok</Label>
+            <Input type="number" value={form.year ?? ""} onChange={(e) => setForm({ ...form, year: e.target.value as any })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Stav</Label>
+            <Select value={form.status ?? "active"} onValueChange={(v) => setForm({ ...form, status: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Aktívne</SelectItem>
+                <SelectItem value="service">V servise</SelectItem>
+                <SelectItem value="retired">Vyradené</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Nosnosť (kg)</Label>
+            <Input type="number" value={form.capacity_kg ?? ""} onChange={(e) => setForm({ ...form, capacity_kg: e.target.value as any })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Objem (m³)</Label>
+            <Input type="number" step="0.1" value={form.volume_m3 ?? ""} onChange={(e) => setForm({ ...form, volume_m3: e.target.value as any })} />
+          </div>
+          <div className="col-span-2 space-y-1">
+            <Label>Poznámka</Label>
+            <Textarea rows={2} value={form.note ?? ""} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Zrušiť</Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>Uložiť</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
