@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      client_contacts: {
+        Row: {
+          client_id: string
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          is_primary: boolean
+          note: string | null
+          phone: string | null
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          is_primary?: boolean
+          note?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          is_primary?: boolean
+          note?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_contacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -440,6 +487,7 @@ export type Database = {
       quotes: {
         Row: {
           client_id: string | null
+          contact_id: string | null
           created_at: string
           created_by: string | null
           discount_type: Database["public"]["Enums"]["quote_adjust_type"]
@@ -463,6 +511,7 @@ export type Database = {
         }
         Insert: {
           client_id?: string | null
+          contact_id?: string | null
           created_at?: string
           created_by?: string | null
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
@@ -486,6 +535,7 @@ export type Database = {
         }
         Update: {
           client_id?: string | null
+          contact_id?: string | null
           created_at?: string
           created_by?: string | null
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
@@ -513,6 +563,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "client_contacts"
             referencedColumns: ["id"]
           },
           {
@@ -569,6 +626,7 @@ export type Database = {
           available_from_at: string
           client_id: string | null
           color: string | null
+          contact_id: string | null
           contact_person: string | null
           created_at: string
           created_by: string | null
@@ -592,6 +650,7 @@ export type Database = {
           available_from_at: string
           client_id?: string | null
           color?: string | null
+          contact_id?: string | null
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
@@ -615,6 +674,7 @@ export type Database = {
           available_from_at?: string
           client_id?: string | null
           color?: string | null
+          contact_id?: string | null
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
@@ -639,6 +699,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "client_contacts"
             referencedColumns: ["id"]
           },
         ]
