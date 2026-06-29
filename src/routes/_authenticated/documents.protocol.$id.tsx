@@ -10,11 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Printer, Save, Trash2, CheckCircle2, Wrench } from "lucide-react";
+import { ArrowLeft, Printer, Save, Trash2, CheckCircle2, Wrench, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import { SignaturePad } from "@/components/signature-pad";
 import { COMPANY_INFO, formatDate, formatDateTime } from "@/lib/document-utils";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
+import { QrScannerDialog } from "@/components/qr-scanner-dialog";
 
 export const Route = createFileRoute("/_authenticated/documents/protocol/$id")({
   head: () => ({ meta: [{ title: "Protokol · Mima Production CRM" }] }),
@@ -48,6 +49,7 @@ function ProtocolDetail() {
   const [issuedAt, setIssuedAt] = useState<string>("");
   const [sigCo, setSigCo] = useState<string | null>(null);
   const [sigCl, setSigCl] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     if (q.data && rows === null) {
@@ -134,6 +136,24 @@ function ProtocolDetail() {
     setRows((cur) => cur!.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   };
 
+  const handleScanned = (furnitureId: string) => {
+    const idx = rows!.findIndex((r) => r.furniture_item_id === furnitureId);
+    if (idx < 0) {
+      toast.error("Táto položka nie je v zozname protokolu.");
+      return;
+    }
+    const row = rows![idx];
+    if (isReturn) {
+      const next = Math.min(Number(row.qty_expected), Number(row.qty_actual || 0) + 1);
+      updateRow(idx, { qty_actual: next });
+      toast.success(`${row.item_name}: vrátené ${next}/${row.qty_expected}`);
+    } else {
+      const next = Math.min(Number(row.qty_expected), Number(row.qty_actual || 0) + 1);
+      updateRow(idx, { qty_actual: next });
+      toast.success(`${row.item_name}: naložené ${next}/${row.qty_expected}`);
+    }
+  };
+
   return (
     <>
       <AppHeader title={`${title} ${p.protocol_number}`} />
@@ -145,6 +165,11 @@ function ProtocolDetail() {
           <div className="flex items-center gap-2">
             <Badge variant={isSigned ? "default" : "outline"}>{isSigned ? "Podpísaný" : "Vygenerovaný"}</Badge>
             <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="size-4 mr-1" />Tlačiť / PDF</Button>
+            {canEdit && !isSigned && (
+              <Button variant="outline" size="sm" onClick={() => setScannerOpen(true)}>
+                <ScanLine className="size-4 mr-1" />Skenovať
+              </Button>
+            )}
             {canEdit && !isSigned && (
               <Button size="sm" onClick={() => save.mutate({})} disabled={save.isPending}><Save className="size-4 mr-1" />Uložiť</Button>
             )}
@@ -254,6 +279,19 @@ function ProtocolDetail() {
       </div>
 
       <PrintProtocol p={p} rows={rows} notes={notes} receivedBy={receivedBy} issuedAt={issuedAt} sigCo={sigCo} sigCl={sigCl} title={title} />
+
+      <QrScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        title={isReturn ? "Skenovať vrátené položky" : "Skenovať nakládané položky"}
+        description="Naskenujte QR kód položky — počet sa automaticky pripočíta. Skener zostáva otvorený, môžete pokračovať ďalším skenom."
+        onDetected={(fid) => {
+          handleScanned(fid);
+          // Re-open scanner immediately for continuous scanning
+          setScannerOpen(false);
+          setTimeout(() => setScannerOpen(true), 350);
+        }}
+      />
     </>
   );
 }

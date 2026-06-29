@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,10 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X, AlertTriangle, Trash2, Database, Download, RefreshCw } from "lucide-react";
+import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X, AlertTriangle, Trash2, Database, Download, RefreshCw, QrCode, ScanLine, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { DamageReportDialog } from "@/components/damage-report-dialog";
+import { QRCode, buildFurnitureScanUrl } from "@/components/qr-code";
+import { QrScannerDialog } from "@/components/qr-scanner-dialog";
 
 export const Route = createFileRoute("/_authenticated/warehouse")({
   head: () => ({ meta: [{ title: "Sklad · Mima Production CRM" }] }),
@@ -186,6 +188,8 @@ function Warehouse() {
   const qc = useQueryClient();
   const { data: user } = useCurrentUser();
   const canManage = hasRole(user, "admin", "warehouse");
+  const navigate = useNavigate();
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [showInactive, setShowInactive] = useState(false);
@@ -289,10 +293,16 @@ function Warehouse() {
             <h2 className="text-2xl font-semibold tracking-tight">Sklad nábytku</h2>
             <p className="text-sm text-muted-foreground">Evidencia všetkého eventového nábytku.</p>
           </div>
-          {canManage && (
-            <div className="flex gap-2">
-            <BackupsButton />
-            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setScannerOpen(true)}>
+              <ScanLine className="size-4 mr-1" />Skenovať
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/warehouse/qr-print"><Printer className="size-4 mr-1" />Tlač QR</Link>
+            </Button>
+            {canManage && <BackupsButton />}
+            {canManage && (
+              <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
               <DialogTrigger asChild>
                 <Button><Plus className="size-4 mr-1" />Pridať položku</Button>
               </DialogTrigger>
@@ -302,9 +312,9 @@ function Warehouse() {
                 categories={categories.data ?? []}
                 onClose={() => { setOpen(false); setEditing(null); }}
               />
-            </Dialog>
-            </div>
-          )}
+              </Dialog>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row gap-2">
@@ -439,6 +449,15 @@ function Warehouse() {
         reservedNow={damageFor ? reservedNow.data?.[damageFor.id] ?? 0 : 0}
       />
 
+      <QrScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onDetected={(id) => {
+          setScannerOpen(false);
+          navigate({ to: "/warehouse/scan/$id", params: { id } });
+        }}
+      />
+
       <AlertDialog open={!!deleteFor} onOpenChange={(o) => !o && setDeleteFor(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -465,6 +484,21 @@ function Warehouse() {
 
 function DetailDialog({ item, onReportDamage, canManage }: { item: FurnitureRow; onReportDamage: () => void; canManage: boolean }) {
   const available = item.total_qty - item.damaged_qty - item.retired_qty;
+  const qrUrl = buildFurnitureScanUrl(item.id);
+  const downloadQr = async () => {
+    try {
+      const QR = await import("qrcode");
+      const dataUrl = await QR.toDataURL(qrUrl, { width: 512, margin: 2 });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `${item.internal_code || item.id}-qr.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch {
+      toast.error("Stiahnutie QR zlyhalo");
+    }
+  };
   return (
     <DialogContent className="max-w-2xl">
       <DialogHeader>
@@ -504,6 +538,22 @@ function DetailDialog({ item, onReportDamage, canManage }: { item: FurnitureRow;
               Nahlásiť poškodenie
             </Button>
           )}
+        </div>
+      </div>
+      <div className="border-t pt-4 mt-2">
+        <div className="flex items-start gap-4">
+          <div className="bg-white p-2 rounded border shrink-0">
+            <QRCode value={qrUrl} size={140} />
+          </div>
+          <div className="flex-1 space-y-2">
+            <div>
+              <div className="text-xs text-muted-foreground">QR kód položky</div>
+              <p className="text-xs font-mono break-all">{qrUrl}</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={downloadQr}>
+              <Download className="size-3.5 mr-1" /> Stiahnuť QR (PNG)
+            </Button>
+          </div>
         </div>
       </div>
     </DialogContent>

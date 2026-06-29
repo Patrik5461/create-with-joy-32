@@ -26,6 +26,7 @@ import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedReservationsIndexRouteImport } from './routes/_authenticated/reservations.index'
 import { Route as AuthenticatedQuotesIndexRouteImport } from './routes/_authenticated/quotes.index'
 import { Route as AuthenticatedClientsIndexRouteImport } from './routes/_authenticated/clients.index'
+import { Route as AuthenticatedWarehouseQrPrintRouteImport } from './routes/_authenticated/warehouse.qr-print'
 import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings.calendar'
 import { Route as AuthenticatedReservationsNewRouteImport } from './routes/_authenticated/reservations.new'
 import { Route as AuthenticatedReservationsIdRouteImport } from './routes/_authenticated/reservations.$id'
@@ -35,6 +36,7 @@ import { Route as AuthenticatedClientsIdRouteImport } from './routes/_authentica
 import { Route as AuthenticatedReservationsIdIndexRouteImport } from './routes/_authenticated/reservations.$id.index'
 import { Route as ApiPublicHooksWarehouseBackupRouteImport } from './routes/api/public/hooks/warehouse-backup'
 import { Route as ApiPublicCalendarTokenRouteImport } from './routes/api/public/calendar.$token'
+import { Route as AuthenticatedWarehouseScanIdRouteImport } from './routes/_authenticated/warehouse.scan.$id'
 import { Route as AuthenticatedReservationsIdLayoutRouteImport } from './routes/_authenticated/reservations.$id.layout'
 import { Route as AuthenticatedDocumentsProtocolIdRouteImport } from './routes/_authenticated/documents.protocol.$id'
 import { Route as AuthenticatedDocumentsContractIdRouteImport } from './routes/_authenticated/documents.contract.$id'
@@ -128,6 +130,12 @@ const AuthenticatedClientsIndexRoute =
     path: '/clients/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedWarehouseQrPrintRoute =
+  AuthenticatedWarehouseQrPrintRouteImport.update({
+    id: '/qr-print',
+    path: '/qr-print',
+    getParentRoute: () => AuthenticatedWarehouseRoute,
+  } as any)
 const AuthenticatedSettingsCalendarRoute =
   AuthenticatedSettingsCalendarRouteImport.update({
     id: '/calendar',
@@ -178,6 +186,12 @@ const ApiPublicCalendarTokenRoute = ApiPublicCalendarTokenRouteImport.update({
   path: '/api/public/calendar/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedWarehouseScanIdRoute =
+  AuthenticatedWarehouseScanIdRouteImport.update({
+    id: '/scan/$id',
+    path: '/scan/$id',
+    getParentRoute: () => AuthenticatedWarehouseRoute,
+  } as any)
 const AuthenticatedReservationsIdLayoutRoute =
   AuthenticatedReservationsIdLayoutRouteImport.update({
     id: '/layout',
@@ -208,7 +222,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/surveys': typeof AuthenticatedSurveysRoute
   '/users': typeof AuthenticatedUsersRoute
-  '/warehouse': typeof AuthenticatedWarehouseRoute
+  '/warehouse': typeof AuthenticatedWarehouseRouteWithChildren
   '/dotaznik/$token': typeof DotaznikTokenRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/quotes/$id': typeof AuthenticatedQuotesIdRoute
@@ -216,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/clients/': typeof AuthenticatedClientsIndexRoute
   '/quotes/': typeof AuthenticatedQuotesIndexRoute
   '/reservations/': typeof AuthenticatedReservationsIndexRoute
@@ -223,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/documents/contract/$id': typeof AuthenticatedDocumentsContractIdRoute
   '/documents/protocol/$id': typeof AuthenticatedDocumentsProtocolIdRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
+  '/warehouse/scan/$id': typeof AuthenticatedWarehouseScanIdRoute
   '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
   '/api/public/hooks/warehouse-backup': typeof ApiPublicHooksWarehouseBackupRoute
   '/reservations/$id/': typeof AuthenticatedReservationsIdIndexRoute
@@ -237,13 +253,14 @@ export interface FileRoutesByTo {
   '/maintenance': typeof AuthenticatedMaintenanceRoute
   '/surveys': typeof AuthenticatedSurveysRoute
   '/users': typeof AuthenticatedUsersRoute
-  '/warehouse': typeof AuthenticatedWarehouseRoute
+  '/warehouse': typeof AuthenticatedWarehouseRouteWithChildren
   '/dotaznik/$token': typeof DotaznikTokenRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/quotes/$id': typeof AuthenticatedQuotesIdRoute
   '/quotes/new': typeof AuthenticatedQuotesNewRoute
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/clients': typeof AuthenticatedClientsIndexRoute
   '/quotes': typeof AuthenticatedQuotesIndexRoute
   '/reservations': typeof AuthenticatedReservationsIndexRoute
@@ -251,6 +268,7 @@ export interface FileRoutesByTo {
   '/documents/contract/$id': typeof AuthenticatedDocumentsContractIdRoute
   '/documents/protocol/$id': typeof AuthenticatedDocumentsProtocolIdRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
+  '/warehouse/scan/$id': typeof AuthenticatedWarehouseScanIdRoute
   '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
   '/api/public/hooks/warehouse-backup': typeof ApiPublicHooksWarehouseBackupRoute
   '/reservations/$id': typeof AuthenticatedReservationsIdIndexRoute
@@ -268,7 +286,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/_authenticated/surveys': typeof AuthenticatedSurveysRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
-  '/_authenticated/warehouse': typeof AuthenticatedWarehouseRoute
+  '/_authenticated/warehouse': typeof AuthenticatedWarehouseRouteWithChildren
   '/dotaznik/$token': typeof DotaznikTokenRoute
   '/_authenticated/clients/$id': typeof AuthenticatedClientsIdRoute
   '/_authenticated/quotes/$id': typeof AuthenticatedQuotesIdRoute
@@ -276,6 +294,7 @@ export interface FileRoutesById {
   '/_authenticated/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/_authenticated/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/_authenticated/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/_authenticated/clients/': typeof AuthenticatedClientsIndexRoute
   '/_authenticated/quotes/': typeof AuthenticatedQuotesIndexRoute
   '/_authenticated/reservations/': typeof AuthenticatedReservationsIndexRoute
@@ -283,6 +302,7 @@ export interface FileRoutesById {
   '/_authenticated/documents/contract/$id': typeof AuthenticatedDocumentsContractIdRoute
   '/_authenticated/documents/protocol/$id': typeof AuthenticatedDocumentsProtocolIdRoute
   '/_authenticated/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
+  '/_authenticated/warehouse/scan/$id': typeof AuthenticatedWarehouseScanIdRoute
   '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
   '/api/public/hooks/warehouse-backup': typeof ApiPublicHooksWarehouseBackupRoute
   '/_authenticated/reservations/$id/': typeof AuthenticatedReservationsIdIndexRoute
@@ -308,6 +328,7 @@ export interface FileRouteTypes {
     | '/reservations/$id'
     | '/reservations/new'
     | '/settings/calendar'
+    | '/warehouse/qr-print'
     | '/clients/'
     | '/quotes/'
     | '/reservations/'
@@ -315,6 +336,7 @@ export interface FileRouteTypes {
     | '/documents/contract/$id'
     | '/documents/protocol/$id'
     | '/reservations/$id/layout'
+    | '/warehouse/scan/$id'
     | '/api/public/calendar/$token'
     | '/api/public/hooks/warehouse-backup'
     | '/reservations/$id/'
@@ -336,6 +358,7 @@ export interface FileRouteTypes {
     | '/quotes/new'
     | '/reservations/new'
     | '/settings/calendar'
+    | '/warehouse/qr-print'
     | '/clients'
     | '/quotes'
     | '/reservations'
@@ -343,6 +366,7 @@ export interface FileRouteTypes {
     | '/documents/contract/$id'
     | '/documents/protocol/$id'
     | '/reservations/$id/layout'
+    | '/warehouse/scan/$id'
     | '/api/public/calendar/$token'
     | '/api/public/hooks/warehouse-backup'
     | '/reservations/$id'
@@ -367,6 +391,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reservations/$id'
     | '/_authenticated/reservations/new'
     | '/_authenticated/settings/calendar'
+    | '/_authenticated/warehouse/qr-print'
     | '/_authenticated/clients/'
     | '/_authenticated/quotes/'
     | '/_authenticated/reservations/'
@@ -374,6 +399,7 @@ export interface FileRouteTypes {
     | '/_authenticated/documents/contract/$id'
     | '/_authenticated/documents/protocol/$id'
     | '/_authenticated/reservations/$id/layout'
+    | '/_authenticated/warehouse/scan/$id'
     | '/api/public/calendar/$token'
     | '/api/public/hooks/warehouse-backup'
     | '/_authenticated/reservations/$id/'
@@ -509,6 +535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/warehouse/qr-print': {
+      id: '/_authenticated/warehouse/qr-print'
+      path: '/qr-print'
+      fullPath: '/warehouse/qr-print'
+      preLoaderRoute: typeof AuthenticatedWarehouseQrPrintRouteImport
+      parentRoute: typeof AuthenticatedWarehouseRoute
+    }
     '/_authenticated/settings/calendar': {
       id: '/_authenticated/settings/calendar'
       path: '/calendar'
@@ -572,6 +605,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCalendarTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/warehouse/scan/$id': {
+      id: '/_authenticated/warehouse/scan/$id'
+      path: '/scan/$id'
+      fullPath: '/warehouse/scan/$id'
+      preLoaderRoute: typeof AuthenticatedWarehouseScanIdRouteImport
+      parentRoute: typeof AuthenticatedWarehouseRoute
+    }
     '/_authenticated/reservations/$id/layout': {
       id: '/_authenticated/reservations/$id/layout'
       path: '/layout'
@@ -611,6 +651,22 @@ const AuthenticatedSettingsRouteWithChildren =
     AuthenticatedSettingsRouteChildren,
   )
 
+interface AuthenticatedWarehouseRouteChildren {
+  AuthenticatedWarehouseQrPrintRoute: typeof AuthenticatedWarehouseQrPrintRoute
+  AuthenticatedWarehouseScanIdRoute: typeof AuthenticatedWarehouseScanIdRoute
+}
+
+const AuthenticatedWarehouseRouteChildren: AuthenticatedWarehouseRouteChildren =
+  {
+    AuthenticatedWarehouseQrPrintRoute: AuthenticatedWarehouseQrPrintRoute,
+    AuthenticatedWarehouseScanIdRoute: AuthenticatedWarehouseScanIdRoute,
+  }
+
+const AuthenticatedWarehouseRouteWithChildren =
+  AuthenticatedWarehouseRoute._addFileChildren(
+    AuthenticatedWarehouseRouteChildren,
+  )
+
 interface AuthenticatedReservationsIdRouteChildren {
   AuthenticatedReservationsIdLayoutRoute: typeof AuthenticatedReservationsIdLayoutRoute
   AuthenticatedReservationsIdIndexRoute: typeof AuthenticatedReservationsIdIndexRoute
@@ -638,7 +694,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRouteWithChildren
   AuthenticatedSurveysRoute: typeof AuthenticatedSurveysRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
-  AuthenticatedWarehouseRoute: typeof AuthenticatedWarehouseRoute
+  AuthenticatedWarehouseRoute: typeof AuthenticatedWarehouseRouteWithChildren
   AuthenticatedClientsIdRoute: typeof AuthenticatedClientsIdRoute
   AuthenticatedQuotesIdRoute: typeof AuthenticatedQuotesIdRoute
   AuthenticatedQuotesNewRoute: typeof AuthenticatedQuotesNewRoute
@@ -660,7 +716,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRouteWithChildren,
   AuthenticatedSurveysRoute: AuthenticatedSurveysRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
-  AuthenticatedWarehouseRoute: AuthenticatedWarehouseRoute,
+  AuthenticatedWarehouseRoute: AuthenticatedWarehouseRouteWithChildren,
   AuthenticatedClientsIdRoute: AuthenticatedClientsIdRoute,
   AuthenticatedQuotesIdRoute: AuthenticatedQuotesIdRoute,
   AuthenticatedQuotesNewRoute: AuthenticatedQuotesNewRoute,
