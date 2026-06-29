@@ -559,7 +559,7 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Zrušiť</Button>
-        <Button onClick={() => save.mutate()} disabled={save.isPending || uploading || !form.name || !form.internal_code}>Uložiť</Button>
+        <Button onClick={() => save.mutate()} disabled={save.isPending || uploading || !form.name || !form.category_id || (!!item && !form.internal_code)}>Uložiť</Button>
       </DialogFooter>
     </DialogContent>
   );
