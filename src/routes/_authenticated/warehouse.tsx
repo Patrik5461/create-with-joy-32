@@ -515,6 +515,14 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
           <Label>Vyradené</Label>
           <Input type="number" min={0} value={form.retired_qty} onChange={(e) => setForm({ ...form, retired_qty: Number(e.target.value) })} />
         </div>
+        <div className="space-y-1.5">
+          <Label>Cena za deň (€/ks)</Label>
+          <Input type="number" step="0.01" min={0} value={form.price_per_day} onChange={(e) => setForm({ ...form, price_per_day: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="napr. 2.50" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Fixná cena za event (€/ks)</Label>
+          <Input type="number" step="0.01" min={0} value={form.price_fixed} onChange={(e) => setForm({ ...form, price_fixed: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="napr. 10.00" />
+        </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Poznámka</Label>
           <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
