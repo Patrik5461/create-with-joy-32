@@ -1,123 +1,93 @@
-# MimaProduction CRM – plán implementácie
+## Modul Kalkulácie (cenové ponuky)
 
-Interná CRM aplikácia pre správu eventového nábytku, skladu, rezervácií, klientov a logistiky. Postavené na TanStack Start + Supabase (už pripojené).
+Nový modul pre tvorbu cenových ponúk klientom s prepojením na existujúce rezervácie, nábytok a klientov.
 
-## 1. Dizajn a layout
+### 1. Databáza (Supabase migrácia)
 
-- Moderný CRM look: tmavý/svetlý režim, profesionálna typografia (napr. Inter/Space Grotesk pre nadpisy), akcentová farba inšpirovaná eventovou brandžou (hlboká indigo + jantárový accent), nie generický fialový gradient.
-- Sidebar layout (collapsable na mobile), hlavička s názvom „MimaProduction CRM“, prepínač témy, info o používateľovi a odhlásenie.
-- Tabová stránka má `<title>MimaProduction CRM</title>` cez `head()` v `__root.tsx`.
-- Všetky farby ako semantické tokeny v `src/styles.css` (oklch), shadcn komponenty s variantmi.
+**Rozšírenie `furniture_items`:**
+- `price_per_day` numeric(10,2) nullable
+- `price_fixed` numeric(10,2) nullable
 
-## 2. Autentifikácia a roly
+**Nové tabuľky:**
 
-- Iba prihlasovacia obrazovka `/auth` (verejná) – email + heslo cez Supabase Auth. Žiadna verejná registrácia.
-- Chránený layout `src/routes/_authenticated/route.tsx` (managed integráciou) presmeruje neprihlásených na `/auth`.
-- Po prihlásení redirect na `/` (dashboard).
-- Roly: `admin`, `manager`, `warehouse` – cez samostatnú tabuľku `user_roles` + enum `app_role` + `SECURITY DEFINER` funkcia `has_role(uuid, app_role)`.
-- Iba admin môže vytvárať nových používateľov (modul „Používatelia“ – zoznam + formulár, ktorý cez chránenú server function s `requireSupabaseAuth` + `has_role(..., 'admin')` zavolá Supabase Auth Admin API a priradí rolu).
-- Prvý admin sa nastaví manuálne v Supabase dashboarde (po prvom signup-e). Toto v UI vysvetlím.
+`quotes`:
+- `quote_number` text unique (auto, formát `Q2026-0001`)
+- `client_id` uuid → clients
+- `reservation_id` uuid nullable → reservations
+- `status` enum: `draft | sent | approved | rejected`
+- `issue_date` date, `valid_until` date
+- `vat_rate` numeric(5,2) default 23
+- `discount_type` enum: `none | percent | fixed`, `discount_value` numeric
+- `surcharge_type` enum: `none | percent | fixed`, `surcharge_value` numeric, `surcharge_label` text
+- `notes` text
+- `subtotal`, `total_without_vat`, `vat_amount`, `total_with_vat` (generované resp. počítané)
+- `created_by`, `created_at`, `updated_at`
 
-## 3. Databáza (Supabase, RLS všade)
+`quote_items` (nábytok aj služby v jednej tabuľke s `kind`):
+- `quote_id` uuid → quotes (cascade)
+- `kind` enum: `furniture | service`
+- `furniture_item_id` uuid nullable → furniture_items
+- `name` text (snapshot názvu / názov služby)
+- `qty` numeric
+- `price_mode` enum: `per_day | fixed | service`
+- `unit_price` numeric (snapshot)
+- `days` integer (1 pre fixed/service)
+- `line_total` numeric
+- `sort_order` int
 
-Tabuľky v `public` schéme so `GRANT` + RLS:
+**RLS a GRANT:** authenticated full CRUD, service_role ALL. Žiadny anon.
 
-- `app_role` enum: `admin`, `manager`, `warehouse`.
-- `profiles` (id = auth.users.id, full_name, email, active).
-- `user_roles` (user_id, role) – unikátny pár.
-- `clients` – názov firmy, IČO, kontaktná osoba, telefón, email, adresa, poznámky.
-- `furniture_categories` – seed: stoly, stoličky, lounge, bary, dekorácie, osvetlenie, doplnky, ostatné.
-- `furniture_items` – názov, category_id, photo_url, internal_code (unique), dimensions, color, note, total_qty, damaged_qty, retired_qty, active. Dostupné = total - damaged - retired (computed v UI/SQL view).
-- `reservation_statuses` enum: `inquiry`, `confirmed`, `prepared`, `loaded`, `delivered`, `in_progress`, `returned`, `cancelled`.
-- `reservations` – client_id, contact_person, phone, email, event_name, venue, address, note, status, časy: `load_at`, `depart_at`, `event_start_at`, `event_end_at`, `return_at`, `available_from_at`, created_by.
-- `reservation_items` – reservation_id, furniture_item_id, qty.
-- `logistics` – reservation_id, load_time, unload_time, return_time, internal_note, assigned_to.
-- `damaged_items` – furniture_item_id, qty, reason, reported_at, reported_by, reservation_id (nullable).
-- Storage bucket `furniture-photos` (public read pre interný systém s auth listom – v skutočnosti private + signed URLs; pre jednoduchosť public bucket lebo všetko za loginom v UI).
+**Sequence** pre quote_number + trigger na auto-naplnenie.
 
-### RLS politiky (zhrnutie)
-- `profiles`, `user_roles`: čítanie pre prihlásených, zápis len admin.
-- `clients`, `reservations`, `reservation_items`, `logistics`: SELECT pre všetky roly; INSERT/UPDATE pre admin a manager; DELETE len admin.
-- `furniture_*`, `damaged_items`: SELECT pre všetkých; INSERT/UPDATE pre admin a warehouse; DELETE len admin.
+### 2. Frontend moduly
 
-### Inteligentná dostupnosť (kľúčová funkcia)
+**Sklad** (`warehouse.tsx` + edit form):
+- Pridať polia "Cena/deň (€)" a "Fixná cena (€)" do formulára nábytku.
+- Zobraziť ceny na karte (malým písmom).
 
-SQL funkcia `check_availability(item_id uuid, qty int, from_ts timestamptz, to_ts timestamptz, exclude_reservation uuid default null) returns table(available int, reserved int, total int)`:
+**Nový route `/_authenticated/quotes`** s:
+- `quotes.index.tsx` — tabuľka kalkulácií, filtre (klient, stav, dátum), tlačidlo Nová.
+- `quotes.new.tsx` — formulár.
+- `quotes.$id.tsx` — detail + edit + akcie (Duplikovať, Zmazať, Export PDF, Odoslať email).
 
-- Berie všetky `reservation_items` daného `furniture_item_id`, kde rezervácia nie je `cancelled` a jej interval `[load_at, available_from_at)` sa prekrýva s `[from_ts, to_ts)`.
-- Sumuje `qty` prekrývajúcich sa rezervácií = `reserved`.
-- `available = total_qty - damaged_qty - retired_qty - reserved`.
+**Formulár kalkulácie (`QuoteForm`):**
+- Výber klienta (kombo + inline "Nový klient" link).
+- Výber rezervácie (voliteľné) — pri zmene predvyplní položky a dátumy.
+- Sekcia "Položky nábytku": multi-add row, dropdown výberu nábytku, qty, price_mode toggle (per_day/fixed), dni, jednotková cena (predvyplnená, editovateľná), line_total.
+- Sekcia "Služby": voľné riadky (názov, suma).
+- Zľava (percent/fixed) + Príplatok (percent/fixed, label).
+- Sadzba DPH (default 23).
+- Live výpočty: medzisúčet, po zľavách/príplatkoch, DPH, celkom s DPH.
+- Stav (draft/sent/approved/rejected).
+- Poznámka, dátum vystavenia, platnosť do.
 
-Trigger `validate_reservation_availability` BEFORE INSERT/UPDATE na `reservation_items` (a pri zmene časov na `reservations`) zamietne uloženie, ak ktorákoľvek položka nemá dosť kusov – aplikácia zobrazí: „Nie je dostupný dostatočný počet kusov v zvolenom čase.“
+### 3. Export PDF (client-side)
 
-Časový interval rezervácie pre účely dostupnosti = `[load_at, available_from_at)`, takže ak sa nábytok vráti o 14:00 a `available_from_at` je 15:00, ďalšia rezervácia od 15:00 prejde.
+- Použiť `window.print()` s dedikovaným print-only layoutom (`<div class="print:block hidden">`) — žiadne SSR knižnice.
+- Hlavička: logo MimaProduction, údaje firmy, číslo kalkulácie, dátumy.
+- Údaje klienta (IČO, adresa).
+- Tabuľka položiek (názov, qty, cena, dni, total).
+- Súčty: medzisúčet, zľava/príplatok, bez DPH, DPH (sadzba), spolu.
+- Tlačidlo "Tlačiť / Uložiť ako PDF" otvorí print dialóg.
 
-## 4. Server logika
+### 4. Odoslanie emailom
 
-TanStack `createServerFn` (nie edge functions):
+- TanStack server function `sendQuoteEmail` (`requireSupabaseAuth`) → využije Resend cez gateway (ak je pripojený) alebo zobrazí info že treba pripojiť email connector.
+- V prvej iterácii: email obsahuje link na zdieľanú stránku kalkulácie (public route `/api/public/quotes/$token` na neskôr) — zatiaľ použijeme jednoduchý prístup: server fn vygeneruje email s textovým zhrnutím a HTML rozpisom, bez priloženého PDF. PDF si klient vytlačí cez tlačidlo "Tlačiť" na zdieľanom linku.
+- Pre prvý release: pridať len akciu "Označiť ako Odoslaná" + `mailto:` link s predvyplneným textom (rýchle a bez nutnosti connector setupu). Skutočné odosielanie cez Resend pridáme ak používateľ pripojí connector.
 
-- `src/lib/users.functions.ts` – `listUsers`, `createUser` (admin-only, Supabase Auth Admin API + insert role), `updateUserRole`, `deactivateUser`.
-- `src/lib/clients.functions.ts` – CRUD + história rezervácií.
-- `src/lib/furniture.functions.ts` – CRUD, upload fotky (signed upload URL).
-- `src/lib/reservations.functions.ts` – CRUD, `checkAvailability(items, from, to)`, zmena stavu.
-- `src/lib/logistics.functions.ts` – denný plán, CRUD.
-- `src/lib/dashboard.functions.ts` – agregácie: dnešné nakládky/návraty, mimo skladu, najbližšie eventy, konflikty, štatistiky mesiaca, top prenajímaný nábytok, vyťaženosť.
+### 5. Dashboard widget
 
-Všetko cez `requireSupabaseAuth`; admin-only funkcie navyše overia `has_role`.
+- Karta "Kalkulácie" v `dashboard.tsx` so štatistikou: počet návrhov / odoslaných / schválených (posledných 30 dní), link na zoznam.
 
-## 5. Routes (TanStack file-based)
+### 6. Navigácia
 
-```text
-src/routes/
-  __root.tsx                       (title, theme, providers)
-  index.tsx                        (redirect na /auth alebo /dashboard)
-  auth.tsx                         (prihlásenie)
-  _authenticated/
-    route.tsx                      (managed gate)
-    dashboard.tsx
-    warehouse.index.tsx            (zoznam nábytku)
-    warehouse.$id.tsx              (detail/editácia)
-    reservations.index.tsx         (kalendár deň/týždeň/mesiac)
-    reservations.new.tsx
-    reservations.$id.tsx
-    clients.index.tsx
-    clients.$id.tsx
-    logistics.tsx
-    users.tsx                      (admin only)
-```
+- Pridať položku "Kalkulácie" (ikona `FileText` alebo `Calculator`) do `app-sidebar.tsx`.
 
-## 6. Moduly – UI
+### Technické poznámky
 
-- **Dashboard**: karty s dnešnými nakládkami, návratmi, nábytok mimo skladu, najbližšie eventy (7 dní), upozornenia na konflikty, štatistické karty (mesiac, aktívne rezervácie, top nábytok, vyťaženosť skladu %).
-- **Sklad**: tabuľka + grid s fotkami, filter podľa kategórie/farby/dostupnosti, vyhľadávanie, modálne formuláre na pridanie/editáciu, action „deaktivovať“. Detail ukáže históriu rezervácií a poškodení.
-- **Kalendár rezervácií**: prepínač Deň/Týždeň/Mesiac (knižnica `react-big-calendar` alebo vlastný komponent – použijem ľahké vlastné riešenie s `date-fns` aby som sa vyhol ťažkým závislostiam). Klik na slot otvorí nový formulár.
-- **Formulár rezervácie**: klient (select + quick create), kontakt, event detaily, časové polia (datetime-local), tabuľka pridaných položiek s live výpisom „Celkom / Rezervované / Voľné“ podľa `check_availability`. Tlačidlo Uložiť volá server fn; ak trigger vyhodí chybu, ukáže slovenskú hlášku.
-- **Stavy rezervácie**: badge + dropdown na zmenu stavu (s respektovaním rolí).
-- **Klienti**: tabuľka, detail so záložkami Info / Rezervácie.
-- **Logistika**: denný plán (zoznam podľa dátumu) – nakládky a návraty zoradené v čase, editovateľné poznámky.
-- **Používatelia (admin)**: zoznam + formulár (email, meno, heslo, rola).
+- Všetky výpočty robiť na frontende v live formulári, ale ukladať aj výsledné totaly do `quotes` pre rýchle zoznamy/filtre.
+- Validácia zod schémou v `QuoteForm`.
+- Pri prepojení s rezerváciou kopírujeme položky ako snapshot (názov + cena), aby zmeny cien v sklade nemenili odoslané kalkulácie.
 
-## 7. Implementačné poradie
-
-1. Migrácia DB (enums, tabuľky, GRANT, RLS, `has_role`, `check_availability`, trigger, seed kategórií, storage bucket).
-2. Dizajn systém v `src/styles.css` + základný layout (sidebar, header, theme toggle).
-3. Auth flow + chránený layout + redirect z `/`.
-4. Modul Sklad.
-5. Modul Klienti.
-6. Modul Rezervácie + kalendár + dostupnosť.
-7. Modul Logistika.
-8. Dashboard agregácie.
-9. Admin – Používatelia.
-10. Sitemap/robots (minimal – interná appka, `robots.txt` zakáže crawl).
-
-## Technické poznámky (pre vývoj)
-
-- TanStack Start + TanStack Query, server fns s `requireSupabaseAuth`.
-- `attachSupabaseAuth` v `src/start.ts`.
-- Žiadne edge functions – všetko `createServerFn`.
-- Pre admin operácie nad Auth API načítam `supabaseAdmin` cez `await import("@/integrations/supabase/client.server")` vnútri handlera.
-- Trigger na dostupnosť beží v DB → istota, že žiaden klient ho neobíde.
-- Časové polia ukladáme ako `timestamptz`.
-- Texty v UI po slovensky.
-
-Po schválení začnem migráciou databázy.
+Pokračujem implementáciou po schválení plánu.
