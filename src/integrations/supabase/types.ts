@@ -731,6 +731,54 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicles: {
+        Row: {
+          brand: string | null
+          capacity_kg: number | null
+          created_at: string
+          id: string
+          license_plate: string | null
+          model: string | null
+          name: string
+          note: string | null
+          status: string
+          updated_at: string
+          vehicle_type: string | null
+          volume_m3: number | null
+          year: number | null
+        }
+        Insert: {
+          brand?: string | null
+          capacity_kg?: number | null
+          created_at?: string
+          id?: string
+          license_plate?: string | null
+          model?: string | null
+          name: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_type?: string | null
+          volume_m3?: number | null
+          year?: number | null
+        }
+        Update: {
+          brand?: string | null
+          capacity_kg?: number | null
+          created_at?: string
+          id?: string
+          license_plate?: string | null
+          model?: string | null
+          name?: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_type?: string | null
+          volume_m3?: number | null
+          year?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
