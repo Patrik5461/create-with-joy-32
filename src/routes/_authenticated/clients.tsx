@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, Search, Pencil, Trash2, Star, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
@@ -56,6 +57,18 @@ function Clients() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const deleteClient = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("clients").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Klient odstránený");
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Nepodarilo sa odstrániť klienta"),
   });
 
   const filtered = useMemo(() => {
@@ -123,6 +136,27 @@ function Clients() {
                       <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true); }} aria-label={`Upraviť klienta ${c.company_name}`}>
                         <Pencil className="size-4" />
                       </Button>
+                    )}
+                    {canManage && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost" aria-label={`Odstrániť klienta ${c.company_name}`}>
+                            <Trash2 className="size-4 text-rose-600" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Odstrániť klienta?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Klient <strong>{c.company_name}</strong> a všetky jeho kontaktné osoby budú trvalo odstránené. Túto akciu nie je možné vrátiť späť. Ak má klient existujúce rezervácie alebo kalkulácie, odstránenie sa nemusí podariť.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Zrušiť</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteClient.mutate(c.id)} className="bg-rose-600 hover:bg-rose-700">Odstrániť</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     )}
                   </TableCell>
                 </TableRow>
