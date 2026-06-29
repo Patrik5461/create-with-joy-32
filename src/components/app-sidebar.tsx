@@ -26,7 +26,7 @@ const mainItems = [
   { title: "Plán rozloženia", url: "/layouts", icon: LayoutPanelTop },
   { title: "Kalkulácie", url: "/quotes", icon: Calculator },
   { title: "Logistické dotazníky", url: "/surveys", icon: ClipboardCheck },
-  { title: "Chat", url: "/chat", icon: MessageSquare },
+  { title: "Interný Chat", url: "/chat", icon: MessageSquare },
 ] as const;
 
 const itemClass =
