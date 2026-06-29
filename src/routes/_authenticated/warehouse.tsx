@@ -449,6 +449,15 @@ function Warehouse() {
         reservedNow={damageFor ? reservedNow.data?.[damageFor.id] ?? 0 : 0}
       />
 
+      <QrScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onDetected={(id) => {
+          setScannerOpen(false);
+          navigate({ to: "/warehouse/scan/$id", params: { id } });
+        }}
+      />
+
       <AlertDialog open={!!deleteFor} onOpenChange={(o) => !o && setDeleteFor(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
