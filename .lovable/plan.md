@@ -1,93 +1,108 @@
-## Modul Kalkulácie (cenové ponuky)
+## Modul Chat - interný real-time chat
 
-Nový modul pre tvorbu cenových ponúk klientom s prepojením na existujúce rezervácie, nábytok a klientov.
+### Dátový model (migrácia)
 
-### 1. Databáza (Supabase migrácia)
+**Tabuľky v `public`:**
 
-**Rozšírenie `furniture_items`:**
-- `price_per_day` numeric(10,2) nullable
-- `price_fixed` numeric(10,2) nullable
+1. `conversations`
+   - `id uuid pk`
+   - `type text` ('global' | 'direct')
+   - `created_at timestamptz`
+   - unique partial index: jedna 'global' konverzácia; pre 'direct' deterministický kľúč cez pomocné pole
 
-**Nové tabuľky:**
+2. `conversation_participants`
+   - `conversation_id uuid fk → conversations`
+   - `user_id uuid fk → profiles`
+   - `last_read_at timestamptz default now()`
+   - PK (conversation_id, user_id)
 
-`quotes`:
-- `quote_number` text unique (auto, formát `Q2026-0001`)
-- `client_id` uuid → clients
-- `reservation_id` uuid nullable → reservations
-- `status` enum: `draft | sent | approved | rejected`
-- `issue_date` date, `valid_until` date
-- `vat_rate` numeric(5,2) default 23
-- `discount_type` enum: `none | percent | fixed`, `discount_value` numeric
-- `surcharge_type` enum: `none | percent | fixed`, `surcharge_value` numeric, `surcharge_label` text
-- `notes` text
-- `subtotal`, `total_without_vat`, `vat_amount`, `total_with_vat` (generované resp. počítané)
-- `created_by`, `created_at`, `updated_at`
+3. `messages`
+   - `id uuid pk`
+   - `conversation_id uuid fk`
+   - `sender_id uuid fk → profiles`
+   - `body text`
+   - `attachment_url text`, `attachment_name text`, `attachment_mime text`
+   - `created_at timestamptz`
 
-`quote_items` (nábytok aj služby v jednej tabuľke s `kind`):
-- `quote_id` uuid → quotes (cascade)
-- `kind` enum: `furniture | service`
-- `furniture_item_id` uuid nullable → furniture_items
-- `name` text (snapshot názvu / názov služby)
-- `qty` numeric
-- `price_mode` enum: `per_day | fixed | service`
-- `unit_price` numeric (snapshot)
-- `days` integer (1 pre fixed/service)
-- `line_total` numeric
-- `sort_order` int
+4. `message_mentions`
+   - `message_id uuid fk → messages on delete cascade`
+   - `user_id uuid fk → profiles`
+   - PK (message_id, user_id)
 
-**RLS a GRANT:** authenticated full CRUD, service_role ALL. Žiadny anon.
+**Security definer fn `public.is_conversation_participant(_conv uuid, _user uuid)`** — kvôli RLS bez rekurzie. Pre 'global' konverzáciu vracia true pre každého prihláseného (každý profil je účastník).
 
-**Sequence** pre quote_number + trigger na auto-naplnenie.
+**RLS politiky:**
+- `conversations`: SELECT pre účastníkov (cez fn) + pre type='global'. INSERT pre authenticated. UPDATE/DELETE iba service_role.
+- `conversation_participants`: SELECT ak je user účastník danej konverzácie. INSERT/DELETE: user môže pridať seba; alebo do priamej konverzácie môže pridať druhú stranu pri vytvorení.
+- `messages`: SELECT ak je účastník. INSERT ak `sender_id = auth.uid()` AND je účastník. UPDATE/DELETE iba vlastné.
+- `message_mentions`: SELECT ak je účastník konverzácie správy. INSERT odosielateľom správy.
 
-### 2. Frontend moduly
+**Pomocné RPC:**
+- `get_or_create_direct_conversation(_other uuid) returns uuid` — security definer; nájde existujúcu 'direct' konverzáciu s presne dvoma účastníkmi {auth.uid(), _other} alebo vytvorí.
+- `ensure_global_conversation()` — vloží jeden riadok pri inicializácii (seed v migrácii) + trigger na `profiles` AFTER INSERT pridá nového profilu medzi účastníkov globálnej konverzácie.
+- Migrácia tiež pridá všetkých existujúcich profilov ako účastníkov globálnej konverzácie.
 
-**Sklad** (`warehouse.tsx` + edit form):
-- Pridať polia "Cena/deň (€)" a "Fixná cena (€)" do formulára nábytku.
-- Zobraziť ceny na karte (malým písmom).
+**Realtime publication:**
+- `ALTER PUBLICATION supabase_realtime ADD TABLE public.messages, public.message_mentions, public.conversation_participants;`
+- `ALTER TABLE ... REPLICA IDENTITY FULL` na týchto tabuľkách.
 
-**Nový route `/_authenticated/quotes`** s:
-- `quotes.index.tsx` — tabuľka kalkulácií, filtre (klient, stav, dátum), tlačidlo Nová.
-- `quotes.new.tsx` — formulár.
-- `quotes.$id.tsx` — detail + edit + akcie (Duplikovať, Zmazať, Export PDF, Odoslať email).
+**GRANTy** pre `authenticated` (SELECT/INSERT/UPDATE/DELETE podľa potreby) a `service_role ALL` na všetkých nových tabuľkách.
 
-**Formulár kalkulácie (`QuoteForm`):**
-- Výber klienta (kombo + inline "Nový klient" link).
-- Výber rezervácie (voliteľné) — pri zmene predvyplní položky a dátumy.
-- Sekcia "Položky nábytku": multi-add row, dropdown výberu nábytku, qty, price_mode toggle (per_day/fixed), dni, jednotková cena (predvyplnená, editovateľná), line_total.
-- Sekcia "Služby": voľné riadky (názov, suma).
-- Zľava (percent/fixed) + Príplatok (percent/fixed, label).
-- Sadzba DPH (default 23).
-- Live výpočty: medzisúčet, po zľavách/príplatkoch, DPH, celkom s DPH.
-- Stav (draft/sent/approved/rejected).
-- Poznámka, dátum vystavenia, platnosť do.
+### Storage
 
-### 3. Export PDF (client-side)
+Nový bucket `chat-attachments` (privátny) cez `supabase--storage_create_bucket`. RLS politiky na `storage.objects`:
+- INSERT/SELECT authenticated v rámci `chat-attachments` (cestou `{conversation_id}/{filename}`); SELECT povolíme len účastníkom konverzácie cez join na `conversation_participants` (resp. zjednodušene: každý authenticated, keďže URL nikde nezdieľame). Praktický kompromis: SELECT pre authenticated, keďže URL sa vždy generuje signed.
+- Použijeme **signed URLs** (1h) pri zobrazení príloh.
 
-- Použiť `window.print()` s dedikovaným print-only layoutom (`<div class="print:block hidden">`) — žiadne SSR knižnice.
-- Hlavička: logo MimaProduction, údaje firmy, číslo kalkulácie, dátumy.
-- Údaje klienta (IČO, adresa).
-- Tabuľka položiek (názov, qty, cena, dni, total).
-- Súčty: medzisúčet, zľava/príplatok, bez DPH, DPH (sadzba), spolu.
-- Tlačidlo "Tlačiť / Uložiť ako PDF" otvorí print dialóg.
+### Frontend
 
-### 4. Odoslanie emailom
+**Nová route `src/routes/_authenticated/chat.tsx`** (`ssr: false` aby sa SSR nepokúšalo o realtime/localStorage):
+- Layout: ľavý panel (sidebar konverzácií) + pravý panel (správy + input).
+- Responzívne: na mobile prepínanie medzi zoznamom a aktívnym chatom (`useIsMobile`).
 
-- TanStack server function `sendQuoteEmail` (`requireSupabaseAuth`) → využije Resend cez gateway (ak je pripojený) alebo zobrazí info že treba pripojiť email connector.
-- V prvej iterácii: email obsahuje link na zdieľanú stránku kalkulácie (public route `/api/public/quotes/$token` na neskôr) — zatiaľ použijeme jednoduchý prístup: server fn vygeneruje email s textovým zhrnutím a HTML rozpisom, bez priloženého PDF. PDF si klient vytlačí cez tlačidlo "Tlačiť" na zdieľanom linku.
-- Pre prvý release: pridať len akciu "Označiť ako Odoslaná" + `mailto:` link s predvyplneným textom (rýchle a bez nutnosti connector setupu). Skutočné odosielanie cez Resend pridáme ak používateľ pripojí connector.
+**Komponenty (`src/components/chat/`):**
+- `conversation-list.tsx` — Všetci (global) + zoznam direct konverzácií + tlačidlo "Nová správa" → dialog so zoznamom používateľov.
+- `message-list.tsx` — virtualizácia nie nutná, scroll na koniec; bubliny: vlastné vpravo (primary), cudzie vľavo; meno + čas; render `@mentions` ako badge; obrázky inline (`<img>` so signed URL), iné súbory ako odkaz s ikonou.
+- `message-composer.tsx` — textarea s autosize, attach button (upload do Storage), `@` mention popover s filtered zoznamom profiles, Enter na odoslanie, Shift+Enter newline.
+- `unread-badge.tsx` — používa hook.
 
-### 5. Dashboard widget
+**Hooky (`src/hooks/`):**
+- `use-chat-conversations.ts` — query na konverzácie kde som účastník + last message + unread count (na základe `last_read_at` vs `messages.created_at`).
+- `use-chat-messages.ts` — query messages danej konv. + realtime subscription (INSERT/DELETE) v `useEffect` s cleanup cez `removeChannel`. Mark-as-read: pri otvorení/novej správe update `last_read_at` na `now()` pre (conv, me).
+- `use-unread-total.ts` — globálne počítadlo cez query (sum unreadov), invalidate pri realtime INSERT.
+- `use-online-profiles.ts` (voliteľné, vynechané pre jednoduchosť).
 
-- Karta "Kalkulácie" v `dashboard.tsx` so štatistikou: počet návrhov / odoslaných / schválených (posledných 30 dní), link na zoznam.
+**Sidebar:** v `src/components/app-sidebar.tsx` pridať položku "Chat" s `MessageSquare` ikonou a badge s počtom neprečítaných (z `use-unread-total`). Pri @mention navyše toast (sonner) keď príde realtime mention pre mňa — riešené v root listener-i alebo v `use-unread-total`.
 
-### 6. Navigácia
+**Globálny notifikátor:** v `_authenticated/route.tsx` (alebo nový tichý komponent v rámci sidebaru) namountujeme `useChatNotifications()` ktorý subscribuje na všetky moje konverzácie cez jeden kanál `messages:user:{me}` a:
+- invaliduje queries
+- ak mention obsahuje moje id → `toast("Spomenuli ťa: ...")`
+- ak správa nie je v aktívnej konv → `toast` s názvom odosielateľa
 
-- Pridať položku "Kalkulácie" (ikona `FileText` alebo `Calculator`) do `app-sidebar.tsx`.
+### Server functions
 
-### Technické poznámky
+Žiadne — všetko cez priamy `supabase` klient s RLS (vrátane uploadu prílohy). RPC `get_or_create_direct_conversation` voláme cez `supabase.rpc()`.
 
-- Všetky výpočty robiť na frontende v live formulári, ale ukladať aj výsledné totaly do `quotes` pre rýchle zoznamy/filtre.
-- Validácia zod schémou v `QuoteForm`.
-- Pri prepojení s rezerváciou kopírujeme položky ako snapshot (názov + cena), aby zmeny cien v sklade nemenili odoslané kalkulácie.
+### Riziká / SSR
 
-Pokračujem implementáciou po schválení plánu.
+- Route `chat.tsx` má `ssr: false`.
+- Realtime subscription výhradne v `useEffect`, cleanup `removeChannel` — zabraňuje účtovacej slučke.
+- Upload prílohy: `supabase.storage.from('chat-attachments').upload(...)`.
+- Žiadne node-only knižnice.
+
+### Pri publish/self-host
+Funguje proti nášmu Supabase projektu (env je `VITE_SUPABASE_URL` + publishable key), realtime cez ten istý projekt.
+
+### Súbory na vytvorenie/úpravu
+
+- migrácia (tabuľky, RLS, RPC, triggery, realtime publication, seed global)
+- `src/routes/_authenticated/chat.tsx`
+- `src/components/chat/conversation-list.tsx`
+- `src/components/chat/message-list.tsx`
+- `src/components/chat/message-composer.tsx`
+- `src/components/chat/chat-notifications.tsx`
+- `src/hooks/use-chat-conversations.ts`
+- `src/hooks/use-chat-messages.ts`
+- `src/hooks/use-unread-total.ts`
+- úprava `src/components/app-sidebar.tsx` (položka Chat + badge + mount notifications)
+- bucket `chat-attachments`
