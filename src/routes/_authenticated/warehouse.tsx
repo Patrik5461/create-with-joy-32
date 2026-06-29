@@ -766,6 +766,30 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
           <Label>Poznámka</Label>
           <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
         </div>
+        <div className="space-y-2 sm:col-span-2 rounded-md border p-3 bg-muted/30">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium text-sm">Verejný katalóg</div>
+              <p className="text-xs text-muted-foreground">Zobrazí položku na verejnej stránke /katalog (bez interných údajov).</p>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="size-4" checked={!!form.public_visible} onChange={(e) => setForm({ ...form, public_visible: e.target.checked })} />
+              Zobraziť v katalógu
+            </label>
+          </div>
+          {form.public_visible && (
+            <div className="grid sm:grid-cols-3 gap-3 pt-2">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Verejný popis</Label>
+                <Textarea rows={2} value={form.public_description} onChange={(e) => setForm({ ...form, public_description: e.target.value })} placeholder="Marketingový popis pre klienta" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Orientačná cena (€/ks)</Label>
+                <Input type="number" step="0.01" min={0} value={form.public_price} onChange={(e) => setForm({ ...form, public_price: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="voliteľné" />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Zrušiť</Button>
