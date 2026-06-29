@@ -374,6 +374,8 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
     total_qty: item?.total_qty ?? 0,
     damaged_qty: item?.damaged_qty ?? 0,
     retired_qty: item?.retired_qty ?? 0,
+    price_per_day: item?.price_per_day ?? ("" as number | ""),
+    price_fixed: item?.price_fixed ?? ("" as number | ""),
   });
 
   const handleFile = async (file: File) => {
