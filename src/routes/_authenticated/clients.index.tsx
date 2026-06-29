@@ -37,7 +37,7 @@ const createDraftContact = (isPrimary = false): DraftContact => ({
   is_primary: isPrimary,
 });
 
-export const Route = createFileRoute("/_authenticated/clients")({
+export const Route = createFileRoute("/_authenticated/clients/")({
   head: () => ({ meta: [{ title: "Klienti · Mima Production CRM" }] }),
   component: Clients,
 });
