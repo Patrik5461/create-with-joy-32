@@ -103,6 +103,75 @@ export type Database = {
         }
         Relationships: []
       }
+      contracts: {
+        Row: {
+          contract_number: string | null
+          created_at: string
+          created_by: string | null
+          data: Json
+          id: string
+          quote_id: string | null
+          reservation_id: string
+          signature_client: string | null
+          signature_company: string | null
+          signed_at: string | null
+          signed_by_name: string | null
+          status: Database["public"]["Enums"]["document_status"]
+          terms: Json
+          total_with_vat: number | null
+          updated_at: string
+        }
+        Insert: {
+          contract_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          quote_id?: string | null
+          reservation_id: string
+          signature_client?: string | null
+          signature_company?: string | null
+          signed_at?: string | null
+          signed_by_name?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          terms?: Json
+          total_with_vat?: number | null
+          updated_at?: string
+        }
+        Update: {
+          contract_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          quote_id?: string | null
+          reservation_id?: string
+          signature_client?: string | null
+          signature_company?: string | null
+          signed_at?: string | null
+          signed_by_name?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          terms?: Json
+          total_with_vat?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -556,6 +625,148 @@ export type Database = {
         }
         Relationships: []
       }
+      protocol_items: {
+        Row: {
+          condition: Database["public"]["Enums"]["protocol_item_condition"]
+          created_at: string
+          damage_report_id: string | null
+          furniture_item_id: string | null
+          id: string
+          item_code: string | null
+          item_name: string
+          note: string | null
+          protocol_id: string
+          qty_actual: number
+          qty_expected: number
+        }
+        Insert: {
+          condition?: Database["public"]["Enums"]["protocol_item_condition"]
+          created_at?: string
+          damage_report_id?: string | null
+          furniture_item_id?: string | null
+          id?: string
+          item_code?: string | null
+          item_name: string
+          note?: string | null
+          protocol_id: string
+          qty_actual?: number
+          qty_expected?: number
+        }
+        Update: {
+          condition?: Database["public"]["Enums"]["protocol_item_condition"]
+          created_at?: string
+          damage_report_id?: string | null
+          furniture_item_id?: string | null
+          id?: string
+          item_code?: string | null
+          item_name?: string
+          note?: string | null
+          protocol_id?: string
+          qty_actual?: number
+          qty_expected?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocol_items_damage_report_id_fkey"
+            columns: ["damage_report_id"]
+            isOneToOne: false
+            referencedRelation: "damaged_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "furniture_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_items_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      protocols: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data: Json
+          id: string
+          issued_at: string
+          issued_by: string | null
+          issued_by_name: string | null
+          notes: string | null
+          protocol_number: string | null
+          received_by_name: string | null
+          related_handover_id: string | null
+          reservation_id: string
+          signature_client: string | null
+          signature_company: string | null
+          signed_at: string | null
+          status: Database["public"]["Enums"]["document_status"]
+          type: Database["public"]["Enums"]["protocol_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          issued_by_name?: string | null
+          notes?: string | null
+          protocol_number?: string | null
+          received_by_name?: string | null
+          related_handover_id?: string | null
+          reservation_id: string
+          signature_client?: string | null
+          signature_company?: string | null
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          type: Database["public"]["Enums"]["protocol_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          issued_by_name?: string | null
+          notes?: string | null
+          protocol_number?: string | null
+          received_by_name?: string | null
+          related_handover_id?: string | null
+          reservation_id?: string
+          signature_client?: string | null
+          signature_company?: string | null
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          type?: Database["public"]["Enums"]["protocol_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protocols_related_handover_id_fkey"
+            columns: ["related_handover_id"]
+            isOneToOne: false
+            referencedRelation: "protocols"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocols_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_items: {
         Row: {
           created_at: string
@@ -993,6 +1204,9 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "warehouse"
+      document_status: "draft" | "signed"
+      protocol_item_condition: "ok" | "damaged" | "missing"
+      protocol_type: "handover" | "return"
       quote_adjust_type: "none" | "percent" | "fixed"
       quote_item_kind: "furniture" | "service"
       quote_price_mode: "per_day" | "fixed" | "service"
@@ -1133,6 +1347,9 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "warehouse"],
+      document_status: ["draft", "signed"],
+      protocol_item_condition: ["ok", "damaged", "missing"],
+      protocol_type: ["handover", "return"],
       quote_adjust_type: ["none", "percent", "fixed"],
       quote_item_kind: ["furniture", "service"],
       quote_price_mode: ["per_day", "fixed", "service"],

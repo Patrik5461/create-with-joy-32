@@ -36,6 +36,8 @@ import { Route as AuthenticatedReservationsIdIndexRouteImport } from './routes/_
 import { Route as ApiPublicHooksWarehouseBackupRouteImport } from './routes/api/public/hooks/warehouse-backup'
 import { Route as ApiPublicCalendarTokenRouteImport } from './routes/api/public/calendar.$token'
 import { Route as AuthenticatedReservationsIdLayoutRouteImport } from './routes/_authenticated/reservations.$id.layout'
+import { Route as AuthenticatedDocumentsProtocolIdRouteImport } from './routes/_authenticated/documents.protocol.$id'
+import { Route as AuthenticatedDocumentsContractIdRouteImport } from './routes/_authenticated/documents.contract.$id'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -182,6 +184,18 @@ const AuthenticatedReservationsIdLayoutRoute =
     path: '/layout',
     getParentRoute: () => AuthenticatedReservationsIdRoute,
   } as any)
+const AuthenticatedDocumentsProtocolIdRoute =
+  AuthenticatedDocumentsProtocolIdRouteImport.update({
+    id: '/documents/protocol/$id',
+    path: '/documents/protocol/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDocumentsContractIdRoute =
+  AuthenticatedDocumentsContractIdRouteImport.update({
+    id: '/documents/contract/$id',
+    path: '/documents/contract/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -206,6 +220,8 @@ export interface FileRoutesByFullPath {
   '/quotes/': typeof AuthenticatedQuotesIndexRoute
   '/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/documents/contract/$id': typeof AuthenticatedDocumentsContractIdRoute
+  '/documents/protocol/$id': typeof AuthenticatedDocumentsProtocolIdRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
   '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
   '/api/public/hooks/warehouse-backup': typeof ApiPublicHooksWarehouseBackupRoute
@@ -232,6 +248,8 @@ export interface FileRoutesByTo {
   '/quotes': typeof AuthenticatedQuotesIndexRoute
   '/reservations': typeof AuthenticatedReservationsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
+  '/documents/contract/$id': typeof AuthenticatedDocumentsContractIdRoute
+  '/documents/protocol/$id': typeof AuthenticatedDocumentsProtocolIdRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
   '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
   '/api/public/hooks/warehouse-backup': typeof ApiPublicHooksWarehouseBackupRoute
@@ -262,6 +280,8 @@ export interface FileRoutesById {
   '/_authenticated/quotes/': typeof AuthenticatedQuotesIndexRoute
   '/_authenticated/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/_authenticated/documents/contract/$id': typeof AuthenticatedDocumentsContractIdRoute
+  '/_authenticated/documents/protocol/$id': typeof AuthenticatedDocumentsProtocolIdRoute
   '/_authenticated/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
   '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
   '/api/public/hooks/warehouse-backup': typeof ApiPublicHooksWarehouseBackupRoute
@@ -292,6 +312,8 @@ export interface FileRouteTypes {
     | '/quotes/'
     | '/reservations/'
     | '/settings/'
+    | '/documents/contract/$id'
+    | '/documents/protocol/$id'
     | '/reservations/$id/layout'
     | '/api/public/calendar/$token'
     | '/api/public/hooks/warehouse-backup'
@@ -318,6 +340,8 @@ export interface FileRouteTypes {
     | '/quotes'
     | '/reservations'
     | '/settings'
+    | '/documents/contract/$id'
+    | '/documents/protocol/$id'
     | '/reservations/$id/layout'
     | '/api/public/calendar/$token'
     | '/api/public/hooks/warehouse-backup'
@@ -347,6 +371,8 @@ export interface FileRouteTypes {
     | '/_authenticated/quotes/'
     | '/_authenticated/reservations/'
     | '/_authenticated/settings/'
+    | '/_authenticated/documents/contract/$id'
+    | '/_authenticated/documents/protocol/$id'
     | '/_authenticated/reservations/$id/layout'
     | '/api/public/calendar/$token'
     | '/api/public/hooks/warehouse-backup'
@@ -553,6 +579,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReservationsIdLayoutRouteImport
       parentRoute: typeof AuthenticatedReservationsIdRoute
     }
+    '/_authenticated/documents/protocol/$id': {
+      id: '/_authenticated/documents/protocol/$id'
+      path: '/documents/protocol/$id'
+      fullPath: '/documents/protocol/$id'
+      preLoaderRoute: typeof AuthenticatedDocumentsProtocolIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/documents/contract/$id': {
+      id: '/_authenticated/documents/contract/$id'
+      path: '/documents/contract/$id'
+      fullPath: '/documents/contract/$id'
+      preLoaderRoute: typeof AuthenticatedDocumentsContractIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -607,6 +647,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClientsIndexRoute: typeof AuthenticatedClientsIndexRoute
   AuthenticatedQuotesIndexRoute: typeof AuthenticatedQuotesIndexRoute
   AuthenticatedReservationsIndexRoute: typeof AuthenticatedReservationsIndexRoute
+  AuthenticatedDocumentsContractIdRoute: typeof AuthenticatedDocumentsContractIdRoute
+  AuthenticatedDocumentsProtocolIdRoute: typeof AuthenticatedDocumentsProtocolIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -628,6 +670,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedClientsIndexRoute: AuthenticatedClientsIndexRoute,
   AuthenticatedQuotesIndexRoute: AuthenticatedQuotesIndexRoute,
   AuthenticatedReservationsIndexRoute: AuthenticatedReservationsIndexRoute,
+  AuthenticatedDocumentsContractIdRoute: AuthenticatedDocumentsContractIdRoute,
+  AuthenticatedDocumentsProtocolIdRoute: AuthenticatedDocumentsProtocolIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
