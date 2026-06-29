@@ -32,6 +32,7 @@ import { Route as AuthenticatedQuotesNewRouteImport } from './routes/_authentica
 import { Route as AuthenticatedQuotesIdRouteImport } from './routes/_authenticated/quotes.$id'
 import { Route as AuthenticatedClientsIdRouteImport } from './routes/_authenticated/clients.$id'
 import { Route as AuthenticatedReservationsIdIndexRouteImport } from './routes/_authenticated/reservations.$id.index'
+import { Route as ApiPublicHooksWarehouseBackupRouteImport } from './routes/api/public/hooks/warehouse-backup'
 import { Route as ApiPublicCalendarTokenRouteImport } from './routes/api/public/calendar.$token'
 import { Route as AuthenticatedReservationsIdLayoutRouteImport } from './routes/_authenticated/reservations.$id.layout'
 
@@ -158,6 +159,12 @@ const AuthenticatedReservationsIdIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedReservationsIdRoute,
   } as any)
+const ApiPublicHooksWarehouseBackupRoute =
+  ApiPublicHooksWarehouseBackupRouteImport.update({
+    id: '/api/public/hooks/warehouse-backup',
+    path: '/api/public/hooks/warehouse-backup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCalendarTokenRoute = ApiPublicCalendarTokenRouteImport.update({
   id: '/api/public/calendar/$token',
   path: '/api/public/calendar/$token',
@@ -194,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
   '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
+  '/api/public/hooks/warehouse-backup': typeof ApiPublicHooksWarehouseBackupRoute
   '/reservations/$id/': typeof AuthenticatedReservationsIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -218,6 +226,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
   '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
+  '/api/public/hooks/warehouse-backup': typeof ApiPublicHooksWarehouseBackupRoute
   '/reservations/$id': typeof AuthenticatedReservationsIdIndexRoute
 }
 export interface FileRoutesById {
@@ -246,6 +255,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
   '/api/public/calendar/$token': typeof ApiPublicCalendarTokenRoute
+  '/api/public/hooks/warehouse-backup': typeof ApiPublicHooksWarehouseBackupRoute
   '/_authenticated/reservations/$id/': typeof AuthenticatedReservationsIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -274,6 +284,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/reservations/$id/layout'
     | '/api/public/calendar/$token'
+    | '/api/public/hooks/warehouse-backup'
     | '/reservations/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/reservations/$id/layout'
     | '/api/public/calendar/$token'
+    | '/api/public/hooks/warehouse-backup'
     | '/reservations/$id'
   id:
     | '__root__'
@@ -325,6 +337,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/'
     | '/_authenticated/reservations/$id/layout'
     | '/api/public/calendar/$token'
+    | '/api/public/hooks/warehouse-backup'
     | '/_authenticated/reservations/$id/'
   fileRoutesById: FileRoutesById
 }
@@ -334,6 +347,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DotaznikTokenRoute: typeof DotaznikTokenRoute
   ApiPublicCalendarTokenRoute: typeof ApiPublicCalendarTokenRoute
+  ApiPublicHooksWarehouseBackupRoute: typeof ApiPublicHooksWarehouseBackupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -499,6 +513,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReservationsIdIndexRouteImport
       parentRoute: typeof AuthenticatedReservationsIdRoute
     }
+    '/api/public/hooks/warehouse-backup': {
+      id: '/api/public/hooks/warehouse-backup'
+      path: '/api/public/hooks/warehouse-backup'
+      fullPath: '/api/public/hooks/warehouse-backup'
+      preLoaderRoute: typeof ApiPublicHooksWarehouseBackupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/calendar/$token': {
       id: '/api/public/calendar/$token'
       path: '/api/public/calendar/$token'
@@ -597,6 +618,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DotaznikTokenRoute: DotaznikTokenRoute,
   ApiPublicCalendarTokenRoute: ApiPublicCalendarTokenRoute,
+  ApiPublicHooksWarehouseBackupRoute: ApiPublicHooksWarehouseBackupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
