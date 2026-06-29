@@ -119,6 +119,34 @@ function Dashboard() {
           <Stat icon={TrendingUp} label="Eventy tento mesiac" value={data?.monthCount ?? "—"} />
         </div>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2"><ListChecks className="size-4" />Rezervácie podľa stavu</CardTitle>
+            <CardDescription>Životný cyklus eventov v reálnom čase</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+              {[...RESERVATION_FLOW, "cancelled" as const].map((s) => {
+                const count = data?.statusCounts?.[s] ?? 0;
+                return (
+                  <Link
+                    key={s}
+                    to="/reservations"
+                    search={{ status: s } as any}
+                    className="block rounded-lg border p-3 hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`size-2 rounded-full ${STATUS_DOT[s as ReservationStatus]}`} />
+                      <span className="text-xs font-medium text-muted-foreground truncate">{STATUS_LABEL[s as ReservationStatus]}</span>
+                    </div>
+                    <div className="text-2xl font-semibold mt-1">{count}</div>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
