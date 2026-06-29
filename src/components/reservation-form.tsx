@@ -68,6 +68,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
 
   const [form, setForm] = useState({
     client_id: initial?.client_id ?? "",
+    contact_id: initial?.contact_id ?? "",
     contact_person: initial?.contact_person ?? "",
     phone: initial?.phone ?? "",
     email: initial?.email ?? "",
@@ -91,6 +92,31 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
   );
 
   const clients = useQuery({ queryKey: ["clients-min"], queryFn: async () => (await supabase.from("clients").select("id,company_name,phone,email,contact_person").order("company_name")).data ?? [] });
+  const contacts = useQuery({
+    queryKey: ["client-contacts", form.client_id],
+    enabled: !!form.client_id,
+    queryFn: async () => (await supabase
+      .from("client_contacts")
+      .select("id, full_name, role, phone, email, is_primary")
+      .eq("client_id", form.client_id)
+      .order("is_primary", { ascending: false })
+      .order("full_name")).data ?? [],
+  });
+
+  useEffect(() => {
+    if (!contacts.data || form.contact_id) return;
+    const primary = contacts.data.find((c: any) => c.is_primary) ?? contacts.data[0];
+    if (primary) {
+      setForm((f) => ({
+        ...f,
+        contact_id: primary.id,
+        contact_person: f.contact_person || primary.full_name || "",
+        phone: f.phone || primary.phone || "",
+        email: f.email || primary.email || "",
+      }));
+    }
+  }, [contacts.data, form.contact_id]);
+
   const furniture = useQuery({ queryKey: ["furniture-min"], queryFn: async () => (await supabase.from("furniture_items").select("id,name,internal_code,total_qty").eq("active", true).order("name")).data ?? [] });
 
   // Refresh availability for all items when time window or items change
@@ -122,6 +148,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
     mutationFn: async () => {
       const payload = {
         client_id: form.client_id || null,
+        contact_id: form.contact_id || null,
         contact_person: form.contact_person || null,
         phone: form.phone || null,
         email: form.email || null,
@@ -182,9 +209,21 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
     setForm((f) => ({
       ...f,
       client_id: id,
+      contact_id: "",
       contact_person: f.contact_person || c?.contact_person || "",
       phone: f.phone || c?.phone || "",
       email: f.email || c?.email || "",
+    }));
+  };
+
+  const pickContact = (cid: string) => {
+    const c = contacts.data?.find((x: any) => x.id === cid);
+    setForm((f) => ({
+      ...f,
+      contact_id: cid,
+      contact_person: c?.full_name ?? f.contact_person,
+      phone: c?.phone ?? f.phone,
+      email: c?.email ?? f.email,
     }));
   };
 
@@ -236,6 +275,23 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
             )}
           </div>
           <div className="space-y-1.5"><Label>Kontaktná osoba</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Kontakt klienta</Label>
+            <Select
+              value={form.contact_id || "__none"}
+              onValueChange={(v) => v === "__none" ? setForm({ ...form, contact_id: "" }) : pickContact(v)}
+              disabled={!form.client_id}
+            >
+              <SelectTrigger><SelectValue placeholder={form.client_id ? "—" : "Najprv vyberte klienta"} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">— bez kontaktu —</SelectItem>
+                {(contacts.data ?? []).map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.full_name}{c.role ? ` · ${c.role}` : ""}{c.is_primary ? " (primárny)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1.5"><Label>Telefón</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Stav</Label>
