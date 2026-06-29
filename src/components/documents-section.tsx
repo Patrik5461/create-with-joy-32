@@ -106,7 +106,7 @@ export function DocumentsSection({ reservation }: Props) {
         data: snapshot,
         issued_at: new Date().toISOString(),
         issued_by: user?.id ?? null,
-        issued_by_name: user?.profile?.full_name ?? user?.email ?? null,
+        issued_by_name: user?.full_name ?? user?.email ?? null,
         received_by_name: snapshot.client.contact_person,
         related_handover_id,
         created_by: user?.id ?? null,
