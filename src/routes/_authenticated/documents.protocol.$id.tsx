@@ -10,11 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Printer, Save, Trash2, CheckCircle2, Wrench } from "lucide-react";
+import { ArrowLeft, Printer, Save, Trash2, CheckCircle2, Wrench, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import { SignaturePad } from "@/components/signature-pad";
 import { COMPANY_INFO, formatDate, formatDateTime } from "@/lib/document-utils";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
+import { QrScannerDialog } from "@/components/qr-scanner-dialog";
 
 export const Route = createFileRoute("/_authenticated/documents/protocol/$id")({
   head: () => ({ meta: [{ title: "Protokol · Mima Production CRM" }] }),
