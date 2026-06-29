@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DotaznikTokenRouteImport } from './routes/dotaznik.$token'
 import { Route as AuthenticatedWarehouseRouteImport } from './routes/_authenticated/warehouse'
 import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
+import { Route as AuthenticatedSurveysRouteImport } from './routes/_authenticated/surveys'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMaintenanceRouteImport } from './routes/_authenticated/maintenance'
 import { Route as AuthenticatedLogisticsRouteImport } from './routes/_authenticated/logistics'
@@ -61,6 +62,11 @@ const AuthenticatedWarehouseRoute = AuthenticatedWarehouseRouteImport.update({
 const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSurveysRoute = AuthenticatedSurveysRouteImport.update({
+  id: '/surveys',
+  path: '/surveys',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -172,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/logistics': typeof AuthenticatedLogisticsRoute
   '/maintenance': typeof AuthenticatedMaintenanceRoute
   '/settings': typeof AuthenticatedSettingsRouteWithChildren
+  '/surveys': typeof AuthenticatedSurveysRoute
   '/users': typeof AuthenticatedUsersRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/dotaznik/$token': typeof DotaznikTokenRoute
@@ -196,6 +203,7 @@ export interface FileRoutesByTo {
   '/layouts': typeof AuthenticatedLayoutsRoute
   '/logistics': typeof AuthenticatedLogisticsRoute
   '/maintenance': typeof AuthenticatedMaintenanceRoute
+  '/surveys': typeof AuthenticatedSurveysRoute
   '/users': typeof AuthenticatedUsersRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/dotaznik/$token': typeof DotaznikTokenRoute
@@ -222,6 +230,7 @@ export interface FileRoutesById {
   '/_authenticated/logistics': typeof AuthenticatedLogisticsRoute
   '/_authenticated/maintenance': typeof AuthenticatedMaintenanceRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
+  '/_authenticated/surveys': typeof AuthenticatedSurveysRoute
   '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/warehouse': typeof AuthenticatedWarehouseRoute
   '/dotaznik/$token': typeof DotaznikTokenRoute
@@ -249,6 +258,7 @@ export interface FileRouteTypes {
     | '/logistics'
     | '/maintenance'
     | '/settings'
+    | '/surveys'
     | '/users'
     | '/warehouse'
     | '/dotaznik/$token'
@@ -273,6 +283,7 @@ export interface FileRouteTypes {
     | '/layouts'
     | '/logistics'
     | '/maintenance'
+    | '/surveys'
     | '/users'
     | '/warehouse'
     | '/dotaznik/$token'
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/_authenticated/logistics'
     | '/_authenticated/maintenance'
     | '/_authenticated/settings'
+    | '/_authenticated/surveys'
     | '/_authenticated/users'
     | '/_authenticated/warehouse'
     | '/dotaznik/$token'
@@ -365,6 +377,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AuthenticatedUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/surveys': {
+      id: '/_authenticated/surveys'
+      path: '/surveys'
+      fullPath: '/surveys'
+      preLoaderRoute: typeof AuthenticatedSurveysRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
@@ -547,6 +566,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLogisticsRoute: typeof AuthenticatedLogisticsRoute
   AuthenticatedMaintenanceRoute: typeof AuthenticatedMaintenanceRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRouteWithChildren
+  AuthenticatedSurveysRoute: typeof AuthenticatedSurveysRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedWarehouseRoute: typeof AuthenticatedWarehouseRoute
   AuthenticatedQuotesIdRoute: typeof AuthenticatedQuotesIdRoute
@@ -564,6 +584,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLogisticsRoute: AuthenticatedLogisticsRoute,
   AuthenticatedMaintenanceRoute: AuthenticatedMaintenanceRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRouteWithChildren,
+  AuthenticatedSurveysRoute: AuthenticatedSurveysRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedWarehouseRoute: AuthenticatedWarehouseRoute,
   AuthenticatedQuotesIdRoute: AuthenticatedQuotesIdRoute,
