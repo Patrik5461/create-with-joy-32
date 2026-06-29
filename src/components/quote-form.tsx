@@ -399,18 +399,42 @@ export function QuoteForm({ initial, quoteId }: Props) {
         <CardHeader><CardTitle className="text-base">Zľava a príplatok</CardTitle></CardHeader>
         <CardContent className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Zľava</Label>
-            <div className="flex gap-2">
-              <Select value={form.discount_type} onValueChange={(v) => setForm({ ...form, discount_type: v as AdjustType })}>
-                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Bez zľavy</SelectItem>
-                  <SelectItem value="percent">Percentuálne (%)</SelectItem>
-                  <SelectItem value="fixed">Fixná suma (€)</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input type="number" step="0.01" min={0} value={form.discount_value} disabled={form.discount_type === "none"} onChange={(e) => setForm({ ...form, discount_value: Number(e.target.value) })} />
+            <div className="flex items-center justify-between">
+              <Label>Zľava (len na nábytok)</Label>
+              {form.discount_type !== "none" && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-rose-600 hover:text-rose-700"
+                  onClick={() => setForm({ ...form, discount_type: "none", discount_value: 0 })}
+                >
+                  <Trash2 className="size-3.5 mr-1" />Odstrániť zľavu
+                </Button>
+              )}
             </div>
+            {form.discount_type === "none" ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setForm({ ...form, discount_type: "percent", discount_value: 0 })}
+              >
+                <Plus className="size-3.5 mr-1" />Pridať zľavu
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Select value={form.discount_type} onValueChange={(v) => setForm({ ...form, discount_type: v as AdjustType })}>
+                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percent">Percentuálne (%)</SelectItem>
+                    <SelectItem value="fixed">Fixná suma (€)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input type="number" step="0.01" min={0} value={form.discount_value} onChange={(e) => setForm({ ...form, discount_value: Number(e.target.value) })} />
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">Zľava sa uplatní iba na položky typu nábytok, nie na služby ani dopravu.</p>
           </div>
           <div className="space-y-2">
             <Label>Príplatok</Label>
