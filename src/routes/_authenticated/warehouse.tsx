@@ -416,7 +416,12 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, photo_url: form.photo_url || null };
+      const payload = {
+        ...form,
+        photo_url: form.photo_url || null,
+        price_per_day: form.price_per_day === "" || form.price_per_day == null ? null : Number(form.price_per_day),
+        price_fixed: form.price_fixed === "" || form.price_fixed == null ? null : Number(form.price_fixed),
+      };
       if (item) {
         const { error } = await supabase.from("furniture_items").update(payload).eq("id", item.id);
         if (error) throw error;
