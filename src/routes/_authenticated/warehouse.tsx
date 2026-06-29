@@ -223,6 +223,12 @@ function Warehouse() {
                   {i.note && (
                     <p className="text-xs text-muted-foreground line-clamp-2">{i.note}</p>
                   )}
+                  {(i.price_per_day != null || i.price_fixed != null) && (
+                    <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                      {i.price_per_day != null && <span>Cena/deň: <strong className="text-foreground">{Number(i.price_per_day).toFixed(2)} €</strong></span>}
+                      {i.price_fixed != null && <span>Fixná: <strong className="text-foreground">{Number(i.price_fixed).toFixed(2)} €</strong></span>}
+                    </div>
+                  )}
                   <div className="grid grid-cols-4 gap-1 text-center mt-auto">
                     <div className="rounded-md bg-muted/60 px-1 py-1.5">
                       <div className="text-[10px] text-muted-foreground">Celkom</div>
