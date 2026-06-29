@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,13 +85,11 @@ export function QuoteForm({ initial, quoteId }: Props) {
   });
 
   // Po načítaní kontaktov nastav default na primárny, ak ešte nie je nič vybrané.
-  const contactsData = contacts.data;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useMemo(() => {
-    if (!contactsData || form.contact_id) return;
-    const primary = contactsData.find((c: any) => c.is_primary) ?? contactsData[0];
+  useEffect(() => {
+    if (!contacts.data || form.contact_id) return;
+    const primary = contacts.data.find((c: any) => c.is_primary) ?? contacts.data[0];
     if (primary) setForm((f) => ({ ...f, contact_id: primary.id }));
-  }, [contactsData]);
+  }, [contacts.data, form.contact_id]);
 
   const reservations = useQuery({
     queryKey: ["reservations-min"],
