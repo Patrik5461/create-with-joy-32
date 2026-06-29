@@ -76,6 +76,9 @@ function AuthPage() {
             </div>
           </CardContent>
         </Card>
+        <p className="text-center text-xs text-muted-foreground mt-4">
+          Nie ste zamestnanec? <a href="/katalog" className="underline hover:text-foreground">Pozrieť verejný katalóg</a>
+        </p>
       </div>
     </div>
   );
