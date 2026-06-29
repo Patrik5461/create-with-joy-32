@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,11 +7,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, Pencil } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Star, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
+
+type DraftContact = {
+  id: string;
+  full_name: string;
+  role: string;
+  phone: string;
+  email: string;
+  note: string;
+  is_primary: boolean;
+};
+
+const createDraftContact = (isPrimary = false): DraftContact => ({
+  id: crypto.randomUUID(),
+  full_name: "",
+  role: "",
+  phone: "",
+  email: "",
+  note: "",
+  is_primary: isPrimary,
+});
 
 export const Route = createFileRoute("/_authenticated/clients")({
   head: () => ({ meta: [{ title: "Klienti · Mima Production CRM" }] }),
@@ -20,6 +42,7 @@ export const Route = createFileRoute("/_authenticated/clients")({
 
 function Clients() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { data: user } = useCurrentUser();
   const canManage = hasRole(user, "admin", "manager");
   const [search, setSearch] = useState("");
@@ -84,7 +107,7 @@ function Clients() {
             </TableHeader>
             <TableBody>
               {filtered.map((c) => (
-                <TableRow key={c.id}>
+                <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate({ to: "/clients/$id", params: { id: c.id } })}>
                   <TableCell>
                     <Link to="/clients/$id" params={{ id: c.id }} className="font-medium hover:underline">{c.company_name}</Link>
                   </TableCell>
@@ -92,9 +115,12 @@ function Clients() {
                   <TableCell>{c.contact_person ?? "—"}</TableCell>
                   <TableCell>{c.phone ?? "—"}</TableCell>
                   <TableCell>{c.email ?? "—"}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" variant="ghost" asChild aria-label={`Otvoriť detail klienta ${c.company_name}`}>
+                      <Link to="/clients/$id" params={{ id: c.id }}><ExternalLink className="size-4" /></Link>
+                    </Button>
                     {canManage && (
-                      <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true); }}>
+                      <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true); }} aria-label={`Upraviť klienta ${c.company_name}`}>
                         <Pencil className="size-4" />
                       </Button>
                     )}
@@ -122,15 +148,52 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
     address: item?.address ?? "",
     notes: item?.notes ?? "",
   });
+  const [contacts, setContacts] = useState<DraftContact[]>([createDraftContact(true)]);
+
+  const updateContact = (id: string, patch: Partial<DraftContact>) => {
+    setContacts((current) => current.map((contact) => contact.id === id ? { ...contact, ...patch } : contact));
+  };
+
+  const setPrimaryContact = (id: string) => {
+    setContacts((current) => current.map((contact) => ({ ...contact, is_primary: contact.id === id })));
+  };
+
+  const removeContact = (id: string) => {
+    setContacts((current) => {
+      const next = current.filter((contact) => contact.id !== id);
+      if (next.length > 0 && !next.some((contact) => contact.is_primary)) next[0].is_primary = true;
+      return next;
+    });
+  };
 
   const save = useMutation({
     mutationFn: async () => {
+      const preparedContacts = contacts
+        .map((contact) => ({
+          full_name: contact.full_name.trim(),
+          role: contact.role.trim() || null,
+          phone: contact.phone.trim() || null,
+          email: contact.email.trim() || null,
+          note: contact.note.trim() || null,
+          is_primary: contact.is_primary,
+        }))
+        .filter((contact) => contact.full_name);
+
       if (item) {
         const { error } = await supabase.from("clients").update(form).eq("id", item.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("clients").insert(form);
+        const { data, error } = await supabase.from("clients").insert(form).select("id").single();
         if (error) throw error;
+        if (data && preparedContacts.length > 0) {
+          const normalizedContacts = preparedContacts.map((contact, index) => ({
+            ...contact,
+            client_id: data.id,
+            is_primary: preparedContacts.some((c) => c.is_primary) ? contact.is_primary : index === 0,
+          }));
+          const { error: contactsError } = await supabase.from("client_contacts").insert(normalizedContacts);
+          if (contactsError) throw contactsError;
+        }
       }
     },
     onSuccess: () => { toast.success(item ? "Klient upravený" : "Klient pridaný"); onClose(); },
@@ -138,7 +201,7 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
   });
 
   return (
-    <DialogContent className="max-w-xl">
+    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>{item ? "Upraviť klienta" : "Nový klient"}</DialogTitle>
         <DialogDescription>Údaje o klientovi.</DialogDescription>
@@ -152,6 +215,50 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
         <div className="space-y-1.5 sm:col-span-2"><Label>Adresa</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
         <div className="space-y-1.5 sm:col-span-2"><Label>Poznámky</Label><Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
       </div>
+      {!item && (
+        <div className="space-y-3 rounded-lg border p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">Kontaktné osoby</h3>
+              <p className="text-xs text-muted-foreground">Pridajte kontakty hneď pri vytváraní klienta.</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => setContacts((current) => [...current, createDraftContact(current.length === 0)])}>
+              <Plus className="size-4 mr-1" />Pridať kontakt
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {contacts.map((contact, index) => (
+              <div key={contact.id} className="rounded-md border bg-background p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Kontakt {index + 1}</span>
+                    {contact.is_primary && <Badge variant="outline"><Star className="size-3 mr-1" />Primárny</Badge>}
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removeContact(contact.id)} aria-label={`Odstrániť kontakt ${index + 1}`}>
+                    <Trash2 className="size-4 text-rose-600" />
+                  </Button>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5 sm:col-span-2"><Label>Meno a priezvisko</Label><Input value={contact.full_name} onChange={(e) => updateContact(contact.id, { full_name: e.target.value })} /></div>
+                  <div className="space-y-1.5"><Label>Pozícia / rola</Label><Input placeholder="napr. produkčný, fakturácia" value={contact.role} onChange={(e) => updateContact(contact.id, { role: e.target.value })} /></div>
+                  <div className="space-y-1.5"><Label>Telefón</Label><Input value={contact.phone} onChange={(e) => updateContact(contact.id, { phone: e.target.value })} /></div>
+                  <div className="space-y-1.5 sm:col-span-2"><Label>Email</Label><Input type="email" value={contact.email} onChange={(e) => updateContact(contact.id, { email: e.target.value })} /></div>
+                  <div className="space-y-1.5 sm:col-span-2"><Label>Poznámka</Label><Textarea rows={2} value={contact.note} onChange={(e) => updateContact(contact.id, { note: e.target.value })} /></div>
+                  <label className="sm:col-span-2 flex items-center gap-2 text-sm">
+                    <Checkbox checked={contact.is_primary} onCheckedChange={() => setPrimaryContact(contact.id)} />
+                    Primárny kontakt
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {item && (
+        <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+          Kontaktné osoby upravíte v detaile klienta cez tlačidlo otvorenia detailu v zozname.
+        </p>
+      )}
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Zrušiť</Button>
         <Button onClick={() => save.mutate()} disabled={!form.company_name || save.isPending}>Uložiť</Button>
