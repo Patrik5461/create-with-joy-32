@@ -8,13 +8,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
-import { STATUS_LABEL, STATUS_COLOR, type ReservationStatus } from "@/lib/reservation-status";
+import { RESERVATION_STATUSES, STATUS_LABEL, STATUS_COLOR, STATUS_DOT, type ReservationStatus } from "@/lib/reservation-status";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/reservations/")({
   head: () => ({ meta: [{ title: "Rezervácie · Mima Production CRM" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    status: typeof s.status === "string" ? (s.status as ReservationStatus | "all") : "all",
+  }),
   component: Reservations,
 });
 
@@ -24,6 +28,8 @@ function Reservations() {
   const { data: user } = useCurrentUser();
   const canCreate = hasRole(user, "admin", "manager");
   const navigate = useNavigate();
+  const search = Route.useSearch();
+  const statusFilter = (search.status ?? "all") as ReservationStatus | "all";
   const [view, setView] = useState<View>("week");
   const [cursor, setCursor] = useState<Date>(new Date());
 
@@ -34,14 +40,16 @@ function Reservations() {
   }, [view, cursor]);
 
   const reservations = useQuery({
-    queryKey: ["reservations", range.from.toISOString(), range.to.toISOString()],
+    queryKey: ["reservations", range.from.toISOString(), range.to.toISOString(), statusFilter],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("reservations")
         .select("id, event_name, venue, status, color, load_at, event_start_at, event_end_at, return_at, clients(company_name)")
         .gte("event_start_at", range.from.toISOString())
         .lte("event_start_at", range.to.toISOString())
         .order("event_start_at");
+      if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      const { data, error } = await q;
       if (error) throw error;
       return data as any[];
     },
@@ -87,13 +95,34 @@ function Reservations() {
             <Button variant="outline" size="icon" onClick={() => move(1)}><ChevronRight className="size-4" /></Button>
             <span className="font-medium text-sm ml-2 capitalize">{headerLabel}</span>
           </div>
-          <Tabs value={view} onValueChange={(v) => setView(v as View)}>
-            <TabsList>
-              <TabsTrigger value="day">Deň</TabsTrigger>
-              <TabsTrigger value="week">Týždeň</TabsTrigger>
-              <TabsTrigger value="month">Mesiac</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => navigate({ to: "/reservations", search: { status: v === "all" ? undefined : v } as any })}
+            >
+              <SelectTrigger className="h-9 w-44 text-xs">
+                <SelectValue placeholder="Všetky stavy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Všetky stavy</SelectItem>
+                {RESERVATION_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    <span className="inline-flex items-center gap-2">
+                      <span className={`size-2 rounded-full ${STATUS_DOT[s]}`} />
+                      {STATUS_LABEL[s]}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Tabs value={view} onValueChange={(v) => setView(v as View)}>
+              <TabsList>
+                <TabsTrigger value="day">Deň</TabsTrigger>
+                <TabsTrigger value="week">Týždeň</TabsTrigger>
+                <TabsTrigger value="month">Mesiac</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
 
         {view === "month" ? (
