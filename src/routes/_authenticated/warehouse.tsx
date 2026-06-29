@@ -36,6 +36,8 @@ interface FurnitureRow {
   damaged_qty: number;
   retired_qty: number;
   active: boolean;
+  price_per_day: number | null;
+  price_fixed: number | null;
   furniture_categories: { name: string; code: string } | null;
 }
 
