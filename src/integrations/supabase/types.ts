@@ -337,6 +337,9 @@ export type Database = {
           photo_url: string | null
           price_fixed: number | null
           price_per_day: number | null
+          public_description: string | null
+          public_price: number | null
+          public_visible: boolean
           retired_qty: number
           total_qty: number
           updated_at: string
@@ -355,6 +358,9 @@ export type Database = {
           photo_url?: string | null
           price_fixed?: number | null
           price_per_day?: number | null
+          public_description?: string | null
+          public_price?: number | null
+          public_visible?: boolean
           retired_qty?: number
           total_qty?: number
           updated_at?: string
@@ -373,6 +379,9 @@ export type Database = {
           photo_url?: string | null
           price_fixed?: number | null
           price_per_day?: number | null
+          public_description?: string | null
+          public_price?: number | null
+          public_visible?: boolean
           retired_qty?: number
           total_qty?: number
           updated_at?: string
@@ -383,6 +392,81 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "furniture_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inquiries: {
+        Row: {
+          client_id: string | null
+          company: string | null
+          created_at: string
+          email: string
+          event_end_at: string | null
+          event_start_at: string | null
+          id: string
+          items: Json
+          message: string | null
+          name: string
+          phone: string | null
+          reservation_id: string | null
+          source_ip: string | null
+          status: string
+          updated_at: string
+          user_agent: string | null
+          venue: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          company?: string | null
+          created_at?: string
+          email: string
+          event_end_at?: string | null
+          event_start_at?: string | null
+          id?: string
+          items?: Json
+          message?: string | null
+          name: string
+          phone?: string | null
+          reservation_id?: string | null
+          source_ip?: string | null
+          status?: string
+          updated_at?: string
+          user_agent?: string | null
+          venue?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          company?: string | null
+          created_at?: string
+          email?: string
+          event_end_at?: string | null
+          event_start_at?: string | null
+          id?: string
+          items?: Json
+          message?: string | null
+          name?: string
+          phone?: string | null
+          reservation_id?: string | null
+          source_ip?: string | null
+          status?: string
+          updated_at?: string
+          user_agent?: string | null
+          venue?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inquiries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inquiries_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
             referencedColumns: ["id"]
           },
         ]

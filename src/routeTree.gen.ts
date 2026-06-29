@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as KatalogRouteImport } from './routes/katalog'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -20,6 +21,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedMaintenanceRouteImport } from './routes/_authenticated/maintenance'
 import { Route as AuthenticatedLogisticsRouteImport } from './routes/_authenticated/logistics'
 import { Route as AuthenticatedLayoutsRouteImport } from './routes/_authenticated/layouts'
+import { Route as AuthenticatedInquiriesRouteImport } from './routes/_authenticated/inquiries'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings.index'
@@ -41,6 +43,11 @@ import { Route as AuthenticatedReservationsIdLayoutRouteImport } from './routes/
 import { Route as AuthenticatedDocumentsProtocolIdRouteImport } from './routes/_authenticated/documents.protocol.$id'
 import { Route as AuthenticatedDocumentsContractIdRouteImport } from './routes/_authenticated/documents.contract.$id'
 
+const KatalogRoute = KatalogRouteImport.update({
+  id: '/katalog',
+  path: '/katalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -94,6 +101,11 @@ const AuthenticatedLogisticsRoute = AuthenticatedLogisticsRouteImport.update({
 const AuthenticatedLayoutsRoute = AuthenticatedLayoutsRouteImport.update({
   id: '/layouts',
   path: '/layouts',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedInquiriesRoute = AuthenticatedInquiriesRouteImport.update({
+  id: '/inquiries',
+  path: '/inquiries',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -214,8 +226,10 @@ const AuthenticatedDocumentsContractIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/katalog': typeof KatalogRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/inquiries': typeof AuthenticatedInquiriesRoute
   '/layouts': typeof AuthenticatedLayoutsRoute
   '/logistics': typeof AuthenticatedLogisticsRoute
   '/maintenance': typeof AuthenticatedMaintenanceRoute
@@ -246,8 +260,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/katalog': typeof KatalogRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/inquiries': typeof AuthenticatedInquiriesRoute
   '/layouts': typeof AuthenticatedLayoutsRoute
   '/logistics': typeof AuthenticatedLogisticsRoute
   '/maintenance': typeof AuthenticatedMaintenanceRoute
@@ -278,8 +294,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/katalog': typeof KatalogRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/inquiries': typeof AuthenticatedInquiriesRoute
   '/_authenticated/layouts': typeof AuthenticatedLayoutsRoute
   '/_authenticated/logistics': typeof AuthenticatedLogisticsRoute
   '/_authenticated/maintenance': typeof AuthenticatedMaintenanceRoute
@@ -312,8 +330,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/katalog'
     | '/chat'
     | '/dashboard'
+    | '/inquiries'
     | '/layouts'
     | '/logistics'
     | '/maintenance'
@@ -344,8 +364,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/katalog'
     | '/chat'
     | '/dashboard'
+    | '/inquiries'
     | '/layouts'
     | '/logistics'
     | '/maintenance'
@@ -375,8 +397,10 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/katalog'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
+    | '/_authenticated/inquiries'
     | '/_authenticated/layouts'
     | '/_authenticated/logistics'
     | '/_authenticated/maintenance'
@@ -409,6 +433,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  KatalogRoute: typeof KatalogRoute
   DotaznikTokenRoute: typeof DotaznikTokenRoute
   ApiPublicCalendarTokenRoute: typeof ApiPublicCalendarTokenRoute
   ApiPublicHooksWarehouseBackupRoute: typeof ApiPublicHooksWarehouseBackupRoute
@@ -416,6 +441,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/katalog': {
+      id: '/katalog'
+      path: '/katalog'
+      fullPath: '/katalog'
+      preLoaderRoute: typeof KatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -491,6 +523,13 @@ declare module '@tanstack/react-router' {
       path: '/layouts'
       fullPath: '/layouts'
       preLoaderRoute: typeof AuthenticatedLayoutsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/inquiries': {
+      id: '/_authenticated/inquiries'
+      path: '/inquiries'
+      fullPath: '/inquiries'
+      preLoaderRoute: typeof AuthenticatedInquiriesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -688,6 +727,7 @@ const AuthenticatedReservationsIdRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedInquiriesRoute: typeof AuthenticatedInquiriesRoute
   AuthenticatedLayoutsRoute: typeof AuthenticatedLayoutsRoute
   AuthenticatedLogisticsRoute: typeof AuthenticatedLogisticsRoute
   AuthenticatedMaintenanceRoute: typeof AuthenticatedMaintenanceRoute
@@ -710,6 +750,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedInquiriesRoute: AuthenticatedInquiriesRoute,
   AuthenticatedLayoutsRoute: AuthenticatedLayoutsRoute,
   AuthenticatedLogisticsRoute: AuthenticatedLogisticsRoute,
   AuthenticatedMaintenanceRoute: AuthenticatedMaintenanceRoute,
@@ -737,6 +778,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  KatalogRoute: KatalogRoute,
   DotaznikTokenRoute: DotaznikTokenRoute,
   ApiPublicCalendarTokenRoute: ApiPublicCalendarTokenRoute,
   ApiPublicHooksWarehouseBackupRoute: ApiPublicHooksWarehouseBackupRoute,
