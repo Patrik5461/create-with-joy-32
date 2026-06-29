@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,7 @@ import {
 interface QuoteRecord {
   id?: string;
   client_id: string | null;
+  contact_id: string | null;
   reservation_id: string | null;
   status: "draft" | "sent" | "approved" | "rejected";
   issue_date: string;
@@ -44,6 +45,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
 
   const [form, setForm] = useState<QuoteRecord>(initial ?? {
     client_id: null,
+    contact_id: null,
     reservation_id: null,
     status: "draft",
     issue_date: new Date().toISOString().slice(0, 10),
@@ -66,6 +68,28 @@ export function QuoteForm({ initial, quoteId }: Props) {
       return data;
     },
   });
+
+  const contacts = useQuery({
+    queryKey: ["client-contacts", form.client_id],
+    enabled: !!form.client_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_contacts")
+        .select("id, full_name, role, phone, email, is_primary")
+        .eq("client_id", form.client_id!)
+        .order("is_primary", { ascending: false })
+        .order("full_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Po načítaní kontaktov nastav default na primárny, ak ešte nie je nič vybrané.
+  useEffect(() => {
+    if (!contacts.data || form.contact_id) return;
+    const primary = contacts.data.find((c: any) => c.is_primary) ?? contacts.data[0];
+    if (primary) setForm((f) => ({ ...f, contact_id: primary.id }));
+  }, [contacts.data, form.contact_id]);
 
   const reservations = useQuery({
     queryKey: ["reservations-min"],
@@ -168,6 +192,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
       if (lines.length === 0) throw new Error("Pridajte aspoň jednu položku.");
       const payload = {
         client_id: form.client_id,
+        contact_id: form.contact_id,
         reservation_id: form.reservation_id,
         status: form.status,
         issue_date: form.issue_date,
@@ -228,10 +253,30 @@ export function QuoteForm({ initial, quoteId }: Props) {
         <CardContent className="grid sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Klient *</Label>
-            <Select value={form.client_id ?? ""} onValueChange={(v) => setForm({ ...form, client_id: v })}>
+            <Select value={form.client_id ?? ""} onValueChange={(v) => setForm({ ...form, client_id: v, contact_id: null })}>
               <SelectTrigger><SelectValue placeholder="Vyberte klienta" /></SelectTrigger>
               <SelectContent>
                 {clients.data?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Kontaktná osoba</Label>
+            <Select
+              value={form.contact_id ?? "__none"}
+              onValueChange={(v) => setForm({ ...form, contact_id: v === "__none" ? null : v })}
+              disabled={!form.client_id}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={form.client_id ? "—" : "Najprv vyberte klienta"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">— bez kontaktu —</SelectItem>
+                {(contacts.data ?? []).map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.full_name}{c.role ? ` · ${c.role}` : ""}{c.is_primary ? " (primárny)" : ""}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -388,14 +433,16 @@ export function QuoteForm({ initial, quoteId }: Props) {
       <Card>
         <CardHeader><CardTitle className="text-base">Súčty</CardTitle></CardHeader>
         <CardContent className="space-y-1.5 text-sm">
-          <Row label="Medzisúčet" value={formatEur(totals.subtotal)} />
-          {totals.discount > 0 && <Row label="Zľava" value={`− ${formatEur(totals.discount)}`} tone="emerald" />}
+          <Row label="Medzisúčet – nábytok" value={formatEur(totals.furnitureSubtotal)} />
+          {totals.discount > 0 && <Row label="Zľava (len nábytok)" value={`− ${formatEur(totals.discount)}`} tone="emerald" />}
+          {totals.servicesSubtotal > 0 && <Row label="Medzisúčet – služby / doprava" value={formatEur(totals.servicesSubtotal)} />}
           {totals.surcharge > 0 && <Row label={form.surcharge_label || "Príplatok"} value={`+ ${formatEur(totals.surcharge)}`} />}
           <Row label="Spolu bez DPH" value={formatEur(totals.totalWithoutVat)} bold />
           <Row label={`DPH ${form.vat_rate}%`} value={formatEur(totals.vatAmount)} />
           <div className="border-t pt-2 mt-2">
             <Row label="Spolu s DPH" value={formatEur(totals.totalWithVat)} bold big />
           </div>
+          <p className="text-xs text-muted-foreground pt-1">Zľava sa vzťahuje výhradne na položky typu nábytok; služby a doprava sa nezľavňujú.</p>
         </CardContent>
       </Card>
 

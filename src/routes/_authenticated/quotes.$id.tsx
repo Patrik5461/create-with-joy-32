@@ -27,7 +27,7 @@ function QuoteDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("*, clients(*), reservations(event_name, venue), quote_items(*)")
+        .select("*, clients(*), client_contacts(id, full_name, role, phone, email), reservations(event_name, venue), quote_items(*)")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -55,6 +55,7 @@ function QuoteDetail() {
       const { data: ins, error } = await supabase.from("quotes").insert({
         quote_number: "",
         client_id: q.client_id,
+        contact_id: q.contact_id,
         reservation_id: null,
         status: "draft",
         issue_date: new Date().toISOString().slice(0, 10),
@@ -161,9 +162,19 @@ function QuoteDetail() {
             <CardContent className="text-sm space-y-1">
               <div className="font-semibold">{q.clients?.company_name ?? "—"}</div>
               {q.clients?.ico && <div className="text-muted-foreground">IČO: {q.clients.ico}</div>}
-              {q.clients?.contact_person && <div>{q.clients.contact_person}</div>}
-              {q.clients?.email && <div className="text-muted-foreground">{q.clients.email}</div>}
-              {q.clients?.phone && <div className="text-muted-foreground">{q.clients.phone}</div>}
+              {q.client_contacts ? (
+                <div className="pt-1">
+                  <div>{q.client_contacts.full_name}{q.client_contacts.role ? ` · ${q.client_contacts.role}` : ""}</div>
+                  {q.client_contacts.email && <div className="text-muted-foreground">{q.client_contacts.email}</div>}
+                  {q.client_contacts.phone && <div className="text-muted-foreground">{q.client_contacts.phone}</div>}
+                </div>
+              ) : (
+                <>
+                  {q.clients?.contact_person && <div>{q.clients.contact_person}</div>}
+                  {q.clients?.email && <div className="text-muted-foreground">{q.clients.email}</div>}
+                  {q.clients?.phone && <div className="text-muted-foreground">{q.clients.phone}</div>}
+                </>
+              )}
               {q.clients?.address && <div className="text-muted-foreground">{q.clients.address}</div>}
             </CardContent>
           </Card>
@@ -203,12 +214,12 @@ function QuoteDetail() {
 
         <Card>
           <CardContent className="p-5 space-y-1 text-sm">
-            <Row label="Medzisúčet" value={formatEur(Number(q.subtotal))} />
-            <Row label="Spolu bez DPH" value={formatEur(Number(q.total_without_vat))} bold />
+            {renderBreakdown(q)}
             <Row label={`DPH ${q.vat_rate}%`} value={formatEur(Number(q.vat_amount))} />
             <div className="border-t pt-2 mt-2">
               <Row label="Spolu s DPH" value={formatEur(Number(q.total_with_vat))} bold big />
             </div>
+            <p className="text-xs text-muted-foreground pt-1">Zľava sa vzťahuje výhradne na nábytok; služby a doprava sa nezľavňujú.</p>
           </CardContent>
         </Card>
 
@@ -232,6 +243,55 @@ function Row({ label, value, bold, big }: { label: string; value: string; bold?:
       <span className="text-muted-foreground">{label}</span>
       <span className={bold ? "font-semibold" : ""}>{value}</span>
     </div>
+  );
+}
+
+function deriveBreakdown(q: any) {
+  const items = (q.quote_items ?? []) as any[];
+  const furniture = items.filter((it) => it.kind === "furniture")
+    .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
+  const services = items.filter((it) => it.kind === "service")
+    .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
+  const totalWithoutVat = Number(q.total_without_vat ?? 0);
+  const dtype = q.discount_type ?? "none";
+  const dval = Number(q.discount_value ?? 0);
+  const rawDiscount = dtype === "percent" ? (furniture * dval) / 100 : dtype === "fixed" ? dval : 0;
+  const discount = Math.min(Math.max(0, rawDiscount), furniture);
+  const furnitureAfter = Math.max(0, furniture - discount);
+  const baseForSurcharge = furnitureAfter + services;
+  const surcharge = Math.max(0, totalWithoutVat - baseForSurcharge);
+  return { furniture, services, discount, surcharge };
+}
+
+function renderBreakdown(q: any) {
+  const b = deriveBreakdown(q);
+  return (
+    <>
+      <Row label="Medzisúčet – nábytok" value={formatEur(b.furniture)} />
+      {b.discount > 0 && <Row label="Zľava (len nábytok)" value={`− ${formatEur(b.discount)}`} />}
+      {b.services > 0 && <Row label="Medzisúčet – služby / doprava" value={formatEur(b.services)} />}
+      {b.surcharge > 0 && <Row label={q.surcharge_label || "Príplatok"} value={`+ ${formatEur(b.surcharge)}`} />}
+      <Row label="Spolu bez DPH" value={formatEur(Number(q.total_without_vat))} bold />
+    </>
+  );
+}
+
+function renderPrintBreakdown(q: any) {
+  const b = deriveBreakdown(q);
+  return (
+    <>
+      <div className="flex justify-between"><span>Medzisúčet – nábytok</span><span>{formatEur(b.furniture)}</span></div>
+      {b.discount > 0 && (
+        <div className="flex justify-between"><span>Zľava (len nábytok)</span><span>− {formatEur(b.discount)}</span></div>
+      )}
+      {b.services > 0 && (
+        <div className="flex justify-between"><span>Medzisúčet – služby / doprava</span><span>{formatEur(b.services)}</span></div>
+      )}
+      {b.surcharge > 0 && (
+        <div className="flex justify-between"><span>{q.surcharge_label || "Príplatok"}</span><span>+ {formatEur(b.surcharge)}</span></div>
+      )}
+      <div className="flex justify-between font-medium"><span>Spolu bez DPH</span><span>{formatEur(Number(q.total_without_vat))}</span></div>
+    </>
   );
 }
 
@@ -263,10 +323,12 @@ function PrintView({ quote: q }: { quote: any }) {
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Odberateľ</div>
           <div className="font-semibold">{q.clients?.company_name ?? "—"}</div>
           {q.clients?.ico && <div>IČO: {q.clients.ico}</div>}
-          {q.clients?.contact_person && <div>{q.clients.contact_person}</div>}
+          {q.client_contacts
+            ? <div>{q.client_contacts.full_name}{q.client_contacts.role ? ` · ${q.client_contacts.role}` : ""}</div>
+            : (q.clients?.contact_person && <div>{q.clients.contact_person}</div>)}
           {q.clients?.address && <div>{q.clients.address}</div>}
-          {q.clients?.email && <div>{q.clients.email}</div>}
-          {q.clients?.phone && <div>{q.clients.phone}</div>}
+          {(q.client_contacts?.email ?? q.clients?.email) && <div>{q.client_contacts?.email ?? q.clients?.email}</div>}
+          {(q.client_contacts?.phone ?? q.clients?.phone) && <div>{q.client_contacts?.phone ?? q.clients?.phone}</div>}
         </div>
       </div>
 
@@ -295,14 +357,12 @@ function PrintView({ quote: q }: { quote: any }) {
 
       <div className="flex justify-end">
         <div className="w-72 space-y-1">
-          <div className="flex justify-between"><span>Medzisúčet</span><span>{formatEur(Number(q.subtotal))}</span></div>
-          {Number(q.subtotal) !== Number(q.total_without_vat) && (
-            <div className="flex justify-between"><span>Po úpravách</span><span>{formatEur(Number(q.total_without_vat))}</span></div>
-          )}
+          {renderPrintBreakdown(q)}
           <div className="flex justify-between"><span>DPH {q.vat_rate}%</span><span>{formatEur(Number(q.vat_amount))}</span></div>
           <div className="flex justify-between border-t-2 border-black pt-2 text-lg font-bold">
             <span>Spolu s DPH</span><span>{formatEur(Number(q.total_with_vat))}</span>
           </div>
+          <p className="text-[10px] text-gray-500 pt-1">Zľava sa vzťahuje výhradne na nábytok; služby a doprava sa nezľavňujú.</p>
         </div>
       </div>
 

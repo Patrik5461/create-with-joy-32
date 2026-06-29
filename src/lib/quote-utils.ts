@@ -20,6 +20,8 @@ export function lineTotal(l: QuoteLine): number {
 
 export interface QuoteTotals {
   subtotal: number;
+  furnitureSubtotal: number;
+  servicesSubtotal: number;
   discount: number;
   surcharge: number;
   totalWithoutVat: number;
@@ -35,18 +37,27 @@ export function computeTotals(opts: {
   surchargeValue: number;
   vatRate: number;
 }): QuoteTotals {
-  const subtotal = opts.lines.reduce((s, l) => s + lineTotal(l), 0);
-  const discount =
-    opts.discountType === "percent" ? (subtotal * opts.discountValue) / 100 :
+  const furnitureSubtotal = opts.lines
+    .filter((l) => l.kind === "furniture")
+    .reduce((s, l) => s + lineTotal(l), 0);
+  const servicesSubtotal = opts.lines
+    .filter((l) => l.kind === "service")
+    .reduce((s, l) => s + lineTotal(l), 0);
+  const subtotal = furnitureSubtotal + servicesSubtotal;
+  // Zľava sa vzťahuje LEN na nábytok, NIE na služby/dopravu.
+  const rawDiscount =
+    opts.discountType === "percent" ? (furnitureSubtotal * opts.discountValue) / 100 :
     opts.discountType === "fixed" ? opts.discountValue : 0;
-  const afterDiscount = Math.max(0, subtotal - discount);
+  const discount = Math.min(Math.max(0, rawDiscount), furnitureSubtotal);
+  const furnitureAfterDiscount = Math.max(0, furnitureSubtotal - discount);
+  const baseForSurcharge = furnitureAfterDiscount + servicesSubtotal;
   const surcharge =
-    opts.surchargeType === "percent" ? (afterDiscount * opts.surchargeValue) / 100 :
+    opts.surchargeType === "percent" ? (baseForSurcharge * opts.surchargeValue) / 100 :
     opts.surchargeType === "fixed" ? opts.surchargeValue : 0;
-  const totalWithoutVat = Math.max(0, afterDiscount + surcharge);
+  const totalWithoutVat = Math.max(0, baseForSurcharge + surcharge);
   const vatAmount = (totalWithoutVat * opts.vatRate) / 100;
   const totalWithVat = totalWithoutVat + vatAmount;
-  return { subtotal, discount, surcharge, totalWithoutVat, vatAmount, totalWithVat };
+  return { subtotal, furnitureSubtotal, servicesSubtotal, discount, surcharge, totalWithoutVat, vatAmount, totalWithVat };
 }
 
 export function formatEur(n: number): string {
