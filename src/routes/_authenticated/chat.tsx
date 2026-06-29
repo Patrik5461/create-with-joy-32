@@ -53,7 +53,7 @@ function ChatPage() {
 
   return (
     <>
-      <AppHeader title="Chat" />
+      <AppHeader title="Interný Chat" />
       <div className="flex h-[calc(100vh-3.5rem)]">
         {showList && (
           <aside className="w-full md:w-80 border-r bg-card flex-shrink-0">
