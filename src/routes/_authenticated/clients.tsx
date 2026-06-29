@@ -174,6 +174,7 @@ function Clients() {
 }
 
 function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
+  const qc = useQueryClient();
   const [form, setForm] = useState({
     company_name: item?.company_name ?? "",
     ico: item?.ico ?? "",
@@ -300,7 +301,12 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
         }
       }
     },
-    onSuccess: () => { toast.success(item ? "Klient upravený" : "Klient pridaný"); onClose(); },
+    onSuccess: () => {
+      toast.success(item ? "Klient upravený" : "Klient pridaný");
+      qc.invalidateQueries({ queryKey: ["client-contacts"] });
+      if (item?.id) qc.invalidateQueries({ queryKey: ["client", item.id] });
+      onClose();
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
