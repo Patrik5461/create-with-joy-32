@@ -246,6 +246,55 @@ function Row({ label, value, bold, big }: { label: string; value: string; bold?:
   );
 }
 
+function deriveBreakdown(q: any) {
+  const items = (q.quote_items ?? []) as any[];
+  const furniture = items.filter((it) => it.kind === "furniture")
+    .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
+  const services = items.filter((it) => it.kind === "service")
+    .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
+  const totalWithoutVat = Number(q.total_without_vat ?? 0);
+  const dtype = q.discount_type ?? "none";
+  const dval = Number(q.discount_value ?? 0);
+  const rawDiscount = dtype === "percent" ? (furniture * dval) / 100 : dtype === "fixed" ? dval : 0;
+  const discount = Math.min(Math.max(0, rawDiscount), furniture);
+  const furnitureAfter = Math.max(0, furniture - discount);
+  const baseForSurcharge = furnitureAfter + services;
+  const surcharge = Math.max(0, totalWithoutVat - baseForSurcharge);
+  return { furniture, services, discount, surcharge };
+}
+
+function renderBreakdown(q: any) {
+  const b = deriveBreakdown(q);
+  return (
+    <>
+      <Row label="Medzisúčet – nábytok" value={formatEur(b.furniture)} />
+      {b.discount > 0 && <Row label="Zľava (len nábytok)" value={`− ${formatEur(b.discount)}`} />}
+      {b.services > 0 && <Row label="Medzisúčet – služby / doprava" value={formatEur(b.services)} />}
+      {b.surcharge > 0 && <Row label={q.surcharge_label || "Príplatok"} value={`+ ${formatEur(b.surcharge)}`} />}
+      <Row label="Spolu bez DPH" value={formatEur(Number(q.total_without_vat))} bold />
+    </>
+  );
+}
+
+function renderPrintBreakdown(q: any) {
+  const b = deriveBreakdown(q);
+  return (
+    <>
+      <div className="flex justify-between"><span>Medzisúčet – nábytok</span><span>{formatEur(b.furniture)}</span></div>
+      {b.discount > 0 && (
+        <div className="flex justify-between"><span>Zľava (len nábytok)</span><span>− {formatEur(b.discount)}</span></div>
+      )}
+      {b.services > 0 && (
+        <div className="flex justify-between"><span>Medzisúčet – služby / doprava</span><span>{formatEur(b.services)}</span></div>
+      )}
+      {b.surcharge > 0 && (
+        <div className="flex justify-between"><span>{q.surcharge_label || "Príplatok"}</span><span>+ {formatEur(b.surcharge)}</span></div>
+      )}
+      <div className="flex justify-between font-medium"><span>Spolu bez DPH</span><span>{formatEur(Number(q.total_without_vat))}</span></div>
+    </>
+  );
+}
+
 function PrintView({ quote: q }: { quote: any }) {
   return (
     <div className="hidden print:block p-10 text-sm text-black bg-white">
