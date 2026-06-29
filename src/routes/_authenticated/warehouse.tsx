@@ -196,8 +196,23 @@ function Warehouse() {
 
         {items.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((i) => {
+        {(() => {
+          const cats = categories.data ?? [];
+          const groups = cats
+            .map((c) => ({ cat: c, list: filtered.filter((i) => i.category_id === c.id) }))
+            .filter((g) => g.list.length > 0);
+          if (!items.isLoading && groups.length === 0) return null;
+          return (
+            <div className="space-y-8">
+              {groups.map(({ cat, list }) => (
+                <section key={cat.id} className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Badge className={`border ${categoryClass(cat.code)}`}>{cat.name}</Badge>
+                    <div className="h-px bg-border flex-1" />
+                    <span className="text-xs text-muted-foreground">{list.length} ks</span>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {list.map((i) => {
             const reserved = reservedNow.data?.[i.id] ?? 0;
             const available = i.total_qty - i.damaged_qty - i.retired_qty - reserved;
             return (
@@ -268,8 +283,13 @@ function Warehouse() {
                 </CardContent>
               </Card>
             );
-          })}
-        </div>
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          );
+        })()}
         {!items.isLoading && filtered.length === 0 && (
           <p className="text-center text-sm text-muted-foreground py-12">Žiadne položky nenájdené.</p>
         )}
@@ -416,7 +436,7 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: any = {
         ...form,
         photo_url: form.photo_url || null,
         price_per_day: form.price_per_day === "" || form.price_per_day == null ? null : Number(form.price_per_day),
@@ -426,6 +446,8 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
         const { error } = await supabase.from("furniture_items").update(payload).eq("id", item.id);
         if (error) throw error;
       } else {
+        // Nechaj DB trigger vygenerovať interný kód automaticky podľa kategórie
+        delete payload.internal_code;
         const { error } = await supabase.from("furniture_items").insert(payload);
         if (error) throw error;
       }
@@ -484,7 +506,14 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
         </div>
         <div className="space-y-1.5">
           <Label>Interný kód</Label>
-          <Input value={form.internal_code} onChange={(e) => setForm({ ...form, internal_code: e.target.value })} />
+          {item ? (
+            <Input value={form.internal_code} onChange={(e) => setForm({ ...form, internal_code: e.target.value })} />
+          ) : (
+            <>
+              <Input value="" disabled placeholder="Vygeneruje sa automaticky" />
+              <p className="text-[11px] text-muted-foreground">Pridelí sa podľa kategórie (napr. TABLES-0001).</p>
+            </>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label>Kategória</Label>
@@ -530,7 +559,7 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Zrušiť</Button>
-        <Button onClick={() => save.mutate()} disabled={save.isPending || uploading || !form.name || !form.internal_code}>Uložiť</Button>
+        <Button onClick={() => save.mutate()} disabled={save.isPending || uploading || !form.name || !form.category_id || (!!item && !form.internal_code)}>Uložiť</Button>
       </DialogFooter>
     </DialogContent>
   );
