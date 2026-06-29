@@ -51,7 +51,10 @@ function ClientDetail() {
         {client.data && (
           <div className="grid md:grid-cols-3 gap-4">
             <Card className="md:col-span-1">
-              <CardHeader><CardTitle>{client.data.company_name}</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardTitle>{client.data.company_name}</CardTitle>
+                <EditClientButton client={client.data} />
+              </CardHeader>
               <CardContent className="text-sm space-y-2">
                 <Field label="IČO" value={client.data.ico} />
                 <Field label="Hl. kontakt (legacy)" value={client.data.contact_person} />
@@ -87,6 +90,71 @@ function ClientDetail() {
         )}
       </div>
     </>
+  );
+}
+
+function EditClientButton({ client }: { client: any }) {
+  const qc = useQueryClient();
+  const { data: user } = useCurrentUser();
+  const canManage = hasRole(user, "admin", "manager");
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    company_name: client.company_name ?? "",
+    ico: client.ico ?? "",
+    contact_person: client.contact_person ?? "",
+    phone: client.phone ?? "",
+    email: client.email ?? "",
+    address: client.address ?? "",
+    notes: client.notes ?? "",
+  });
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!form.company_name.trim()) throw new Error("Názov firmy je povinný");
+      const { error } = await supabase.from("clients").update(form).eq("id", client.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Klient upravený");
+      qc.invalidateQueries({ queryKey: ["client", client.id] });
+      qc.invalidateQueries({ queryKey: ["clients"] });
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  if (!canManage) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) setForm({
+      company_name: client.company_name ?? "",
+      ico: client.ico ?? "",
+      contact_person: client.contact_person ?? "",
+      phone: client.phone ?? "",
+      email: client.email ?? "",
+      address: client.address ?? "",
+      notes: client.notes ?? "",
+    }); }}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline"><Pencil className="size-3.5 mr-1" />Upraviť</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Upraviť firmu</DialogTitle></DialogHeader>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5 sm:col-span-2"><Label>Názov firmy *</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>IČO</Label><Input value={form.ico} onChange={(e) => setForm({ ...form, ico: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Hl. kontakt (legacy)</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Telefón</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+          <div className="space-y-1.5 sm:col-span-2"><Label>Adresa</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+          <div className="space-y-1.5 sm:col-span-2"><Label>Poznámky</Label><Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Zrušiť</Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || !form.company_name.trim()}>Uložiť</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
