@@ -334,52 +334,6 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Časový plán</CardTitle></CardHeader>
-        <CardContent className="grid md:grid-cols-3 gap-3">
-          <TimeField label="Nakládka" value={form.load_at} onChange={(v) => setForm({ ...form, load_at: v })} />
-          <TimeField label="Odchod na event" value={form.depart_at} onChange={(v) => setForm({ ...form, depart_at: v })} />
-          <TimeField label="Začiatok eventu" value={form.event_start_at} onChange={(v) => setForm({ ...form, event_start_at: v })} />
-          <TimeField label="Koniec eventu" value={form.event_end_at} onChange={(v) => setForm({ ...form, event_end_at: v })} />
-          <TimeField label="Návrat nábytku" value={form.return_at} onChange={(v) => setForm({ ...form, return_at: v })} />
-          <TimeField label="Opätovne dostupné od" value={form.available_from_at} onChange={(v) => setForm({ ...form, available_from_at: v })} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Preprava</CardTitle></CardHeader>
-        <CardContent className="grid md:grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label>Vozidlo</Label>
-            <Select
-              value={form.vehicle_id || "__none"}
-              onValueChange={(v) => setForm({ ...form, vehicle_id: v === "__none" ? "" : v })}
-            >
-              <SelectTrigger><SelectValue placeholder="Vyberte vozidlo" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">— bez vozidla —</SelectItem>
-                {(vehicles.data ?? []).map((v: any) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.name}{v.license_plate ? ` · ${v.license_plate}` : ""}{v.capacity_kg ? ` · ${v.capacity_kg} kg` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">Spravujte vozový park v module Logistika.</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Počet otočiek</Label>
-            <Input
-              type="number"
-              min={1}
-              value={form.trip_count}
-              onChange={(e) => setForm({ ...form, trip_count: Math.max(1, Number(e.target.value) || 1) })}
-            />
-            <p className="text-xs text-muted-foreground">Koľkokrát sa vozidlo musí otočiť, aby previezlo všetok nábytok.</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Položky nábytku</CardTitle>
           <Button size="sm" variant="outline" onClick={() => setItems((p) => [...p, { furniture_item_id: "", qty: 1 }])}><Plus className="size-3.5 mr-1" />Pridať položku</Button>
@@ -425,6 +379,52 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
               <span>Niektoré položky nemajú dostatočný počet kusov v zvolenom čase. Uloženie nebude možné.</span>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Preprava</CardTitle></CardHeader>
+        <CardContent className="grid md:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Vozidlo</Label>
+            <Select
+              value={form.vehicle_id || "__none"}
+              onValueChange={(v) => setForm({ ...form, vehicle_id: v === "__none" ? "" : v })}
+            >
+              <SelectTrigger><SelectValue placeholder="Vyberte vozidlo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">— bez vozidla —</SelectItem>
+                {(vehicles.data ?? []).map((v: any) => (
+                  <SelectItem key={v.id} value={v.id}>
+                    {v.name}{v.license_plate ? ` · ${v.license_plate}` : ""}{v.capacity_kg ? ` · ${v.capacity_kg} kg` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Spravujte vozový park v module Logistika.</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Počet otočiek</Label>
+            <Input
+              type="number"
+              min={1}
+              value={form.trip_count}
+              onChange={(e) => setForm({ ...form, trip_count: Math.max(1, Number(e.target.value) || 1) })}
+            />
+            <p className="text-xs text-muted-foreground">Koľkokrát sa vozidlo musí otočiť, aby previezlo všetok nábytok.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Časový plán</CardTitle></CardHeader>
+        <CardContent className="grid md:grid-cols-3 gap-3">
+          <TimeField label="Nakládka" value={form.load_at} onChange={(v) => setForm({ ...form, load_at: v })} />
+          <TimeField label="Odchod na event" value={form.depart_at} onChange={(v) => setForm({ ...form, depart_at: v })} />
+          <TimeField label="Začiatok eventu" value={form.event_start_at} onChange={(v) => setForm({ ...form, event_start_at: v })} />
+          <TimeField label="Koniec eventu" value={form.event_end_at} onChange={(v) => setForm({ ...form, event_end_at: v })} />
+          <TimeField label="Návrat nábytku" value={form.return_at} onChange={(v) => setForm({ ...form, return_at: v })} />
+          <TimeField label="Opätovne dostupné od" value={form.available_from_at} onChange={(v) => setForm({ ...form, available_from_at: v })} />
         </CardContent>
       </Card>
 
