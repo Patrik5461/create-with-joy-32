@@ -752,6 +752,44 @@ export type Database = {
           },
         ]
       }
+      reservation_status_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          from_status: Database["public"]["Enums"]["reservation_status"] | null
+          id: string
+          note: string | null
+          reservation_id: string
+          to_status: Database["public"]["Enums"]["reservation_status"]
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["reservation_status"] | null
+          id?: string
+          note?: string | null
+          reservation_id: string
+          to_status: Database["public"]["Enums"]["reservation_status"]
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["reservation_status"] | null
+          id?: string
+          note?: string | null
+          reservation_id?: string
+          to_status?: Database["public"]["Enums"]["reservation_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservation_status_history_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reservations: {
         Row: {
           address: string | null
@@ -961,12 +999,11 @@ export type Database = {
       quote_status: "draft" | "sent" | "approved" | "rejected"
       reservation_status:
         | "inquiry"
+        | "quote"
         | "confirmed"
-        | "prepared"
-        | "loaded"
-        | "delivered"
         | "in_progress"
         | "returned"
+        | "invoiced"
         | "cancelled"
     }
     CompositeTypes: {
@@ -1102,12 +1139,11 @@ export const Constants = {
       quote_status: ["draft", "sent", "approved", "rejected"],
       reservation_status: [
         "inquiry",
+        "quote",
         "confirmed",
-        "prepared",
-        "loaded",
-        "delivered",
         "in_progress",
         "returned",
+        "invoiced",
         "cancelled",
       ],
     },
