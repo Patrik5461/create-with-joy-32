@@ -34,7 +34,7 @@ function ReservationDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservations")
-        .select("*, clients(id,company_name), reservation_items(id,qty,furniture_item_id,furniture_items(name,internal_code))")
+        .select("*, clients(id,company_name,ico,address,contact_person,email,phone), reservation_items(id,qty,furniture_item_id,furniture_items(name,internal_code))")
         .eq("id", id).maybeSingle();
       if (error) throw error;
       return data as any;
