@@ -190,7 +190,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
         if (error) throw error;
         await supabase.from("quote_items").delete().eq("quote_id", id);
       } else {
-        const { data, error } = await supabase.from("quotes").insert(payload).select("id").single();
+        const { data, error } = await supabase.from("quotes").insert({ ...payload, quote_number: "" }).select("id").single();
         if (error) throw error;
         id = data.id;
       }
