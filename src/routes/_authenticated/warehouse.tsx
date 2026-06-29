@@ -11,7 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X, AlertTriangle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { DamageReportDialog } from "@/components/damage-report-dialog";
@@ -90,6 +91,7 @@ function Warehouse() {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<FurnitureRow | null>(null);
   const [damageFor, setDamageFor] = useState<FurnitureRow | null>(null);
+  const [deleteFor, setDeleteFor] = useState<FurnitureRow | null>(null);
 
   const categories = useQuery({
     queryKey: ["furniture_categories"],
@@ -139,6 +141,29 @@ function Warehouse() {
       toast.success("Stav aktualizovaný");
     },
     onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteItem = useMutation({
+    mutationFn: async (row: FurnitureRow) => {
+      if (row.photo_url && !row.photo_url.startsWith("http")) {
+        await supabase.storage.from(PHOTO_BUCKET).remove([row.photo_url]).catch(() => {});
+      }
+      const { error } = await supabase.from("furniture_items").delete().eq("id", row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["furniture_items"] });
+      toast.success("Položka odstránená");
+      setDeleteFor(null);
+    },
+    onError: (e: any) => {
+      const msg = String(e?.message ?? "");
+      if (msg.includes("foreign key") || msg.includes("violates")) {
+        toast.error("Položku nie je možné odstrániť — je použitá v rezerváciách alebo iných záznamoch. Skús ju radšej deaktivovať.");
+      } else {
+        toast.error(msg || "Odstránenie zlyhalo");
+      }
+    },
   });
 
   const filtered = useMemo(() => {
@@ -277,6 +302,9 @@ function Warehouse() {
                         <Button size="sm" variant="ghost" aria-label={i.active ? "Deaktivovať položku" : "Aktivovať položku"} onClick={() => toggleActive.mutate(i)} title={i.active ? "Deaktivovať" : "Aktivovať"}>
                           <Power className="size-3.5" />
                         </Button>
+                        <Button size="sm" variant="ghost" aria-label="Odstrániť položku" onClick={() => setDeleteFor(i)} title="Odstrániť">
+                          <Trash2 className="size-3.5 text-rose-600" />
+                        </Button>
                       </>
                     )}
                   </div>
@@ -305,6 +333,27 @@ function Warehouse() {
         item={damageFor ? { id: damageFor.id, name: damageFor.name, total_qty: damageFor.total_qty, damaged_qty: damageFor.damaged_qty, retired_qty: damageFor.retired_qty } : null}
         reservedNow={damageFor ? reservedNow.data?.[damageFor.id] ?? 0 : 0}
       />
+
+      <AlertDialog open={!!deleteFor} onOpenChange={(o) => !o && setDeleteFor(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Odstrániť položku?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Naozaj chceš trvalo odstrániť „{deleteFor?.name}" zo skladu? Túto akciu nie je možné vrátiť späť. Ak je položka použitá v rezerváciách, radšej ju deaktivuj.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Zrušiť</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 hover:bg-rose-700"
+              onClick={(e) => { e.preventDefault(); if (deleteFor) deleteItem.mutate(deleteFor); }}
+              disabled={deleteItem.isPending}
+            >
+              {deleteItem.isPending ? "Odstraňujem…" : "Odstrániť"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
