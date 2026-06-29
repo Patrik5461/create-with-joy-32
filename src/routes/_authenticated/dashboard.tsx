@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarRange, Package, Truck, AlertTriangle, TrendingUp, Boxes, Wrench, ArrowRight } from "lucide-react";
+import { CalendarRange, Package, Truck, AlertTriangle, TrendingUp, Boxes, Wrench, ArrowRight, Calculator } from "lucide-react";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
 import { STATUS_LABEL, STATUS_BADGE_VARIANT, type ReservationStatus } from "@/lib/reservation-status";
@@ -28,7 +28,7 @@ function useDashboardData() {
       const startMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
       const endMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59).toISOString();
 
-      const [todayLoad, todayReturn, outNow, upcoming, monthCount, active, items, allReservations, openDamage] = await Promise.all([
+      const [todayLoad, todayReturn, outNow, upcoming, monthCount, active, items, allReservations, openDamage, quotes] = await Promise.all([
         supabase.from("reservations").select("id,event_name,load_at,venue,status,clients(company_name)").gte("load_at", startToday).lte("load_at", endToday).neq("status", "cancelled").order("load_at"),
         supabase.from("reservations").select("id,event_name,return_at,venue,status,clients(company_name)").gte("return_at", startToday).lte("return_at", endToday).neq("status", "cancelled").order("return_at"),
         supabase.from("reservations").select("id,event_name,return_at,venue,status,clients(company_name)").lte("load_at", now).gte("available_from_at", now).neq("status", "cancelled"),
@@ -38,6 +38,7 @@ function useDashboardData() {
         supabase.from("furniture_items").select("id,name,total_qty,damaged_qty,retired_qty").eq("active", true),
         supabase.from("reservation_items").select("qty,furniture_item_id,furniture_items(name)"),
         supabase.from("damaged_items").select("id,severity", { count: "exact" }).in("status", ["new", "in_progress"]),
+        supabase.from("quotes").select("status"),
       ]);
 
       // Top rented items aggregation
@@ -65,6 +66,9 @@ function useDashboardData() {
         itemCount: items.data?.length ?? 0,
         openDamageCount: openDamage.count ?? 0,
         severeDamageCount: (openDamage.data ?? []).filter((d: any) => d.severity === "severe").length,
+        quotesDraft: (quotes.data ?? []).filter((q: any) => q.status === "draft").length,
+        quotesSent: (quotes.data ?? []).filter((q: any) => q.status === "sent").length,
+        quotesApproved: (quotes.data ?? []).filter((q: any) => q.status === "approved").length,
       };
     },
   });
@@ -237,6 +241,34 @@ function Dashboard() {
               <div>
                 <div className="text-2xl font-semibold text-rose-700">{data?.severeDamageCount ?? "—"}</div>
                 <p className="text-xs text-muted-foreground mt-1">z toho vážnych</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2"><Calculator className="size-4 text-primary" />Kalkulácie</CardTitle>
+              <CardDescription>Prehľad cenových ponúk</CardDescription>
+            </div>
+            <Link to="/quotes" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
+              Otvoriť modul <ArrowRight className="size-3" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-8">
+              <div>
+                <div className="text-3xl font-semibold">{data?.quotesDraft ?? "—"}</div>
+                <p className="text-xs text-muted-foreground mt-1">návrhov</p>
+              </div>
+              <div>
+                <div className="text-3xl font-semibold text-sky-700">{data?.quotesSent ?? "—"}</div>
+                <p className="text-xs text-muted-foreground mt-1">odoslaných</p>
+              </div>
+              <div>
+                <div className="text-3xl font-semibold text-emerald-700">{data?.quotesApproved ?? "—"}</div>
+                <p className="text-xs text-muted-foreground mt-1">schválených</p>
               </div>
             </div>
           </CardContent>

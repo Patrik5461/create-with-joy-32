@@ -36,6 +36,8 @@ interface FurnitureRow {
   damaged_qty: number;
   retired_qty: number;
   active: boolean;
+  price_per_day: number | null;
+  price_fixed: number | null;
   furniture_categories: { name: string; code: string } | null;
 }
 
@@ -221,6 +223,12 @@ function Warehouse() {
                   {i.note && (
                     <p className="text-xs text-muted-foreground line-clamp-2">{i.note}</p>
                   )}
+                  {(i.price_per_day != null || i.price_fixed != null) && (
+                    <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                      {i.price_per_day != null && <span>Cena/deň: <strong className="text-foreground">{Number(i.price_per_day).toFixed(2)} €</strong></span>}
+                      {i.price_fixed != null && <span>Fixná: <strong className="text-foreground">{Number(i.price_fixed).toFixed(2)} €</strong></span>}
+                    </div>
+                  )}
                   <div className="grid grid-cols-4 gap-1 text-center mt-auto">
                     <div className="rounded-md bg-muted/60 px-1 py-1.5">
                       <div className="text-[10px] text-muted-foreground">Celkom</div>
@@ -366,6 +374,8 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
     total_qty: item?.total_qty ?? 0,
     damaged_qty: item?.damaged_qty ?? 0,
     retired_qty: item?.retired_qty ?? 0,
+    price_per_day: item?.price_per_day ?? ("" as number | ""),
+    price_fixed: item?.price_fixed ?? ("" as number | ""),
   });
 
   const handleFile = async (file: File) => {
@@ -406,7 +416,12 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, photo_url: form.photo_url || null };
+      const payload = {
+        ...form,
+        photo_url: form.photo_url || null,
+        price_per_day: form.price_per_day === "" || form.price_per_day == null ? null : Number(form.price_per_day),
+        price_fixed: form.price_fixed === "" || form.price_fixed == null ? null : Number(form.price_fixed),
+      };
       if (item) {
         const { error } = await supabase.from("furniture_items").update(payload).eq("id", item.id);
         if (error) throw error;
@@ -499,6 +514,14 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
         <div className="space-y-1.5">
           <Label>Vyradené</Label>
           <Input type="number" min={0} value={form.retired_qty} onChange={(e) => setForm({ ...form, retired_qty: Number(e.target.value) })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Cena za deň (€/ks)</Label>
+          <Input type="number" step="0.01" min={0} value={form.price_per_day} onChange={(e) => setForm({ ...form, price_per_day: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="napr. 2.50" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Fixná cena za event (€/ks)</Label>
+          <Input type="number" step="0.01" min={0} value={form.price_fixed} onChange={(e) => setForm({ ...form, price_fixed: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="napr. 10.00" />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Poznámka</Label>
