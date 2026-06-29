@@ -59,13 +59,27 @@ function categoryClass(code?: string | null) {
 
 function FurniturePhoto({ value, alt, className }: { value: string | null; alt: string; className?: string }) {
   const isHttp = value?.startsWith("http");
+  const qc = useQueryClient();
   const { data: signed } = useQuery({
     queryKey: ["furniture-photo", value],
     enabled: !!value && !isHttp,
     staleTime: 1000 * 60 * 30,
+    retry: false,
     queryFn: async () => {
       const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(value!, 60 * 60);
-      if (error) throw error;
+      if (error) {
+        const msg = (error as any)?.message ?? "";
+        const status = (error as any)?.statusCode ?? (error as any)?.status;
+        if (status === "404" || status === 404 || /not.?found/i.test(msg)) {
+          // Self-heal: file no longer exists in storage — clear the orphaned reference
+          await supabase
+            .from("furniture_items")
+            .update({ photo_url: null })
+            .eq("photo_url", value!)
+            .then(() => qc.invalidateQueries({ queryKey: ["furniture_items"] }));
+        }
+        throw error;
+      }
       return data.signedUrl;
     },
   });
