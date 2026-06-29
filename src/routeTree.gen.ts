@@ -22,6 +22,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings.index'
 import { Route as AuthenticatedReservationsIndexRouteImport } from './routes/_authenticated/reservations.index'
+import { Route as AuthenticatedQuotesIndexRouteImport } from './routes/_authenticated/quotes.index'
 import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings.calendar'
 import { Route as AuthenticatedReservationsNewRouteImport } from './routes/_authenticated/reservations.new'
 import { Route as AuthenticatedReservationsIdRouteImport } from './routes/_authenticated/reservations.$id'
@@ -97,6 +98,12 @@ const AuthenticatedReservationsIndexRoute =
     path: '/reservations/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedQuotesIndexRoute =
+  AuthenticatedQuotesIndexRouteImport.update({
+    id: '/quotes/',
+    path: '/quotes/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsCalendarRoute =
   AuthenticatedSettingsCalendarRouteImport.update({
     id: '/calendar',
@@ -153,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/quotes/': typeof AuthenticatedQuotesIndexRoute
   '/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
@@ -172,6 +180,7 @@ export interface FileRoutesByTo {
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/quotes': typeof AuthenticatedQuotesIndexRoute
   '/reservations': typeof AuthenticatedReservationsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
@@ -195,6 +204,7 @@ export interface FileRoutesById {
   '/_authenticated/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/_authenticated/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/_authenticated/quotes/': typeof AuthenticatedQuotesIndexRoute
   '/_authenticated/reservations/': typeof AuthenticatedReservationsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/reservations/$id/layout': typeof AuthenticatedReservationsIdLayoutRoute
@@ -218,6 +228,7 @@ export interface FileRouteTypes {
     | '/reservations/$id'
     | '/reservations/new'
     | '/settings/calendar'
+    | '/quotes/'
     | '/reservations/'
     | '/settings/'
     | '/reservations/$id/layout'
@@ -237,6 +248,7 @@ export interface FileRouteTypes {
     | '/clients/$id'
     | '/reservations/new'
     | '/settings/calendar'
+    | '/quotes'
     | '/reservations'
     | '/settings'
     | '/reservations/$id/layout'
@@ -259,6 +271,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reservations/$id'
     | '/_authenticated/reservations/new'
     | '/_authenticated/settings/calendar'
+    | '/_authenticated/quotes/'
     | '/_authenticated/reservations/'
     | '/_authenticated/settings/'
     | '/_authenticated/reservations/$id/layout'
@@ -364,6 +377,13 @@ declare module '@tanstack/react-router' {
       path: '/reservations'
       fullPath: '/reservations/'
       preLoaderRoute: typeof AuthenticatedReservationsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/quotes/': {
+      id: '/_authenticated/quotes/'
+      path: '/quotes'
+      fullPath: '/quotes/'
+      preLoaderRoute: typeof AuthenticatedQuotesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings/calendar': {
@@ -473,6 +493,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedWarehouseRoute: typeof AuthenticatedWarehouseRoute
   AuthenticatedReservationsIdRoute: typeof AuthenticatedReservationsIdRouteWithChildren
   AuthenticatedReservationsNewRoute: typeof AuthenticatedReservationsNewRoute
+  AuthenticatedQuotesIndexRoute: typeof AuthenticatedQuotesIndexRoute
   AuthenticatedReservationsIndexRoute: typeof AuthenticatedReservationsIndexRoute
 }
 
@@ -488,6 +509,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReservationsIdRoute:
     AuthenticatedReservationsIdRouteWithChildren,
   AuthenticatedReservationsNewRoute: AuthenticatedReservationsNewRoute,
+  AuthenticatedQuotesIndexRoute: AuthenticatedQuotesIndexRoute,
   AuthenticatedReservationsIndexRoute: AuthenticatedReservationsIndexRoute,
 }
 
