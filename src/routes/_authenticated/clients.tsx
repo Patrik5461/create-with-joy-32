@@ -18,6 +18,7 @@ import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 type DraftContact = {
   id: string;
+  existingId?: string;
   full_name: string;
   role: string;
   phone: string;
@@ -173,6 +174,7 @@ function Clients() {
 }
 
 function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
+  const qc = useQueryClient();
   const [form, setForm] = useState({
     company_name: item?.company_name ?? "",
     ico: item?.ico ?? "",
@@ -183,6 +185,33 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
     notes: item?.notes ?? "",
   });
   const [contacts, setContacts] = useState<DraftContact[]>([createDraftContact(true)]);
+  const [removedContactIds, setRemovedContactIds] = useState<string[]>([]);
+
+  useQuery({
+    queryKey: ["client-contacts-edit", item?.id],
+    enabled: !!item?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_contacts")
+        .select("*")
+        .eq("client_id", item.id)
+        .order("is_primary", { ascending: false })
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      const loaded: DraftContact[] = (data ?? []).map((c: any) => ({
+        id: crypto.randomUUID(),
+        existingId: c.id,
+        full_name: c.full_name ?? "",
+        role: c.role ?? "",
+        phone: c.phone ?? "",
+        email: c.email ?? "",
+        note: c.note ?? "",
+        is_primary: !!c.is_primary,
+      }));
+      setContacts(loaded.length > 0 ? loaded : [createDraftContact(true)]);
+      return data;
+    },
+  });
 
   const updateContact = (id: string, patch: Partial<DraftContact>) => {
     setContacts((current) => current.map((contact) => contact.id === id ? { ...contact, ...patch } : contact));
@@ -194,6 +223,8 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
 
   const removeContact = (id: string) => {
     setContacts((current) => {
+      const target = current.find((c) => c.id === id);
+      if (target?.existingId) setRemovedContactIds((ids) => [...ids, target.existingId!]);
       const next = current.filter((contact) => contact.id !== id);
       if (next.length === 0 || next.some((contact) => contact.is_primary)) return next;
       return next.map((contact, index) => ({ ...contact, is_primary: index === 0 }));
@@ -226,6 +257,36 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
       if (item) {
         const { error } = await supabase.from("clients").update(form).eq("id", item.id);
         if (error) throw error;
+
+        // Delete removed contacts
+        if (removedContactIds.length > 0) {
+          const { error: delErr } = await supabase.from("client_contacts").delete().in("id", removedContactIds);
+          if (delErr) throw delErr;
+        }
+
+        const hasPrimary = contacts.some((c) => c.is_primary && c.full_name.trim());
+        const filledContacts = contacts.filter((c) => c.full_name.trim());
+
+        // Upsert each contact preserving order
+        for (let i = 0; i < filledContacts.length; i++) {
+          const c = filledContacts[i];
+          const payload = {
+            client_id: item.id,
+            full_name: c.full_name.trim(),
+            role: c.role.trim() || null,
+            phone: c.phone.trim() || null,
+            email: c.email.trim() || null,
+            note: c.note.trim() || null,
+            is_primary: hasPrimary ? c.is_primary : i === 0,
+          };
+          if (c.existingId) {
+            const { error: upErr } = await supabase.from("client_contacts").update(payload).eq("id", c.existingId);
+            if (upErr) throw upErr;
+          } else {
+            const { error: insErr } = await supabase.from("client_contacts").insert(payload);
+            if (insErr) throw insErr;
+          }
+        }
       } else {
         const { data, error } = await supabase.from("clients").insert(form).select("id").single();
         if (error) throw error;
@@ -240,7 +301,12 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
         }
       }
     },
-    onSuccess: () => { toast.success(item ? "Klient upravený" : "Klient pridaný"); onClose(); },
+    onSuccess: () => {
+      toast.success(item ? "Klient upravený" : "Klient pridaný");
+      qc.invalidateQueries({ queryKey: ["client-contacts"] });
+      if (item?.id) qc.invalidateQueries({ queryKey: ["client", item.id] });
+      onClose();
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -259,12 +325,11 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
         <div className="space-y-1.5 sm:col-span-2"><Label>Adresa</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
         <div className="space-y-1.5 sm:col-span-2"><Label>Poznámky</Label><Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
       </div>
-      {!item && (
-        <div className="space-y-3 rounded-lg border p-3">
+      <div className="space-y-3 rounded-lg border p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-sm font-semibold">Kontaktné osoby</h3>
-              <p className="text-xs text-muted-foreground">Pridajte kontakty hneď pri vytváraní klienta.</p>
+              <p className="text-xs text-muted-foreground">{item ? "Spravujte kontakty klienta — pridajte, upravte alebo odstráňte." : "Pridajte kontakty hneď pri vytváraní klienta."}</p>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={() => setContacts((current) => [...current, createDraftContact(current.length === 0)])}>
               <Plus className="size-4 mr-1" />Pridať kontakt
@@ -296,13 +361,7 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
               </div>
             ))}
           </div>
-        </div>
-      )}
-      {item && (
-        <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-          Kontaktné osoby upravíte v detaile klienta cez tlačidlo otvorenia detailu v zozname.
-        </p>
-      )}
+      </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Zrušiť</Button>
         <Button onClick={() => save.mutate()} disabled={!form.company_name || save.isPending}>Uložiť</Button>
