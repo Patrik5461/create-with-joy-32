@@ -23,6 +23,94 @@ export const Route = createFileRoute("/_authenticated/warehouse")({
 });
 
 const PHOTO_BUCKET = "furniture-photos";
+const BACKUP_BUCKET = "warehouse-backups";
+
+function BackupsButton() {
+  const [open, setOpen] = useState(false);
+  const [running, setRunning] = useState(false);
+  const qc = useQueryClient();
+
+  const list = useQuery({
+    queryKey: ["warehouse-backups"],
+    enabled: open,
+    queryFn: async () => {
+      const all: { name: string; path: string; created_at?: string; size?: number }[] = [];
+      // List by year folders
+      const { data: years } = await supabase.storage.from(BACKUP_BUCKET).list("", { limit: 100, sortBy: { column: "name", order: "desc" } });
+      for (const y of years ?? []) {
+        if (!/^\d{4}$/.test(y.name)) continue;
+        const { data: months } = await supabase.storage.from(BACKUP_BUCKET).list(y.name, { limit: 100, sortBy: { column: "name", order: "desc" } });
+        for (const m of months ?? []) {
+          if (!/^\d{2}$/.test(m.name)) continue;
+          const { data: files } = await supabase.storage.from(BACKUP_BUCKET).list(`${y.name}/${m.name}`, { limit: 1000, sortBy: { column: "name", order: "desc" } });
+          for (const f of files ?? []) {
+            if (!f.name.endsWith(".csv")) continue;
+            all.push({ name: f.name, path: `${y.name}/${m.name}/${f.name}`, created_at: (f as any).created_at, size: (f as any).metadata?.size });
+          }
+        }
+      }
+      return all;
+    },
+  });
+
+  const download = async (path: string) => {
+    const { data, error } = await supabase.storage.from(BACKUP_BUCKET).createSignedUrl(path, 60);
+    if (error || !data?.signedUrl) { toast.error("Stiahnutie zlyhalo"); return; }
+    window.open(data.signedUrl, "_blank");
+  };
+
+  const runNow = async () => {
+    setRunning(true);
+    try {
+      const res = await fetch("/api/public/hooks/warehouse-backup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || "Záloha zlyhala");
+      toast.success(`Záloha vytvorená (${json.items} položiek)`);
+      await qc.invalidateQueries({ queryKey: ["warehouse-backups"] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Záloha zlyhala");
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline"><Database className="size-4 mr-1" />Zálohy</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Zálohy skladu</DialogTitle>
+          <DialogDescription>Automatická denná záloha o 02:00 (UTC) — CSV snapshot všetkých položiek skladu.</DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">{list.data ? `${list.data.length} záloh` : "Načítavam…"}</p>
+          <Button size="sm" onClick={runNow} disabled={running}>
+            {running ? <Loader2 className="size-4 mr-1 animate-spin" /> : <RefreshCw className="size-4 mr-1" />}
+            Spustiť zálohu teraz
+          </Button>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto border rounded-md divide-y">
+          {(list.data ?? []).map((b) => (
+            <div key={b.path} className="flex items-center justify-between p-3 text-sm">
+              <div>
+                <div className="font-medium">{b.name}</div>
+                <div className="text-xs text-muted-foreground">{b.created_at ? new Date(b.created_at).toLocaleString("sk-SK") : b.path}</div>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => download(b.path)}>
+                <Download className="size-4 mr-1" />Stiahnuť
+              </Button>
+            </div>
+          ))}
+          {list.data && list.data.length === 0 && (
+            <div className="p-6 text-center text-sm text-muted-foreground">Zatiaľ žiadne zálohy. Kliknite „Spustiť zálohu teraz".</div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 interface FurnitureRow {
   id: string;
