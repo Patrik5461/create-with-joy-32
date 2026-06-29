@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,10 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X, AlertTriangle, Trash2, Database, Download, RefreshCw } from "lucide-react";
+import { Plus, Search, Pencil, ImageIcon, Power, Eye, Upload, Loader2, X, AlertTriangle, Trash2, Database, Download, RefreshCw, QrCode, ScanLine, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { DamageReportDialog } from "@/components/damage-report-dialog";
+import { QRCode, buildFurnitureScanUrl } from "@/components/qr-code";
+import { QrScannerDialog } from "@/components/qr-scanner-dialog";
 
 export const Route = createFileRoute("/_authenticated/warehouse")({
   head: () => ({ meta: [{ title: "Sklad · Mima Production CRM" }] }),

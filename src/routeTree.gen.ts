@@ -26,6 +26,7 @@ import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedReservationsIndexRouteImport } from './routes/_authenticated/reservations.index'
 import { Route as AuthenticatedQuotesIndexRouteImport } from './routes/_authenticated/quotes.index'
 import { Route as AuthenticatedClientsIndexRouteImport } from './routes/_authenticated/clients.index'
+import { Route as AuthenticatedWarehouseQrPrintRouteImport } from './routes/_authenticated/warehouse.qr-print'
 import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings.calendar'
 import { Route as AuthenticatedReservationsNewRouteImport } from './routes/_authenticated/reservations.new'
 import { Route as AuthenticatedReservationsIdRouteImport } from './routes/_authenticated/reservations.$id'
@@ -129,6 +130,12 @@ const AuthenticatedClientsIndexRoute =
     path: '/clients/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedWarehouseQrPrintRoute =
+  AuthenticatedWarehouseQrPrintRouteImport.update({
+    id: '/qr-print',
+    path: '/qr-print',
+    getParentRoute: () => AuthenticatedWarehouseRoute,
+  } as any)
 const AuthenticatedSettingsCalendarRoute =
   AuthenticatedSettingsCalendarRouteImport.update({
     id: '/calendar',
@@ -223,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/clients/': typeof AuthenticatedClientsIndexRoute
   '/quotes/': typeof AuthenticatedQuotesIndexRoute
   '/reservations/': typeof AuthenticatedReservationsIndexRoute
@@ -252,6 +260,7 @@ export interface FileRoutesByTo {
   '/quotes/new': typeof AuthenticatedQuotesNewRoute
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/clients': typeof AuthenticatedClientsIndexRoute
   '/quotes': typeof AuthenticatedQuotesIndexRoute
   '/reservations': typeof AuthenticatedReservationsIndexRoute
@@ -285,6 +294,7 @@ export interface FileRoutesById {
   '/_authenticated/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/_authenticated/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/_authenticated/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/_authenticated/clients/': typeof AuthenticatedClientsIndexRoute
   '/_authenticated/quotes/': typeof AuthenticatedQuotesIndexRoute
   '/_authenticated/reservations/': typeof AuthenticatedReservationsIndexRoute
@@ -318,6 +328,7 @@ export interface FileRouteTypes {
     | '/reservations/$id'
     | '/reservations/new'
     | '/settings/calendar'
+    | '/warehouse/qr-print'
     | '/clients/'
     | '/quotes/'
     | '/reservations/'
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/quotes/new'
     | '/reservations/new'
     | '/settings/calendar'
+    | '/warehouse/qr-print'
     | '/clients'
     | '/quotes'
     | '/reservations'
@@ -379,6 +391,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reservations/$id'
     | '/_authenticated/reservations/new'
     | '/_authenticated/settings/calendar'
+    | '/_authenticated/warehouse/qr-print'
     | '/_authenticated/clients/'
     | '/_authenticated/quotes/'
     | '/_authenticated/reservations/'
@@ -522,6 +535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/warehouse/qr-print': {
+      id: '/_authenticated/warehouse/qr-print'
+      path: '/qr-print'
+      fullPath: '/warehouse/qr-print'
+      preLoaderRoute: typeof AuthenticatedWarehouseQrPrintRouteImport
+      parentRoute: typeof AuthenticatedWarehouseRoute
+    }
     '/_authenticated/settings/calendar': {
       id: '/_authenticated/settings/calendar'
       path: '/calendar'
@@ -632,11 +652,13 @@ const AuthenticatedSettingsRouteWithChildren =
   )
 
 interface AuthenticatedWarehouseRouteChildren {
+  AuthenticatedWarehouseQrPrintRoute: typeof AuthenticatedWarehouseQrPrintRoute
   AuthenticatedWarehouseScanIdRoute: typeof AuthenticatedWarehouseScanIdRoute
 }
 
 const AuthenticatedWarehouseRouteChildren: AuthenticatedWarehouseRouteChildren =
   {
+    AuthenticatedWarehouseQrPrintRoute: AuthenticatedWarehouseQrPrintRoute,
     AuthenticatedWarehouseScanIdRoute: AuthenticatedWarehouseScanIdRoute,
   }
 
