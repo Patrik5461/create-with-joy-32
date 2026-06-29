@@ -642,7 +642,9 @@ export type Database = {
           phone: string | null
           return_at: string | null
           status: Database["public"]["Enums"]["reservation_status"]
+          trip_count: number
           updated_at: string
+          vehicle_id: string | null
           venue: string | null
         }
         Insert: {
@@ -666,7 +668,9 @@ export type Database = {
           phone?: string | null
           return_at?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
+          trip_count?: number
           updated_at?: string
+          vehicle_id?: string | null
           venue?: string | null
         }
         Update: {
@@ -690,7 +694,9 @@ export type Database = {
           phone?: string | null
           return_at?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
+          trip_count?: number
           updated_at?: string
+          vehicle_id?: string | null
           venue?: string | null
         }
         Relationships: [
@@ -706,6 +712,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "client_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
         ]

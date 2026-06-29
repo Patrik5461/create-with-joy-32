@@ -78,6 +78,8 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
     note: initial?.note ?? "",
     status: (initial?.status ?? "inquiry") as ReservationStatus,
     color: (initial?.color ?? "#3b82f6") as string,
+    vehicle_id: initial?.vehicle_id ?? "",
+    trip_count: initial?.trip_count ?? 1,
     load_at: seedLoad,
     depart_at: toLocalInput(initial?.depart_at ?? null),
     event_start_at: seedEventStart,
@@ -119,6 +121,11 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
 
   const furniture = useQuery({ queryKey: ["furniture-min"], queryFn: async () => (await supabase.from("furniture_items").select("id,name,internal_code,total_qty").eq("active", true).order("name")).data ?? [] });
 
+  const vehicles = useQuery({
+    queryKey: ["vehicles-min"],
+    queryFn: async () => (await supabase.from("vehicles").select("id,name,license_plate,capacity_kg,status").order("name")).data ?? [],
+  });
+
   // Refresh availability for all items when time window or items change
   useEffect(() => {
     if (!form.load_at || !form.available_from_at) return;
@@ -158,6 +165,8 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
         note: form.note || null,
         status: form.status,
         color: form.color || null,
+        vehicle_id: form.vehicle_id || null,
+        trip_count: Math.max(1, Number(form.trip_count) || 1),
         load_at: fromLocalInput(form.load_at),
         depart_at: fromLocalInput(form.depart_at),
         event_start_at: fromLocalInput(form.event_start_at),
