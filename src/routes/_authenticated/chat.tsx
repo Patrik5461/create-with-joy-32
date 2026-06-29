@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Chat · Mima Production CRM" }] }),
+  head: () => ({ meta: [{ title: "Interný Chat · Mima Production CRM" }] }),
   component: ChatPage,
 });
 
