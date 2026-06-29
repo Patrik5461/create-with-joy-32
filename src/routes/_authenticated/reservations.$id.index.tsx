@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { SurveyCard } from "@/components/survey-card";
 import { ReservationStatusWorkflow } from "@/components/reservation-status-workflow";
+import { DocumentsSection } from "@/components/documents-section";
 
 export const Route = createFileRoute("/_authenticated/reservations/$id/")({
   head: () => ({ meta: [{ title: "Rezervácia · Mima Production CRM" }] }),
@@ -135,6 +136,10 @@ function ReservationDetail() {
 
             <div className="lg:col-span-3">
               <SurveyCard reservationId={r.id} email={r.email} canGenerate={canEdit} />
+            </div>
+
+            <div className="lg:col-span-3">
+              <DocumentsSection reservation={r} />
             </div>
           </div>
         )}
