@@ -484,6 +484,21 @@ function Warehouse() {
 
 function DetailDialog({ item, onReportDamage, canManage }: { item: FurnitureRow; onReportDamage: () => void; canManage: boolean }) {
   const available = item.total_qty - item.damaged_qty - item.retired_qty;
+  const qrUrl = buildFurnitureScanUrl(item.id);
+  const downloadQr = async () => {
+    try {
+      const QR = await import("qrcode");
+      const dataUrl = await QR.toDataURL(qrUrl, { width: 512, margin: 2 });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `${item.internal_code || item.id}-qr.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch {
+      toast.error("Stiahnutie QR zlyhalo");
+    }
+  };
   return (
     <DialogContent className="max-w-2xl">
       <DialogHeader>
@@ -523,6 +538,22 @@ function DetailDialog({ item, onReportDamage, canManage }: { item: FurnitureRow;
               Nahlásiť poškodenie
             </Button>
           )}
+        </div>
+      </div>
+      <div className="border-t pt-4 mt-2">
+        <div className="flex items-start gap-4">
+          <div className="bg-white p-2 rounded border shrink-0">
+            <QRCode value={qrUrl} size={140} />
+          </div>
+          <div className="flex-1 space-y-2">
+            <div>
+              <div className="text-xs text-muted-foreground">QR kód položky</div>
+              <p className="text-xs font-mono break-all">{qrUrl}</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={downloadQr}>
+              <Download className="size-3.5 mr-1" /> Stiahnuť QR (PNG)
+            </Button>
+          </div>
         </div>
       </div>
     </DialogContent>
