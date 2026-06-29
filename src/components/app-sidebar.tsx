@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, ShieldCheck, LayoutPanelTop, Settings, Wrench, Calculator } from "lucide-react";
+import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, ShieldCheck, LayoutPanelTop, Settings, Wrench, Calculator, ClipboardCheck } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +22,7 @@ const mainItems = [
   { title: "Údržba nábytku", url: "/maintenance", icon: Wrench },
   { title: "Plán rozloženia", url: "/layouts", icon: LayoutPanelTop },
   { title: "Kalkulácie", url: "/quotes", icon: Calculator },
+  { title: "Logistické dotazníky", url: "/surveys", icon: ClipboardCheck },
 ] as const;
 
 const itemClass =
