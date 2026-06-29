@@ -4,7 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ClipboardCheck, ExternalLink } from "lucide-react";
+import { ClipboardCheck, ExternalLink, Eye } from "lucide-react";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SurveyCard } from "@/components/survey-card";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
 
@@ -16,12 +19,13 @@ export const Route = createFileRoute("/_authenticated/surveys")({
 });
 
 function SurveysPage() {
+  const [previewId, setPreviewId] = useState<{ id: string; email?: string | null } | null>(null);
   const q = useQuery({
     queryKey: ["surveys-overview"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservations")
-        .select("id,event_name,venue,event_start_at,clients(company_name),logistics_surveys(token,status,submitted_at)")
+        .select("id,event_name,venue,event_start_at,email,clients(company_name),logistics_surveys(token,status,submitted_at)")
         .order("event_start_at", { ascending: false })
         .limit(200);
       if (error) throw error;
@@ -49,7 +53,8 @@ function SurveysPage() {
           ) : (
             <div className="divide-y">
               {rows.map((r) => {
-                const s = r.logistics_surveys?.[0];
+                const raw = r.logistics_surveys;
+                const s = Array.isArray(raw) ? raw[0] : raw;
                 const status: "missing" | "sent" | "filled" = !s ? "missing" : s.status === "filled" ? "filled" : "sent";
                 const url = typeof window !== "undefined" && s?.token ? `${window.location.origin}/dotaznik/${s.token}` : "";
                 return (
@@ -62,6 +67,9 @@ function SurveysPage() {
                       </div>
                     </div>
                     <StatusBadge status={status} />
+                    <Button size="sm" variant="outline" onClick={() => setPreviewId({ id: r.id, email: r.email })}>
+                      <Eye className="size-4 mr-1" />Náhľad
+                    </Button>
                     {url && (
                       <Button asChild size="sm" variant="outline">
                         <a href={url} target="_blank" rel="noreferrer"><ExternalLink className="size-4 mr-1" />Verejný odkaz</a>
@@ -77,6 +85,13 @@ function SurveysPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!previewId} onOpenChange={(o) => !o && setPreviewId(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Logistický dotazník</DialogTitle></DialogHeader>
+          {previewId && <SurveyCard reservationId={previewId.id} email={previewId.email} canGenerate />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
