@@ -4,10 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarRange, Package, Truck, AlertTriangle, TrendingUp, Boxes, Wrench, ArrowRight, Calculator } from "lucide-react";
+import { CalendarRange, Package, Truck, AlertTriangle, TrendingUp, Boxes, Wrench, ArrowRight, Calculator, ListChecks } from "lucide-react";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
-import { STATUS_LABEL, STATUS_BADGE_VARIANT, type ReservationStatus } from "@/lib/reservation-status";
+import { RESERVATION_FLOW, STATUS_LABEL, STATUS_BADGE_VARIANT, STATUS_DOT, type ReservationStatus } from "@/lib/reservation-status";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard · Mima Production CRM" }] }),
@@ -28,17 +28,18 @@ function useDashboardData() {
       const startMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
       const endMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59).toISOString();
 
-      const [todayLoad, todayReturn, outNow, upcoming, monthCount, active, items, allReservations, openDamage, quotes] = await Promise.all([
+      const [todayLoad, todayReturn, outNow, upcoming, monthCount, active, items, allReservations, openDamage, quotes, statusBreakdown] = await Promise.all([
         supabase.from("reservations").select("id,event_name,load_at,venue,status,clients(company_name)").gte("load_at", startToday).lte("load_at", endToday).neq("status", "cancelled").order("load_at"),
         supabase.from("reservations").select("id,event_name,return_at,venue,status,clients(company_name)").gte("return_at", startToday).lte("return_at", endToday).neq("status", "cancelled").order("return_at"),
         supabase.from("reservations").select("id,event_name,return_at,venue,status,clients(company_name)").lte("load_at", now).gte("available_from_at", now).neq("status", "cancelled"),
         supabase.from("reservations").select("id,event_name,load_at,event_start_at,venue,status,clients(company_name)").gte("event_start_at", now).lte("event_start_at", in7d).neq("status", "cancelled").order("event_start_at").limit(8),
         supabase.from("reservations").select("id", { count: "exact", head: true }).gte("event_start_at", startMonth).lte("event_start_at", endMonth).neq("status", "cancelled"),
-        supabase.from("reservations").select("id", { count: "exact", head: true }).in("status", ["confirmed", "prepared", "loaded", "delivered", "in_progress"]),
+        supabase.from("reservations").select("id", { count: "exact", head: true }).in("status", ["confirmed", "in_progress"]),
         supabase.from("furniture_items").select("id,name,total_qty,damaged_qty,retired_qty").eq("active", true),
         supabase.from("reservation_items").select("qty,furniture_item_id,furniture_items(name)"),
         supabase.from("damaged_items").select("id,severity", { count: "exact" }).in("status", ["new", "in_progress"]),
         supabase.from("quotes").select("status"),
+        supabase.from("reservations").select("status"),
       ]);
 
       // Top rented items aggregation
@@ -53,6 +54,11 @@ function useDashboardData() {
       const topItems = [...counts.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
 
       const totalCapacity = (items.data ?? []).reduce((s, i) => s + Math.max(0, i.total_qty - i.damaged_qty - i.retired_qty), 0);
+
+      const statusCounts: Record<string, number> = {};
+      for (const row of (statusBreakdown.data ?? []) as { status: string }[]) {
+        statusCounts[row.status] = (statusCounts[row.status] ?? 0) + 1;
+      }
 
       return {
         todayLoad: todayLoad.data ?? [],
@@ -69,6 +75,7 @@ function useDashboardData() {
         quotesDraft: (quotes.data ?? []).filter((q: any) => q.status === "draft").length,
         quotesSent: (quotes.data ?? []).filter((q: any) => q.status === "sent").length,
         quotesApproved: (quotes.data ?? []).filter((q: any) => q.status === "approved").length,
+        statusCounts,
       };
     },
   });
