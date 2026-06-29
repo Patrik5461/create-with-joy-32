@@ -165,6 +165,8 @@ export type Database = {
           name: string
           note: string | null
           photo_url: string | null
+          price_fixed: number | null
+          price_per_day: number | null
           retired_qty: number
           total_qty: number
           updated_at: string
@@ -181,6 +183,8 @@ export type Database = {
           name: string
           note?: string | null
           photo_url?: string | null
+          price_fixed?: number | null
+          price_per_day?: number | null
           retired_qty?: number
           total_qty?: number
           updated_at?: string
@@ -197,6 +201,8 @@ export type Database = {
           name?: string
           note?: string | null
           photo_url?: string | null
+          price_fixed?: number | null
+          price_per_day?: number | null
           retired_qty?: number
           total_qty?: number
           updated_at?: string
@@ -284,6 +290,153 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      quote_items: {
+        Row: {
+          created_at: string
+          days: number
+          furniture_item_id: string | null
+          id: string
+          kind: Database["public"]["Enums"]["quote_item_kind"]
+          line_total: number
+          name: string
+          price_mode: Database["public"]["Enums"]["quote_price_mode"]
+          qty: number
+          quote_id: string
+          sort_order: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          days?: number
+          furniture_item_id?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["quote_item_kind"]
+          line_total?: number
+          name: string
+          price_mode?: Database["public"]["Enums"]["quote_price_mode"]
+          qty?: number
+          quote_id: string
+          sort_order?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          days?: number
+          furniture_item_id?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["quote_item_kind"]
+          line_total?: number
+          name?: string
+          price_mode?: Database["public"]["Enums"]["quote_price_mode"]
+          qty?: number
+          quote_id?: string
+          sort_order?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "furniture_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          discount_type: Database["public"]["Enums"]["quote_adjust_type"]
+          discount_value: number
+          id: string
+          issue_date: string
+          notes: string | null
+          quote_number: string
+          reservation_id: string | null
+          status: Database["public"]["Enums"]["quote_status"]
+          subtotal: number
+          surcharge_label: string | null
+          surcharge_type: Database["public"]["Enums"]["quote_adjust_type"]
+          surcharge_value: number
+          total_with_vat: number
+          total_without_vat: number
+          updated_at: string
+          valid_until: string | null
+          vat_amount: number
+          vat_rate: number
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
+          discount_value?: number
+          id?: string
+          issue_date?: string
+          notes?: string | null
+          quote_number: string
+          reservation_id?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          subtotal?: number
+          surcharge_label?: string | null
+          surcharge_type?: Database["public"]["Enums"]["quote_adjust_type"]
+          surcharge_value?: number
+          total_with_vat?: number
+          total_without_vat?: number
+          updated_at?: string
+          valid_until?: string | null
+          vat_amount?: number
+          vat_rate?: number
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
+          discount_value?: number
+          id?: string
+          issue_date?: string
+          notes?: string | null
+          quote_number?: string
+          reservation_id?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          subtotal?: number
+          surcharge_label?: string | null
+          surcharge_type?: Database["public"]["Enums"]["quote_adjust_type"]
+          surcharge_value?: number
+          total_with_vat?: number
+          total_without_vat?: number
+          updated_at?: string
+          valid_until?: string | null
+          vat_amount?: number
+          vat_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reservation_items: {
         Row: {
@@ -448,6 +601,10 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "warehouse"
+      quote_adjust_type: "none" | "percent" | "fixed"
+      quote_item_kind: "furniture" | "service"
+      quote_price_mode: "per_day" | "fixed" | "service"
+      quote_status: "draft" | "sent" | "approved" | "rejected"
       reservation_status:
         | "inquiry"
         | "confirmed"
@@ -585,6 +742,10 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "warehouse"],
+      quote_adjust_type: ["none", "percent", "fixed"],
+      quote_item_kind: ["furniture", "service"],
+      quote_price_mode: ["per_day", "fixed", "service"],
+      quote_status: ["draft", "sent", "approved", "rejected"],
       reservation_status: [
         "inquiry",
         "confirmed",
