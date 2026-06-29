@@ -196,8 +196,23 @@ function Warehouse() {
 
         {items.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((i) => {
+        {(() => {
+          const cats = categories.data ?? [];
+          const groups = cats
+            .map((c) => ({ cat: c, list: filtered.filter((i) => i.category_id === c.id) }))
+            .filter((g) => g.list.length > 0);
+          if (!items.isLoading && groups.length === 0) return null;
+          return (
+            <div className="space-y-8">
+              {groups.map(({ cat, list }) => (
+                <section key={cat.id} className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Badge className={`border ${categoryClass(cat.code)}`}>{cat.name}</Badge>
+                    <div className="h-px bg-border flex-1" />
+                    <span className="text-xs text-muted-foreground">{list.length} ks</span>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {list.map((i) => {
             const reserved = reservedNow.data?.[i.id] ?? 0;
             const available = i.total_qty - i.damaged_qty - i.retired_qty - reserved;
             return (
@@ -268,8 +283,13 @@ function Warehouse() {
                 </CardContent>
               </Card>
             );
-          })}
-        </div>
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          );
+        })()}
         {!items.isLoading && filtered.length === 0 && (
           <p className="text-center text-sm text-muted-foreground py-12">Žiadne položky nenájdené.</p>
         )}
