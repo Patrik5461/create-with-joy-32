@@ -1,20 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Edit3, Trash2, LayoutGrid } from "lucide-react";
 import { ReservationForm } from "@/components/reservation-form";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
-import { RESERVATION_STATUSES, STATUS_LABEL, STATUS_BADGE_VARIANT, type ReservationStatus } from "@/lib/reservation-status";
+import { STATUS_LABEL, STATUS_BADGE_VARIANT, type ReservationStatus } from "@/lib/reservation-status";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { SurveyCard } from "@/components/survey-card";
+import { ReservationStatusWorkflow } from "@/components/reservation-status-workflow";
 
 export const Route = createFileRoute("/_authenticated/reservations/$id/")({
   head: () => ({ meta: [{ title: "Rezervácia · Mima Production CRM" }] }),
@@ -23,7 +23,6 @@ export const Route = createFileRoute("/_authenticated/reservations/$id/")({
 
 function ReservationDetail() {
   const { id } = Route.useParams();
-  const qc = useQueryClient();
   const { data: user } = useCurrentUser();
   const canEdit = hasRole(user, "admin", "manager");
   const canDelete = hasRole(user, "admin");
@@ -39,15 +38,6 @@ function ReservationDetail() {
       if (error) throw error;
       return data as any;
     },
-  });
-
-  const setStatus = useMutation({
-    mutationFn: async (status: ReservationStatus) => {
-      const { error } = await supabase.from("reservations").update({ status }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["reservation", id] }); toast.success("Stav aktualizovaný"); },
-    onError: (e: any) => toast.error(e.message),
   });
 
   const remove = useMutation({
@@ -93,14 +83,6 @@ function ReservationDetail() {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge variant={STATUS_BADGE_VARIANT[r.status as ReservationStatus]}>{STATUS_LABEL[r.status as ReservationStatus]}</Badge>
-                    {canEdit && (
-                      <Select value={r.status} onValueChange={(v) => setStatus.mutate(v as ReservationStatus)}>
-                        <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {RESERVATION_STATUSES.map((s) => <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -129,6 +111,13 @@ function ReservationDetail() {
             </Card>
 
             <Card>
+              <CardHeader><CardTitle className="text-base">Workflow stavov</CardTitle></CardHeader>
+              <CardContent>
+                <ReservationStatusWorkflow reservationId={r.id} status={r.status as ReservationStatus} canEdit={canEdit} />
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2">
               <CardHeader><CardTitle className="text-base">Položky rezervácie</CardTitle></CardHeader>
               <CardContent className="space-y-2">
                 {r.reservation_items.length === 0 && <p className="text-sm text-muted-foreground">Žiadne položky.</p>}
