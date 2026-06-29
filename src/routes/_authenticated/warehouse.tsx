@@ -293,10 +293,16 @@ function Warehouse() {
             <h2 className="text-2xl font-semibold tracking-tight">Sklad nábytku</h2>
             <p className="text-sm text-muted-foreground">Evidencia všetkého eventového nábytku.</p>
           </div>
-          {canManage && (
-            <div className="flex gap-2">
-            <BackupsButton />
-            <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setScannerOpen(true)}>
+              <ScanLine className="size-4 mr-1" />Skenovať
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/warehouse/qr-print"><Printer className="size-4 mr-1" />Tlač QR</Link>
+            </Button>
+            {canManage && <BackupsButton />}
+            {canManage && (
+              <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
               <DialogTrigger asChild>
                 <Button><Plus className="size-4 mr-1" />Pridať položku</Button>
               </DialogTrigger>
@@ -306,9 +312,9 @@ function Warehouse() {
                 categories={categories.data ?? []}
                 onClose={() => { setOpen(false); setEditing(null); }}
               />
-            </Dialog>
-            </div>
-          )}
+              </Dialog>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row gap-2">
