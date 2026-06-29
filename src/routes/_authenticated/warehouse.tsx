@@ -600,6 +600,9 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
     retired_qty: item?.retired_qty ?? 0,
     price_per_day: item?.price_per_day ?? ("" as number | ""),
     price_fixed: item?.price_fixed ?? ("" as number | ""),
+    public_visible: (item as any)?.public_visible ?? false,
+    public_description: (item as any)?.public_description ?? "",
+    public_price: (item as any)?.public_price ?? ("" as number | ""),
   });
 
   const handleFile = async (file: File) => {
@@ -645,6 +648,9 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
         photo_url: form.photo_url || null,
         price_per_day: form.price_per_day === "" || form.price_per_day == null ? null : Number(form.price_per_day),
         price_fixed: form.price_fixed === "" || form.price_fixed == null ? null : Number(form.price_fixed),
+        public_visible: !!form.public_visible,
+        public_description: form.public_description || null,
+        public_price: form.public_price === "" || form.public_price == null ? null : Number(form.public_price),
       };
       if (item) {
         const { error } = await supabase.from("furniture_items").update(payload).eq("id", item.id);
