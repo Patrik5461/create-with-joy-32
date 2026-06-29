@@ -15,7 +15,6 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/chat")({
-  ssr: false,
   head: () => ({ meta: [{ title: "Chat · Mima Production CRM" }] }),
   component: ChatPage,
 });
