@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
@@ -190,7 +190,7 @@ function VehicleDialog({ open, onOpenChange, vehicle }: { open: boolean; onOpenC
   const qc = useQueryClient();
   const [form, setForm] = useState<Partial<Vehicle>>({});
 
-  useMemo(() => {
+  useEffect(() => {
     setForm(vehicle ?? { status: "active" });
   }, [vehicle, open]);
 
