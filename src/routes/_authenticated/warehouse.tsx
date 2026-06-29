@@ -188,6 +188,8 @@ function Warehouse() {
   const qc = useQueryClient();
   const { data: user } = useCurrentUser();
   const canManage = hasRole(user, "admin", "warehouse");
+  const navigate = useNavigate();
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [showInactive, setShowInactive] = useState(false);
