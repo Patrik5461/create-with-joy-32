@@ -245,6 +245,34 @@ function Dashboard() {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2"><Calculator className="size-4 text-primary" />Kalkulácie</CardTitle>
+              <CardDescription>Prehľad cenových ponúk</CardDescription>
+            </div>
+            <Link to="/quotes" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
+              Otvoriť modul <ArrowRight className="size-3" />
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-8">
+              <div>
+                <div className="text-3xl font-semibold">{data?.quotesDraft ?? "—"}</div>
+                <p className="text-xs text-muted-foreground mt-1">návrhov</p>
+              </div>
+              <div>
+                <div className="text-3xl font-semibold text-sky-700">{data?.quotesSent ?? "—"}</div>
+                <p className="text-xs text-muted-foreground mt-1">odoslaných</p>
+              </div>
+              <div>
+                <div className="text-3xl font-semibold text-emerald-700">{data?.quotesApproved ?? "—"}</div>
+                <p className="text-xs text-muted-foreground mt-1">schválených</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </>
   );
