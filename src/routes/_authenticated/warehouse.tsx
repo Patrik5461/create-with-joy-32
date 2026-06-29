@@ -436,7 +436,7 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: any = {
         ...form,
         photo_url: form.photo_url || null,
         price_per_day: form.price_per_day === "" || form.price_per_day == null ? null : Number(form.price_per_day),
@@ -446,6 +446,8 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
         const { error } = await supabase.from("furniture_items").update(payload).eq("id", item.id);
         if (error) throw error;
       } else {
+        // Nechaj DB trigger vygenerovať interný kód automaticky podľa kategórie
+        delete payload.internal_code;
         const { error } = await supabase.from("furniture_items").insert(payload);
         if (error) throw error;
       }
@@ -504,7 +506,14 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
         </div>
         <div className="space-y-1.5">
           <Label>Interný kód</Label>
-          <Input value={form.internal_code} onChange={(e) => setForm({ ...form, internal_code: e.target.value })} />
+          {item ? (
+            <Input value={form.internal_code} onChange={(e) => setForm({ ...form, internal_code: e.target.value })} />
+          ) : (
+            <>
+              <Input value="" disabled placeholder="Vygeneruje sa automaticky" />
+              <p className="text-[11px] text-muted-foreground">Pridelí sa podľa kategórie (napr. TABLES-0001).</p>
+            </>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label>Kategória</Label>
