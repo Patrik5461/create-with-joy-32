@@ -22,14 +22,16 @@ type Row = {
   id: string;
   name: string;
   internal_code: string;
+  total_qty: number;
   furniture_categories: { name: string } | null;
 };
 
-type PrintLabel = Row & { dataUrl: string };
+type PrintLabel = Row & { dataUrl: string; copyIndex: number; copyTotal: number };
 
 function QrPrint() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [printLabels, setPrintLabels] = useState<PrintLabel[]>([]);
 
   const items = useQuery({
@@ -37,7 +39,7 @@ function QrPrint() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("furniture_items")
-        .select("id, name, internal_code, furniture_categories(name)")
+        .select("id, name, internal_code, total_qty, furniture_categories(name)")
         .eq("active", true)
         .order("internal_code");
       if (error) throw error;
@@ -64,20 +66,32 @@ function QrPrint() {
   const clearAll = () => setSelected(new Set());
 
   const toPrint = filtered.filter((i) => selected.has(i.id));
+  const getQty = (i: Row) => {
+    const c = counts[i.id];
+    if (c === undefined) return Math.max(1, Number(i.total_qty) || 1);
+    return Math.max(1, c);
+  };
+  const totalLabels = toPrint.reduce((s, i) => s + getQty(i), 0);
 
   const handlePrint = async () => {
     if (toPrint.length === 0) return;
     try {
-      const labels = await Promise.all(
+      const perItem = await Promise.all(
         toPrint.map(async (i) => {
           const dataUrl = await QR.toDataURL(buildFurnitureScanUrl(i.id), {
             width: 300,
             margin: 1,
             errorCorrectionLevel: "M",
           });
-          return { ...i, dataUrl };
+          return { item: i, dataUrl, qty: getQty(i) };
         }),
       );
+      const labels: PrintLabel[] = [];
+      for (const { item, dataUrl, qty } of perItem) {
+        for (let k = 0; k < qty; k++) {
+          labels.push({ ...item, dataUrl, copyIndex: k + 1, copyTotal: qty });
+        }
+      }
       setPrintLabels(labels);
       requestAnimationFrame(() => setTimeout(() => window.print(), 150));
     } catch (e: any) {
@@ -99,7 +113,7 @@ function QrPrint() {
             <Button variant="outline" size="sm" onClick={selectAll}>Označiť všetky</Button>
             <Button variant="outline" size="sm" onClick={clearAll} disabled={selected.size === 0}>Zrušiť výber</Button>
             <Button size="sm" onClick={handlePrint} disabled={toPrint.length === 0}>
-              <Printer className="size-4 mr-1" /> Tlačiť ({toPrint.length})
+              <Printer className="size-4 mr-1" /> Tlačiť ({totalLabels} ks)
             </Button>
           </div>
         </div>
@@ -112,14 +126,31 @@ function QrPrint() {
         <Card>
           <CardContent className="p-0 max-h-[60vh] overflow-y-auto divide-y">
             {filtered.map((i) => (
-              <label key={i.id} className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50">
-                <Checkbox checked={selected.has(i.id)} onCheckedChange={() => toggle(i.id)} />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{i.name}</div>
-                  <div className="text-xs text-muted-foreground font-mono">{i.internal_code}</div>
+              <div key={i.id} className="flex items-center gap-3 p-3 hover:bg-muted/50">
+                <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                  <Checkbox checked={selected.has(i.id)} onCheckedChange={() => toggle(i.id)} />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{i.name}</div>
+                    <div className="text-xs text-muted-foreground font-mono">
+                      {i.internal_code} · skladom {i.total_qty} ks
+                    </div>
+                  </div>
+                  <Badge variant="outline">{i.furniture_categories?.name ?? "—"}</Badge>
+                </label>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-xs text-muted-foreground">Štítkov:</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="h-8 w-20"
+                    value={getQty(i)}
+                    disabled={!selected.has(i.id)}
+                    onChange={(e) =>
+                      setCounts((c) => ({ ...c, [i.id]: Math.max(1, Number(e.target.value) || 1) }))
+                    }
+                  />
                 </div>
-                <Badge variant="outline">{i.furniture_categories?.name ?? "—"}</Badge>
-              </label>
+              </div>
             ))}
             {filtered.length === 0 && (
               <p className="text-sm text-muted-foreground p-6 text-center">Žiadne položky.</p>
@@ -129,14 +160,14 @@ function QrPrint() {
 
         {toPrint.length > 0 && (
           <div className="text-xs text-muted-foreground">
-            Náhľad nižšie — pri tlači sa zobrazia len QR štítky (4 stĺpce na A4).
+            Náhľad nižšie — pri tlači sa vytlačí {totalLabels} štítkov (4 stĺpce na A4). Default počet = stav skladom, môžete ho ručne upraviť.
           </div>
         )}
 
         {/* On-screen preview (also printed) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {toPrint.map((i) => (
-            <LabelCard key={i.id} item={i} />
+            <LabelCard key={i.id} item={i} qty={getQty(i)} />
           ))}
         </div>
       </div>
@@ -144,8 +175,8 @@ function QrPrint() {
       {/* Print-only sheet */}
       <div className="hidden print:block print:fixed print:inset-0 print:z-[9999] p-6 bg-white text-black">
         <div className="grid grid-cols-4 gap-4">
-          {printLabels.map((i) => (
-            <PrintLabelCard key={i.id} item={i} />
+          {printLabels.map((i, idx) => (
+            <PrintLabelCard key={`${i.id}-${idx}`} item={i} />
           ))}
         </div>
       </div>
@@ -153,9 +184,12 @@ function QrPrint() {
   );
 }
 
-function LabelCard({ item, print }: { item: Row; print?: boolean }) {
+function LabelCard({ item, qty }: { item: Row; qty: number }) {
   return (
-    <div className={`border rounded-md p-2 flex flex-col items-center text-center ${print ? "break-inside-avoid bg-white" : "bg-card"}`}>
+    <div className="border rounded-md p-2 flex flex-col items-center text-center bg-card relative">
+      {qty > 1 && (
+        <Badge variant="secondary" className="absolute top-1 right-1 text-[10px]">×{qty}</Badge>
+      )}
       <QRCode value={buildFurnitureScanUrl(item.id)} size={140} />
       <div className="mt-2 w-full">
         <div className="text-xs font-semibold truncate" title={item.name}>{item.name}</div>
@@ -171,7 +205,10 @@ function PrintLabelCard({ item }: { item: PrintLabel }) {
       <img src={item.dataUrl} alt={`QR: ${item.name}`} width={140} height={140} />
       <div className="mt-2 w-full">
         <div className="text-xs font-semibold truncate" title={item.name}>{item.name}</div>
-        <div className="text-[10px] font-mono text-neutral-600">{item.internal_code}</div>
+        <div className="text-[10px] font-mono text-neutral-600">
+          {item.internal_code}
+          {item.copyTotal > 1 ? ` · ${item.copyIndex}/${item.copyTotal}` : ""}
+        </div>
       </div>
     </div>
   );
