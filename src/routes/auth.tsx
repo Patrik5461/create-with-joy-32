@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { resolveLoginEmail } from "@/lib/users.functions";
@@ -20,6 +21,7 @@ function AuthPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -69,10 +71,14 @@ function AuthPage() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? <Loader2 className="size-4 animate-spin" /> : "Prihlásiť sa"}
               </Button>
-              <p className="text-xs text-muted-foreground text-center pt-2">
-                Nový účet vytvára výhradne administrátor.
-              </p>
+              <div className="flex items-center justify-between pt-1">
+                <button type="button" onClick={() => setForgotOpen(true)} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2">
+                  Zabudnuté heslo?
+                </button>
+                <p className="text-xs text-muted-foreground">Nový účet vytvára administrátor.</p>
+              </div>
             </form>
+            <ForgotPasswordDialog open={forgotOpen} onOpenChange={setForgotOpen} defaultIdentifier={identifier} />
             <div className="mt-4 rounded-md border border-dashed border-border bg-muted/40 p-3 text-xs">
               <p className="font-medium text-foreground mb-1">Dočasné prihlasovacie údaje (počas vývoja systému)</p>
               <p className="text-muted-foreground">Meno: <span className="font-mono">admin</span></p>

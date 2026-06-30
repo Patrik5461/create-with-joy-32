@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as KatalogRouteImport } from './routes/katalog'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -43,6 +44,11 @@ import { Route as AuthenticatedReservationsIdLayoutRouteImport } from './routes/
 import { Route as AuthenticatedDocumentsProtocolIdRouteImport } from './routes/_authenticated/documents.protocol.$id'
 import { Route as AuthenticatedDocumentsContractIdRouteImport } from './routes/_authenticated/documents.contract.$id'
 
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KatalogRoute = KatalogRouteImport.update({
   id: '/katalog',
   path: '/katalog',
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/katalog': typeof KatalogRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/inquiries': typeof AuthenticatedInquiriesRoute
@@ -261,6 +268,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/katalog': typeof KatalogRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/inquiries': typeof AuthenticatedInquiriesRoute
@@ -295,6 +303,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/katalog': typeof KatalogRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/inquiries': typeof AuthenticatedInquiriesRoute
@@ -331,6 +340,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/katalog'
+    | '/reset-password'
     | '/chat'
     | '/dashboard'
     | '/inquiries'
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/katalog'
+    | '/reset-password'
     | '/chat'
     | '/dashboard'
     | '/inquiries'
@@ -398,6 +409,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/katalog'
+    | '/reset-password'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
     | '/_authenticated/inquiries'
@@ -434,6 +446,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   KatalogRoute: typeof KatalogRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   DotaznikTokenRoute: typeof DotaznikTokenRoute
   ApiPublicCalendarTokenRoute: typeof ApiPublicCalendarTokenRoute
   ApiPublicHooksWarehouseBackupRoute: typeof ApiPublicHooksWarehouseBackupRoute
@@ -441,6 +454,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/katalog': {
       id: '/katalog'
       path: '/katalog'
@@ -779,6 +799,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   KatalogRoute: KatalogRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   DotaznikTokenRoute: DotaznikTokenRoute,
   ApiPublicCalendarTokenRoute: ApiPublicCalendarTokenRoute,
   ApiPublicHooksWarehouseBackupRoute: ApiPublicHooksWarehouseBackupRoute,
