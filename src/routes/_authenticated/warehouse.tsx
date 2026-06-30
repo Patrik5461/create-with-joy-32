@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,8 +21,14 @@ import { QrScannerDialog } from "@/components/qr-scanner-dialog";
 
 export const Route = createFileRoute("/_authenticated/warehouse")({
   head: () => ({ meta: [{ title: "Sklad · Mima Production CRM" }] }),
-  component: Warehouse,
+  component: WarehouseRouteShell,
 });
+
+function WarehouseRouteShell() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  if (pathname !== "/warehouse" && pathname !== "/warehouse/") return <Outlet />;
+  return <Warehouse />;
+}
 
 const PHOTO_BUCKET = "furniture-photos";
 const BACKUP_BUCKET = "warehouse-backups";
