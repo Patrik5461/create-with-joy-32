@@ -181,7 +181,7 @@ function FurniturePhoto({ value, alt, className }: { value: string | null; alt: 
       </div>
     );
   }
-  return <img src={src} alt={alt} className={`object-cover ${className ?? ""}`} />;
+  return <img src={src} alt={alt} className={`object-contain bg-muted ${className ?? ""}`} />;
 }
 
 function Warehouse() {
