@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const RoleEnum = z.enum(["admin", "manager", "warehouse"]);
+const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
+const SYNTHETIC_EMAIL_DOMAIN = "users.mimaproduction.local";
 
 async function ensureAdmin(context: any) {
   const { data, error } = await context.supabase
@@ -13,6 +15,32 @@ async function ensureAdmin(context: any) {
     .maybeSingle();
   if (error || !data) throw new Error("Forbidden");
 }
+
+/**
+ * Public — resolves a username or email to the auth email used by Supabase.
+ * Returns { email } if a profile exists, otherwise throws.
+ */
+export const resolveLoginEmail = createServerFn({ method: "POST" })
+  .inputValidator((d: { identifier: string }) => {
+    const id = (d?.identifier ?? "").trim();
+    if (!id || id.length > 200) throw new Error("Zadajte prihlasovacie meno alebo email");
+    return { identifier: id };
+  })
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const id = data.identifier;
+    // Email — return as is
+    if (id.includes("@")) return { email: id.toLowerCase() };
+    // Username lookup (case-insensitive)
+    const { data: row, error } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .ilike("username", id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row?.email) throw new Error("Používateľ nenájdený");
+    return { email: row.email };
+  });
 
 export const checkIsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -32,7 +60,7 @@ export const listUsers = createServerFn({ method: "GET" })
     await ensureAdmin(context);
     const { data: profiles, error } = await context.supabase
       .from("profiles")
-      .select("id, email, full_name, active, created_at")
+      .select("id, email, username, full_name, active, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     const { data: roles } = await context.supabase.from("user_roles").select("user_id, role");
@@ -47,9 +75,10 @@ export const listUsers = createServerFn({ method: "GET" })
 
 export const createUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { email: string; password: string; full_name: string; role: "admin" | "manager" | "warehouse" }) =>
+  .inputValidator((d: { username: string; email?: string; password: string; full_name: string; role: "admin" | "manager" | "warehouse" }) =>
     z.object({
-      email: z.string().email(),
+      username: z.string().regex(USERNAME_RE, "Meno: 3–32 znakov, bez medzier (a–z, 0–9, . _ -)"),
+      email: z.string().email().optional().or(z.literal("")),
       password: z.string().min(8),
       full_name: z.string().min(1),
       role: RoleEnum,
@@ -58,15 +87,26 @@ export const createUser = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await ensureAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const username = data.username.toLowerCase();
+    // Ensure username unique
+    const { data: existing } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .ilike("username", username)
+      .maybeSingle();
+    if (existing) throw new Error("Toto používateľské meno už existuje");
+    const email = (data.email && data.email.trim())
+      ? data.email.trim().toLowerCase()
+      : `${username}@${SYNTHETIC_EMAIL_DOMAIN}`;
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-      email: data.email,
+      email,
       password: data.password,
       email_confirm: true,
-      user_metadata: { full_name: data.full_name },
+      user_metadata: { full_name: data.full_name, username },
     });
     if (error) throw new Error(error.message);
     const userId = created.user!.id;
-    await supabaseAdmin.from("profiles").upsert({ id: userId, email: data.email, full_name: data.full_name });
+    await supabaseAdmin.from("profiles").upsert({ id: userId, email, username, full_name: data.full_name });
     await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: data.role });
     return { id: userId };
   });
