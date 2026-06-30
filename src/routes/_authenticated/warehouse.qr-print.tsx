@@ -10,6 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Printer, Search } from "lucide-react";
 import { QRCode, buildFurnitureScanUrl } from "@/components/qr-code";
+import QR from "qrcode";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/warehouse/qr-print")({
   head: () => ({ meta: [{ title: "Tlač QR štítkov · Mima Production CRM" }] }),
@@ -60,6 +62,49 @@ function QrPrint() {
 
   const toPrint = filtered.filter((i) => selected.has(i.id));
 
+  const handlePrint = async () => {
+    if (toPrint.length === 0) return;
+    try {
+      const labels = await Promise.all(
+        toPrint.map(async (i) => {
+          const dataUrl = await QR.toDataURL(buildFurnitureScanUrl(i.id), {
+            width: 300,
+            margin: 1,
+            errorCorrectionLevel: "M",
+          });
+          return { ...i, dataUrl };
+        }),
+      );
+      const win = window.open("", "_blank", "width=900,height=1200");
+      if (!win) {
+        toast.error("Prehliadač zablokoval otvorenie tlačového okna. Povoľte pop-up.");
+        return;
+      }
+      const esc = (s: string) =>
+        s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>QR štítky</title>
+<style>
+  *{box-sizing:border-box} body{margin:0;font-family:system-ui,sans-serif;color:#000;background:#fff;padding:12mm}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6mm}
+  .label{border:1px solid #ddd;border-radius:6px;padding:6px;text-align:center;break-inside:avoid;page-break-inside:avoid}
+  .label img{width:100%;height:auto;display:block}
+  .name{font-size:11px;font-weight:600;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .code{font-size:10px;font-family:ui-monospace,monospace;color:#555}
+  @media print{ body{padding:8mm} }
+</style></head><body>
+<div class="grid">
+${labels.map((l) => `<div class="label"><img src="${l.dataUrl}" alt="QR"/><div class="name" title="${esc(l.name)}">${esc(l.name)}</div><div class="code">${esc(l.internal_code)}</div></div>`).join("")}
+</div>
+<script>window.addEventListener('load',()=>{setTimeout(()=>{window.focus();window.print();},200);});</script>
+</body></html>`;
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Nepodarilo sa pripraviť tlač");
+    }
+  };
+
   return (
     <>
       <AppHeader title="Tlač QR štítkov" />
@@ -71,7 +116,7 @@ function QrPrint() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={selectAll}>Označiť všetky</Button>
             <Button variant="outline" size="sm" onClick={clearAll} disabled={selected.size === 0}>Zrušiť výber</Button>
-            <Button size="sm" onClick={() => window.print()} disabled={toPrint.length === 0}>
+            <Button size="sm" onClick={handlePrint} disabled={toPrint.length === 0}>
               <Printer className="size-4 mr-1" /> Tlačiť ({toPrint.length})
             </Button>
           </div>
