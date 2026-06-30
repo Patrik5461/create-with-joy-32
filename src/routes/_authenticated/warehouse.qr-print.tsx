@@ -173,13 +173,37 @@ function QrPrint() {
       </div>
 
       {/* Print-only sheet */}
-      <div className="hidden print:block print:fixed print:inset-0 print:z-[9999] p-6 bg-white text-black">
-        <div className="grid grid-cols-4 gap-4">
-          {printLabels.map((i, idx) => (
-            <PrintLabelCard key={`${i.id}-${idx}`} item={i} />
-          ))}
-        </div>
+      <div className="qr-print-sheet hidden print:block print:fixed print:inset-0 print:z-[9999] bg-white text-black">
+        {Array.from({ length: Math.ceil(printLabels.length / 24) }).map((_, pageIdx) => {
+          const pageLabels = printLabels.slice(pageIdx * 24, pageIdx * 24 + 24);
+          return (
+            <div key={pageIdx} className="qr-print-page">
+              <div className="grid grid-cols-4 grid-rows-6 gap-3 h-full">
+                {pageLabels.map((i, idx) => (
+                  <PrintLabelCard key={`${i.id}-${pageIdx}-${idx}`} item={i} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 10mm; }
+          html, body { background: #fff !important; }
+          .qr-print-page {
+            width: 190mm;
+            height: 277mm;
+            page-break-after: always;
+            break-after: page;
+            box-sizing: border-box;
+          }
+          .qr-print-page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+          }
+        }
+      `}</style>
     </>
   );
 }
