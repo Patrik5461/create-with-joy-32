@@ -75,6 +75,7 @@ function QrPrint() {
 
   const handlePrint = async () => {
     if (toPrint.length === 0) return;
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
     try {
       const perItem = await Promise.all(
         toPrint.map(async (i) => {
@@ -93,8 +94,13 @@ function QrPrint() {
         }
       }
       setPrintLabels(labels);
+      if (printWindow) {
+        writePrintDocument(printWindow, labels);
+        return;
+      }
       requestAnimationFrame(() => setTimeout(() => window.print(), 150));
     } catch (e: any) {
+      printWindow?.close();
       toast.error(e?.message ?? "Nepodarilo sa pripraviť tlač");
     }
   };
@@ -249,4 +255,61 @@ function PrintLabelCard({ item }: { item: PrintLabel }) {
       </div>
     </div>
   );
+}
+
+function writePrintDocument(printWindow: Window, labels: PrintLabel[]) {
+  const pages = chunk(labels, 24);
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8" />
+  <title>Tlač QR štítkov</title>
+  <style>
+    @page { size: A4; margin: 10mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #000; font-family: Arial, sans-serif; }
+    .page { width: 190mm; height: 277mm; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(6, 1fr); gap: 3mm; page-break-after: always; break-after: page; overflow: hidden; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+    .label { border: 1px solid #d4d4d4; border-radius: 4px; padding: 2mm; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden; break-inside: avoid; }
+    .label img { width: 32mm; height: 32mm; display: block; }
+    .name { width: 100%; margin-top: 2mm; font-size: 9px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .code { margin-top: 1mm; font-size: 8px; color: #525252; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  ${pages
+    .map(
+      (page) => `<section class="page">${page
+        .map(
+          (item) => `<article class="label">
+            <img src="${item.dataUrl}" alt="QR" />
+            <div class="name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+            <div class="code">${escapeHtml(item.internal_code)}${item.copyTotal > 1 ? ` · ${item.copyIndex}/${item.copyTotal}` : ""}</div>
+          </article>`,
+        )
+        .join("")}</section>`,
+    )
+    .join("")}
+  <script>
+    window.onload = () => setTimeout(() => { window.focus(); window.print(); }, 150);
+  </script>
+</body>
+</html>`);
+  printWindow.document.close();
+}
+
+function chunk<T>(items: T[], size: number) {
+  const pages: T[][] = [];
+  for (let i = 0; i < items.length; i += size) pages.push(items.slice(i, i + size));
+  return pages;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
