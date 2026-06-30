@@ -75,6 +75,7 @@ function UsersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Meno</TableHead>
+                <TableHead>Používateľské meno</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Rola</TableHead>
                 <TableHead>Stav</TableHead>
@@ -85,7 +86,8 @@ function UsersPage() {
               {users.data?.map((u: any) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.full_name ?? "—"}</TableCell>
-                  <TableCell>{u.email}</TableCell>
+                  <TableCell className="font-mono text-xs">{u.username ?? "—"}</TableCell>
+                  <TableCell className="text-xs">{u.email?.endsWith("@users.mimaproduction.local") ? <span className="text-muted-foreground italic">—</span> : u.email}</TableCell>
                   <TableCell>
                     <Select value={u.roles[0] ?? ""} onValueChange={(v) => roleMut.mutate({ user_id: u.id, role: v })}>
                       <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Bez roly" /></SelectTrigger>
@@ -103,7 +105,7 @@ function UsersPage() {
                 </TableRow>
               ))}
               {!users.isLoading && users.data?.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Žiadni používatelia.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Žiadni používatelia.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -115,16 +117,22 @@ function UsersPage() {
 }
 
 function NewUserDialog({ onSubmit, loading }: { onSubmit: (d: any) => void; loading: boolean }) {
-  const [form, setForm] = useState({ email: "", password: "", full_name: "", role: "manager" });
+  const [form, setForm] = useState({ username: "", email: "", password: "", full_name: "", role: "manager" });
+  const usernameValid = /^[a-zA-Z0-9._-]{3,32}$/.test(form.username);
   return (
     <DialogContent>
       <DialogHeader>
         <DialogTitle>Nový používateľ</DialogTitle>
-        <DialogDescription>Vytvorí účet so zvolenou rolou.</DialogDescription>
+        <DialogDescription>Vytvorí účet so zvolenou rolou. Prihlasovať sa bude pomocou používateľského mena.</DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
         <div className="space-y-1.5"><Label>Meno a priezvisko</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
-        <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+        <div className="space-y-1.5">
+          <Label>Používateľské meno</Label>
+          <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase() })} placeholder="napr. jano.novak" autoCapitalize="none" />
+          <p className="text-xs text-muted-foreground">3–32 znakov: a–z, 0–9, bodka, podčiarkovník, pomlčka.</p>
+        </div>
+        <div className="space-y-1.5"><Label>Email (voliteľné)</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="napr. jano@firma.sk" /></div>
         <div className="space-y-1.5"><Label>Heslo (min. 8 znakov)</Label><Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
         <div className="space-y-1.5"><Label>Rola</Label>
           <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
@@ -138,7 +146,7 @@ function NewUserDialog({ onSubmit, loading }: { onSubmit: (d: any) => void; load
         </div>
       </div>
       <DialogFooter>
-        <Button onClick={() => onSubmit(form)} disabled={loading || !form.email || form.password.length < 8 || !form.full_name}>Vytvoriť</Button>
+        <Button onClick={() => onSubmit(form)} disabled={loading || !usernameValid || form.password.length < 8 || !form.full_name}>Vytvoriť</Button>
       </DialogFooter>
     </DialogContent>
   );
