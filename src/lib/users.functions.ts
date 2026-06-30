@@ -141,3 +141,20 @@ export const setUserActive = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+/**
+ * Admin — set a new password for any user. Useful when the user has
+ * no real email (synthetic login) and forgot-password by email is impossible.
+ */
+export const adminSetUserPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string; password: string }) =>
+    z.object({ user_id: z.string().uuid(), password: z.string().min(8) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await ensureAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, { password: data.password });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
