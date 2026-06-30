@@ -25,9 +25,12 @@ type Row = {
   furniture_categories: { name: string } | null;
 };
 
+type PrintLabel = Row & { dataUrl: string };
+
 function QrPrint() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [printLabels, setPrintLabels] = useState<PrintLabel[]>([]);
 
   const items = useQuery({
     queryKey: ["furniture_qr_list"],
@@ -75,31 +78,8 @@ function QrPrint() {
           return { ...i, dataUrl };
         }),
       );
-      const win = window.open("", "_blank", "width=900,height=1200");
-      if (!win) {
-        toast.error("Prehliadač zablokoval otvorenie tlačového okna. Povoľte pop-up.");
-        return;
-      }
-      const esc = (s: string) =>
-        s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>QR štítky</title>
-<style>
-  *{box-sizing:border-box} body{margin:0;font-family:system-ui,sans-serif;color:#000;background:#fff;padding:12mm}
-  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6mm}
-  .label{border:1px solid #ddd;border-radius:6px;padding:6px;text-align:center;break-inside:avoid;page-break-inside:avoid}
-  .label img{width:100%;height:auto;display:block}
-  .name{font-size:11px;font-weight:600;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .code{font-size:10px;font-family:ui-monospace,monospace;color:#555}
-  @media print{ body{padding:8mm} }
-</style></head><body>
-<div class="grid">
-${labels.map((l) => `<div class="label"><img src="${l.dataUrl}" alt="QR"/><div class="name" title="${esc(l.name)}">${esc(l.name)}</div><div class="code">${esc(l.internal_code)}</div></div>`).join("")}
-</div>
-<script>window.addEventListener('load',()=>{setTimeout(()=>{window.focus();window.print();},200);});</script>
-</body></html>`;
-      win.document.open();
-      win.document.write(html);
-      win.document.close();
+      setPrintLabels(labels);
+      requestAnimationFrame(() => setTimeout(() => window.print(), 150));
     } catch (e: any) {
       toast.error(e?.message ?? "Nepodarilo sa pripraviť tlač");
     }
@@ -107,7 +87,9 @@ ${labels.map((l) => `<div class="label"><img src="${l.dataUrl}" alt="QR"/><div c
 
   return (
     <>
-      <AppHeader title="Tlač QR štítkov" />
+      <div className="print:hidden">
+        <AppHeader title="Tlač QR štítkov" />
+      </div>
       <div className="p-4 md:p-6 space-y-4 print:hidden">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <Button variant="ghost" size="sm" asChild>
@@ -160,10 +142,10 @@ ${labels.map((l) => `<div class="label"><img src="${l.dataUrl}" alt="QR"/><div c
       </div>
 
       {/* Print-only sheet */}
-      <div className="hidden print:block p-6 bg-white text-black">
+      <div className="hidden print:block print:fixed print:inset-0 print:z-[9999] p-6 bg-white text-black">
         <div className="grid grid-cols-4 gap-4">
-          {toPrint.map((i) => (
-            <LabelCard key={i.id} item={i} print />
+          {printLabels.map((i) => (
+            <PrintLabelCard key={i.id} item={i} />
           ))}
         </div>
       </div>
@@ -178,6 +160,18 @@ function LabelCard({ item, print }: { item: Row; print?: boolean }) {
       <div className="mt-2 w-full">
         <div className="text-xs font-semibold truncate" title={item.name}>{item.name}</div>
         <div className="text-[10px] font-mono text-muted-foreground">{item.internal_code}</div>
+      </div>
+    </div>
+  );
+}
+
+function PrintLabelCard({ item }: { item: PrintLabel }) {
+  return (
+    <div className="border border-neutral-300 rounded-md p-2 flex flex-col items-center text-center break-inside-avoid bg-white">
+      <img src={item.dataUrl} alt={`QR: ${item.name}`} width={140} height={140} />
+      <div className="mt-2 w-full">
+        <div className="text-xs font-semibold truncate" title={item.name}>{item.name}</div>
+        <div className="text-[10px] font-mono text-neutral-600">{item.internal_code}</div>
       </div>
     </div>
   );
