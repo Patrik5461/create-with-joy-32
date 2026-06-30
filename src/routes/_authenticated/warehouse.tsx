@@ -155,7 +155,6 @@ function categoryClass(code?: string | null) {
 
 function FurniturePhoto({ value, alt, className }: { value: string | null; alt: string; className?: string }) {
   const isHttp = value?.startsWith("http");
-  const qc = useQueryClient();
   const [broken, setBroken] = useState(false);
   useEffect(() => { setBroken(false); }, [value]);
   const { data: signed } = useQuery({
@@ -166,11 +165,7 @@ function FurniturePhoto({ value, alt, className }: { value: string | null; alt: 
     queryFn: async () => {
       const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(value!, 60 * 60);
       if (error) {
-        const msg = (error as any)?.message ?? "";
-        const status = (error as any)?.statusCode ?? (error as any)?.status;
-        if (status === "404" || status === 404 || /not.?found/i.test(msg)) {
-          await clearOrphanPhoto(value!, qc);
-        }
+        logBrokenPhoto(value!, alt, error);
         throw error;
       }
       return data.signedUrl;
@@ -191,27 +186,33 @@ function FurniturePhoto({ value, alt, className }: { value: string | null; alt: 
       className={`object-contain bg-muted ${className ?? ""}`}
       onError={() => {
         setBroken(true);
-        if (typeof window !== "undefined") {
-          const w = window as any;
-          w.__brokenFurniturePhotos = w.__brokenFurniturePhotos ?? new Set<string>();
-          if (value && !w.__brokenFurniturePhotos.has(value)) {
-            w.__brokenFurniturePhotos.add(value);
-            console.warn(`[warehouse] Rozbitá fotka (404) — položka "${alt}", path: ${value}`);
-          }
-        }
-        if (value && !isHttp) void clearOrphanPhoto(value, qc);
+        if (value) logBrokenPhoto(value, alt);
       }}
     />
   );
 }
 
-async function clearOrphanPhoto(path: string, qc: ReturnType<typeof useQueryClient>) {
+function logBrokenPhoto(path: string, itemName: string, error?: unknown) {
+  if (typeof window === "undefined") return;
+  const w = window as any;
+  w.__brokenFurniturePhotos = w.__brokenFurniturePhotos ?? new Set<string>();
+  if (w.__brokenFurniturePhotos.has(path)) return;
+  w.__brokenFurniturePhotos.add(path);
+  console.warn(`[warehouse] Rozbitá fotka — položka "${itemName}", path: ${path}`, error ?? "");
+}
+
+function normalizePhotoPath(value: string | null) {
+  if (!value) return null;
+  if (!value.startsWith("http")) return value;
   try {
-    await supabase.from("furniture_items").update({ photo_url: null }).eq("photo_url", path);
-    qc.invalidateQueries({ queryKey: ["furniture_items"] });
+    const url = new URL(value);
+    const marker = `/${PHOTO_BUCKET}/`;
+    const idx = url.pathname.indexOf(marker);
+    if (idx >= 0) return decodeURIComponent(url.pathname.slice(idx + marker.length));
   } catch {
-    // best-effort
+    return value;
   }
+  return value;
 }
 
 function Warehouse() {
@@ -675,7 +676,7 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
     mutationFn: async () => {
       const payload: any = {
         ...form,
-        photo_url: form.photo_url || null,
+        photo_url: normalizePhotoPath(form.photo_url),
         price_per_day: form.price_per_day === "" || form.price_per_day == null ? null : Number(form.price_per_day),
         price_fixed: form.price_fixed === "" || form.price_fixed == null ? null : Number(form.price_fixed),
         public_visible: !!form.public_visible,
