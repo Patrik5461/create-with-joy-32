@@ -75,7 +75,7 @@ function QrPrint() {
 
   const handlePrint = async () => {
     if (toPrint.length === 0) return;
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    const printWindow = window.open("", "_blank", "width=900,height=1200");
     try {
       const perItem = await Promise.all(
         toPrint.map(async (i) => {
