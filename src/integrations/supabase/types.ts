@@ -688,6 +688,7 @@ export type Database = {
           ics_token: string
           id: string
           updated_at: string
+          username: string | null
         }
         Insert: {
           active?: boolean
@@ -697,6 +698,7 @@ export type Database = {
           ics_token?: string
           id: string
           updated_at?: string
+          username?: string | null
         }
         Update: {
           active?: boolean
@@ -706,6 +708,7 @@ export type Database = {
           ics_token?: string
           id?: string
           updated_at?: string
+          username?: string | null
         }
         Relationships: []
       }
