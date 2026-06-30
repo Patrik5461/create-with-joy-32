@@ -173,7 +173,7 @@ function QrPrint() {
       </div>
 
       {/* Print-only sheet */}
-      <div className="qr-print-sheet hidden print:block print:fixed print:inset-0 print:z-[9999] bg-white text-black">
+      <div className="qr-print-sheet hidden bg-white text-black">
         {Array.from({ length: Math.ceil(printLabels.length / 24) }).map((_, pageIdx) => {
           const pageLabels = printLabels.slice(pageIdx * 24, pageIdx * 24 + 24);
           return (
@@ -190,12 +190,25 @@ function QrPrint() {
       <style>{`
         @media print {
           @page { size: A4; margin: 10mm; }
-          html, body { background: #fff !important; }
+          html, body { background: #fff !important; margin: 0 !important; }
+          body * { visibility: hidden !important; }
+          .qr-print-sheet, .qr-print-sheet * { visibility: visible !important; }
+          .qr-print-sheet {
+            display: block !important;
+            position: static !important;
+            width: 190mm !important;
+            margin: 0 auto !important;
+            background: #fff !important;
+            color: #000 !important;
+          }
           .qr-print-page {
             width: 190mm;
             height: 277mm;
+            display: block;
             page-break-after: always;
             break-after: page;
+            break-inside: avoid;
+            overflow: hidden;
             box-sizing: border-box;
           }
           .qr-print-page:last-child {
