@@ -12,6 +12,7 @@ import { resolveLoginEmail } from "@/lib/users.functions";
 const mimaLogo = "/mima-logo.png";
 
 export const Route = createFileRoute("/auth")({
+  ssr: false,
   head: () => ({ meta: [{ title: "Prihlásenie · Mima Production CRM" }] }),
   component: AuthPage,
 });
