@@ -217,7 +217,7 @@ function Warehouse() {
   const items = useQuery({
     queryKey: ["furniture_items"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("furniture_items").select("*, furniture_categories(name, code)").order("name");
+      const { data, error } = await supabase.from("furniture_items").select("*, furniture_categories(name, code)").order("internal_code");
       if (error) throw error;
       return data as unknown as FurnitureRow[];
     },
