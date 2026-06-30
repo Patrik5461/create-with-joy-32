@@ -303,6 +303,71 @@ function ProtocolDetail() {
 
 function PrintProtocol({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl, title }: any) {
   const d = p.data ?? {};
+  void d;
+  return _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl, title });
+}
+
+function ScanProgress({ actual, expected }: { actual: number; expected: number }) {
+  const pct = expected > 0 ? Math.min(100, Math.round((actual / expected) * 100)) : 0;
+  const tone =
+    expected === 0
+      ? "bg-muted-foreground"
+      : actual === expected
+      ? "bg-emerald-500"
+      : actual > expected
+      ? "bg-red-500"
+      : actual === 0
+      ? "bg-muted-foreground/60"
+      : "bg-amber-500";
+  const textTone =
+    actual === expected ? "text-emerald-700"
+    : actual > expected ? "text-red-700"
+    : actual === 0 ? "text-muted-foreground"
+    : "text-amber-700";
+  return (
+    <div className="space-y-1">
+      <div className={`text-xs font-medium ${textTone}`}>{actual} / {expected} ks</div>
+      <div className="h-1.5 w-full rounded bg-muted overflow-hidden">
+        <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ScanSummary({ rows, isReturn }: { rows: any[]; isReturn: boolean }) {
+  const incomplete = rows.filter((r) => Number(r.qty_actual) < Number(r.qty_expected));
+  const over = rows.filter((r) => Number(r.qty_actual) > Number(r.qty_expected));
+  const done = rows.length - incomplete.length - over.length;
+  if (rows.length === 0) return null;
+  return (
+    <div className="mt-4 border-t pt-3 space-y-2 text-sm">
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Kompletné: {done}</Badge>
+        {incomplete.length > 0 && (
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Chýba: {incomplete.length}</Badge>
+        )}
+        {over.length > 0 && (
+          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Prebytok: {over.length}</Badge>
+        )}
+      </div>
+      {incomplete.length > 0 && (
+        <div className="text-xs text-muted-foreground">
+          {isReturn ? "Nevrátené" : "Nenaložené"} kusy:
+          <ul className="list-disc ml-5 mt-1">
+            {incomplete.map((r) => (
+              <li key={r.id}>
+                <span className="font-medium text-foreground">{r.item_name}</span>: chýba {Number(r.qty_expected) - Number(r.qty_actual)} ks ({r.qty_actual}/{r.qty_expected})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl, title }: any) {
+  const d = p.data ?? {};
   return (
     <div className="hidden print:block p-10 text-sm text-black bg-white">
       <div className="flex items-start justify-between border-b pb-4 mb-6">
