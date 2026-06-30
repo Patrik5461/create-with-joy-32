@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { resolveLoginEmail } from "@/lib/users.functions";
 const mimaLogo = "/mima-logo.png";
 
 export const Route = createFileRoute("/auth")({
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,14 +30,17 @@ function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
+    try {
+      const { email } = await resolveLoginEmail({ data: { identifier } });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success("Prihlásenie úspešné");
+      navigate({ to: "/dashboard", replace: true });
+    } catch (err: any) {
       toast.error("Nesprávne prihlasovacie údaje");
-      return;
+    } finally {
+      setLoading(false);
     }
-    toast.success("Prihlásenie úspešné");
-    navigate({ to: "/dashboard", replace: true });
   };
 
   return (
@@ -55,8 +59,8 @@ function AuthPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+                <Label htmlFor="identifier">Meno alebo email</Label>
+                <Input id="identifier" type="text" required value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoComplete="username" autoCapitalize="none" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Heslo</Label>
@@ -71,7 +75,7 @@ function AuthPage() {
             </form>
             <div className="mt-4 rounded-md border border-dashed border-border bg-muted/40 p-3 text-xs">
               <p className="font-medium text-foreground mb-1">Dočasné prihlasovacie údaje (počas vývoja systému)</p>
-              <p className="text-muted-foreground">Email: <span className="font-mono">admin@mimaproduction.sk</span></p>
+              <p className="text-muted-foreground">Meno: <span className="font-mono">admin</span></p>
               <p className="text-muted-foreground">Heslo: <span className="font-mono">Mima2026</span></p>
             </div>
           </CardContent>
