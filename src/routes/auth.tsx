@@ -93,3 +93,53 @@ function AuthPage() {
     </div>
   );
 }
+
+function ForgotPasswordDialog({ open, onOpenChange, defaultIdentifier }: { open: boolean; onOpenChange: (v: boolean) => void; defaultIdentifier: string }) {
+  const [identifier, setIdentifier] = useState(defaultIdentifier);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    const id = identifier.trim();
+    if (!id) return toast.error("Zadajte prihlasovacie meno alebo email");
+    setSubmitting(true);
+    try {
+      const { email } = await resolveLoginEmail({ data: { identifier: id } });
+      if (email.endsWith("@users.mimaproduction.local")) {
+        toast.error("Tento účet nemá priradený email. Kontaktujte administrátora pre reset hesla.");
+        return;
+      }
+      const redirectTo = `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) throw error;
+      toast.success("Email s odkazom na obnovu hesla bol odoslaný.");
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Nepodarilo sa odoslať email");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Obnova hesla</DialogTitle>
+          <DialogDescription>
+            Zadajte svoje používateľské meno alebo email. Pošleme vám odkaz na nastavenie nového hesla.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="forgot-id">Meno alebo email</Label>
+          <Input id="forgot-id" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoCapitalize="none" />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>Zrušiť</Button>
+          <Button onClick={submit} disabled={submitting}>
+            {submitting ? <Loader2 className="size-4 animate-spin" /> : "Odoslať odkaz"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
