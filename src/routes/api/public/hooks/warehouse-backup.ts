@@ -8,7 +8,7 @@ export const Route = createFileRoute('/api/public/hooks/warehouse-backup')({
 
         const { data: items, error } = await supabaseAdmin
           .from('furniture_items')
-          .select('internal_code,name,total_qty,damaged_qty,retired_qty,price_per_day,category_id,furniture_categories(name,code)')
+          .select('internal_code,name,total_qty,damaged_qty,retired_qty,price_per_day,photo_url,category_id,furniture_categories(name,code)')
           .order('internal_code', { ascending: true })
 
         if (error) {
@@ -17,7 +17,7 @@ export const Route = createFileRoute('/api/public/hooks/warehouse-backup')({
 
         const headers = [
           'internal_code','name','category_code','category_name',
-          'total_qty','damaged_qty','retired_qty','available_qty','price_per_day',
+          'total_qty','damaged_qty','retired_qty','available_qty','price_per_day','photo_url',
         ]
         const escape = (v: unknown) => {
           if (v === null || v === undefined) return ''
@@ -34,6 +34,7 @@ export const Route = createFileRoute('/api/public/hooks/warehouse-backup')({
             it.furniture_categories?.name ?? '',
             total, damaged, retired, total - damaged - retired,
             it.price_per_day ?? '',
+            it.photo_url ?? '',
           ].map(escape).join(',')
         })
         const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n')
@@ -57,7 +58,65 @@ export const Route = createFileRoute('/api/public/hooks/warehouse-backup')({
           return Response.json({ ok: false, error: upErr.message }, { status: 500 })
         }
 
-        return Response.json({ ok: true, path, items: rows.length })
+        // Mirror photos into warehouse-backups under photos/<original-path>.
+        // Only copy files that aren't already mirrored — this preserves every
+        // photo ever referenced (even if the original gets deleted) without
+        // ballooning storage with daily duplicates.
+        let photosCopied = 0
+        let photosSkipped = 0
+        let photosFailed = 0
+        const photoPaths = Array.from(
+          new Set(
+            (items ?? [])
+              .map((i: any) => i.photo_url)
+              .filter((p: any): p is string => typeof p === 'string' && p.length > 0 && !p.startsWith('http')),
+          ),
+        )
+
+        for (const srcPath of photoPaths) {
+          const destPath = `photos/${srcPath}`
+          try {
+            // Check if already mirrored
+            const lastSlash = destPath.lastIndexOf('/')
+            const dir = destPath.slice(0, lastSlash)
+            const file = destPath.slice(lastSlash + 1)
+            const { data: existing } = await supabaseAdmin.storage
+              .from('warehouse-backups')
+              .list(dir, { limit: 1, search: file })
+            if (existing && existing.some((f) => f.name === file)) {
+              photosSkipped++
+              continue
+            }
+
+            const { data: blob, error: dlErr } = await supabaseAdmin.storage
+              .from('furniture-photos')
+              .download(srcPath)
+            if (dlErr || !blob) {
+              photosFailed++
+              continue
+            }
+            const { error: upPhotoErr } = await supabaseAdmin.storage
+              .from('warehouse-backups')
+              .upload(destPath, blob, {
+                contentType: blob.type || 'image/jpeg',
+                upsert: false,
+              })
+            if (upPhotoErr) {
+              photosFailed++
+              continue
+            }
+            photosCopied++
+          } catch {
+            photosFailed++
+          }
+        }
+
+        return Response.json({
+          ok: true,
+          path,
+          items: rows.length,
+          photos: { total: photoPaths.length, copied: photosCopied, skipped: photosSkipped, failed: photosFailed },
+        })
       },
     },
   },
