@@ -11,9 +11,9 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Power, KeyRound } from "lucide-react";
+import { Plus, Power, KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { listUsers, createUser, setUserRole, setUserActive, checkIsAdmin, adminSetUserPassword } from "@/lib/users.functions";
+import { listUsers, createUser, setUserRole, setUserActive, checkIsAdmin, adminSetUserPassword, deleteUser } from "@/lib/users.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 const ROLE_LABEL: Record<string, string> = { admin: "Administrátor", manager: "Manažér", warehouse: "Skladník" };
@@ -35,9 +35,11 @@ function UsersPage() {
   const setRole = useServerFn(setUserRole);
   const setActive = useServerFn(setUserActive);
   const setPwd = useServerFn(adminSetUserPassword);
+  const del = useServerFn(deleteUser);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [pwdFor, setPwdFor] = useState<{ id: string; name: string } | null>(null);
+  const [delFor, setDelFor] = useState<{ id: string; name: string } | null>(null);
 
   const users = useQuery({ queryKey: ["admin-users"], queryFn: () => list() });
 
@@ -59,6 +61,11 @@ function UsersPage() {
   const pwdMut = useMutation({
     mutationFn: (data: any) => setPwd({ data }),
     onSuccess: () => { toast.success("Heslo bolo zmenené"); setPwdFor(null); },
+    onError: (e: any) => toast.error(e?.message ?? "Chyba"),
+  });
+  const delMut = useMutation({
+    mutationFn: (data: any) => del({ data }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); toast.success("Používateľ bol vymazaný"); setDelFor(null); },
     onError: (e: any) => toast.error(e?.message ?? "Chyba"),
   });
 
@@ -108,7 +115,8 @@ function UsersPage() {
                   <TableCell><Badge variant={u.active ? "default" : "destructive"}>{u.active ? "Aktívny" : "Deaktivovaný"}</Badge></TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="ghost" aria-label="Reset hesla" onClick={() => setPwdFor({ id: u.id, name: u.full_name ?? u.username ?? u.email })}><KeyRound className="size-4" /></Button>
-                    <Button size="sm" variant="ghost" onClick={() => activeMut.mutate({ user_id: u.id, active: !u.active })}><Power className="size-4" /></Button>
+                    <Button size="sm" variant="ghost" aria-label={u.active ? "Deaktivovať" : "Aktivovať"} onClick={() => activeMut.mutate({ user_id: u.id, active: !u.active })}><Power className="size-4" /></Button>
+                    <Button size="sm" variant="ghost" aria-label="Vymazať používateľa" className="text-destructive hover:text-destructive" onClick={() => setDelFor({ id: u.id, name: u.full_name ?? u.username ?? u.email })}><Trash2 className="size-4" /></Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -122,6 +130,20 @@ function UsersPage() {
       </div>
       <Dialog open={!!pwdFor} onOpenChange={(v) => !v && setPwdFor(null)}>
         <ResetPasswordDialog target={pwdFor} loading={pwdMut.isPending} onSubmit={(pwd) => pwdFor && pwdMut.mutate({ user_id: pwdFor.id, password: pwd })} />
+      </Dialog>
+      <Dialog open={!!delFor} onOpenChange={(v) => !v && setDelFor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vymazať používateľa</DialogTitle>
+            <DialogDescription>
+              Naozaj chcete natrvalo vymazať používateľa <strong>{delFor?.name}</strong>? Táto operácia je nezvratná — odstráni účet, profil aj priradené roly.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDelFor(null)}>Zrušiť</Button>
+            <Button variant="destructive" disabled={delMut.isPending} onClick={() => delFor && delMut.mutate({ user_id: delFor.id })}>Vymazať</Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
     </>
   );
