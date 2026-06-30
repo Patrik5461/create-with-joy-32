@@ -683,13 +683,17 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
         public_price: form.public_price === "" || form.public_price == null ? null : Number(form.public_price),
       };
       if (item) {
-        const { error } = await supabase.from("furniture_items").update(payload).eq("id", item.id);
+        const { data, error } = await supabase.from("furniture_items").update(payload).eq("id", item.id).select().single();
         if (error) throw error;
+        if (!data) throw new Error("Položka sa neuložila (žiadne dáta vrátené z databázy).");
+        return data;
       } else {
         // Nechaj DB trigger vygenerovať interný kód automaticky podľa kategórie
         delete payload.internal_code;
-        const { error } = await supabase.from("furniture_items").insert(payload);
+        const { data, error } = await supabase.from("furniture_items").insert(payload).select().single();
         if (error) throw error;
+        if (!data) throw new Error("Položka sa neuložila (žiadne dáta vrátené z databázy).");
+        return data;
       }
     },
     onSuccess: () => {
@@ -697,7 +701,18 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
       toast.success(item ? "Položka upravená" : "Položka pridaná");
       onClose();
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => {
+      const msg = String(e?.message ?? "");
+      const code = String(e?.code ?? "");
+      if (code === "23505" || /duplicate key|unique/i.test(msg)) {
+        toast.error("Položka sa nepodarila uložiť — konflikt interného kódu. Skús to znova.");
+      } else if (/row-level security|permission/i.test(msg)) {
+        toast.error("Nemáte oprávnenie uložiť položku.");
+      } else {
+        toast.error(msg || "Uloženie zlyhalo — položka nebola uložená.");
+      }
+      console.error("[warehouse] save failed:", e);
+    },
   });
 
   return (
