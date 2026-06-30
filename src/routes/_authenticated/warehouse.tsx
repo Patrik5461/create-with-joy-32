@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
@@ -156,6 +156,8 @@ function categoryClass(code?: string | null) {
 function FurniturePhoto({ value, alt, className }: { value: string | null; alt: string; className?: string }) {
   const isHttp = value?.startsWith("http");
   const qc = useQueryClient();
+  const [broken, setBroken] = useState(false);
+  useEffect(() => { setBroken(false); }, [value]);
   const { data: signed } = useQuery({
     queryKey: ["furniture-photo", value],
     enabled: !!value && !isHttp,
@@ -167,12 +169,7 @@ function FurniturePhoto({ value, alt, className }: { value: string | null; alt: 
         const msg = (error as any)?.message ?? "";
         const status = (error as any)?.statusCode ?? (error as any)?.status;
         if (status === "404" || status === 404 || /not.?found/i.test(msg)) {
-          // Self-heal: file no longer exists in storage — clear the orphaned reference
-          await supabase
-            .from("furniture_items")
-            .update({ photo_url: null })
-            .eq("photo_url", value!)
-            .then(() => qc.invalidateQueries({ queryKey: ["furniture_items"] }));
+          await clearOrphanPhoto(value!, qc);
         }
         throw error;
       }
@@ -180,14 +177,41 @@ function FurniturePhoto({ value, alt, className }: { value: string | null; alt: 
     },
   });
   const src = isHttp ? value : signed;
-  if (!src) {
+  if (!src || broken) {
     return (
       <div className={`grid place-items-center bg-muted ${className ?? ""}`}>
         <ImageIcon className="size-10 text-muted-foreground/50" />
       </div>
     );
   }
-  return <img src={src} alt={alt} className={`object-contain bg-muted ${className ?? ""}`} />;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`object-contain bg-muted ${className ?? ""}`}
+      onError={() => {
+        setBroken(true);
+        if (typeof window !== "undefined") {
+          const w = window as any;
+          w.__brokenFurniturePhotos = w.__brokenFurniturePhotos ?? new Set<string>();
+          if (value && !w.__brokenFurniturePhotos.has(value)) {
+            w.__brokenFurniturePhotos.add(value);
+            console.warn(`[warehouse] Rozbitá fotka (404) — položka "${alt}", path: ${value}`);
+          }
+        }
+        if (value && !isHttp) void clearOrphanPhoto(value, qc);
+      }}
+    />
+  );
+}
+
+async function clearOrphanPhoto(path: string, qc: ReturnType<typeof useQueryClient>) {
+  try {
+    await supabase.from("furniture_items").update({ photo_url: null }).eq("photo_url", path);
+    qc.invalidateQueries({ queryKey: ["furniture_items"] });
+  } catch {
+    // best-effort
+  }
 }
 
 function Warehouse() {
