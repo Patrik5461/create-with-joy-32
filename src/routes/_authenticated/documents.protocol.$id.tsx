@@ -212,6 +212,7 @@ function ProtocolDetail() {
                     <th className="py-2">Položka</th>
                     <th className="w-20">Očak.</th>
                     <th className="w-24">Skut.</th>
+                    <th className="w-44">Priebeh</th>
                     <th className="w-36">Stav</th>
                     <th>Poznámka</th>
                     {isReturn && <th className="w-32"></th>}
@@ -229,6 +230,9 @@ function ProtocolDetail() {
                         <Input type="number" min={0} className="h-8 w-20" disabled={!canEdit || isSigned}
                           value={r.qty_actual}
                           onChange={(e) => updateRow(i, { qty_actual: Math.max(0, Number(e.target.value)) })} />
+                      </td>
+                      <td>
+                        <ScanProgress actual={Number(r.qty_actual) || 0} expected={Number(r.qty_expected) || 0} />
                       </td>
                       <td>
                         <Select value={r.condition} disabled={!canEdit || isSigned}
@@ -259,6 +263,7 @@ function ProtocolDetail() {
                 </tbody>
               </table>
             </div>
+            <ScanSummary rows={rows} isReturn={isReturn} />
           </CardContent>
         </Card>
 
