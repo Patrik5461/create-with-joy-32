@@ -11,9 +11,9 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Power } from "lucide-react";
+import { Plus, Power, KeyRound } from "lucide-react";
 import { toast } from "sonner";
-import { listUsers, createUser, setUserRole, setUserActive, checkIsAdmin } from "@/lib/users.functions";
+import { listUsers, createUser, setUserRole, setUserActive, checkIsAdmin, adminSetUserPassword } from "@/lib/users.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 const ROLE_LABEL: Record<string, string> = { admin: "Administrátor", manager: "Manažér", warehouse: "Skladník" };
@@ -34,8 +34,10 @@ function UsersPage() {
   const create = useServerFn(createUser);
   const setRole = useServerFn(setUserRole);
   const setActive = useServerFn(setUserActive);
+  const setPwd = useServerFn(adminSetUserPassword);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [pwdFor, setPwdFor] = useState<{ id: string; name: string } | null>(null);
 
   const users = useQuery({ queryKey: ["admin-users"], queryFn: () => list() });
 
@@ -52,6 +54,11 @@ function UsersPage() {
   const activeMut = useMutation({
     mutationFn: (data: any) => setActive({ data }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); toast.success("Stav zmenený"); },
+    onError: (e: any) => toast.error(e?.message ?? "Chyba"),
+  });
+  const pwdMut = useMutation({
+    mutationFn: (data: any) => setPwd({ data }),
+    onSuccess: () => { toast.success("Heslo bolo zmenené"); setPwdFor(null); },
     onError: (e: any) => toast.error(e?.message ?? "Chyba"),
   });
 
@@ -100,6 +107,7 @@ function UsersPage() {
                   </TableCell>
                   <TableCell><Badge variant={u.active ? "default" : "destructive"}>{u.active ? "Aktívny" : "Deaktivovaný"}</Badge></TableCell>
                   <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" aria-label="Reset hesla" onClick={() => setPwdFor({ id: u.id, name: u.full_name ?? u.username ?? u.email })}><KeyRound className="size-4" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => activeMut.mutate({ user_id: u.id, active: !u.active })}><Power className="size-4" /></Button>
                   </TableCell>
                 </TableRow>
@@ -112,7 +120,29 @@ function UsersPage() {
         </Card>
         <p className="text-xs text-muted-foreground">Tip: prvý admin sa nastavuje manuálne v Supabase dashboarde — pridajte si rolu <code>admin</code> do tabuľky <code>user_roles</code>.</p>
       </div>
+      <Dialog open={!!pwdFor} onOpenChange={(v) => !v && setPwdFor(null)}>
+        <ResetPasswordDialog target={pwdFor} loading={pwdMut.isPending} onSubmit={(pwd) => pwdFor && pwdMut.mutate({ user_id: pwdFor.id, password: pwd })} />
+      </Dialog>
     </>
+  );
+}
+
+function ResetPasswordDialog({ target, loading, onSubmit }: { target: { id: string; name: string } | null; loading: boolean; onSubmit: (pwd: string) => void }) {
+  const [pwd, setPwd] = useState("");
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Reset hesla</DialogTitle>
+        <DialogDescription>Nastav nové heslo pre používateľa <strong>{target?.name}</strong>. Po uložení sa môže prihlásiť novým heslom.</DialogDescription>
+      </DialogHeader>
+      <div className="space-y-1.5">
+        <Label>Nové heslo (min. 8 znakov)</Label>
+        <Input type="text" value={pwd} onChange={(e) => setPwd(e.target.value)} autoComplete="new-password" />
+      </div>
+      <DialogFooter>
+        <Button onClick={() => onSubmit(pwd)} disabled={loading || pwd.length < 8}>Uložiť</Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
