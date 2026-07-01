@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PHOTO_BUCKET = "furniture-photos";
+const BACKUP_BUCKET = "warehouse-backups";
 
 export type PublicCatalogItem = {
   id: string;
@@ -41,10 +42,17 @@ export const getPublicCatalog = createServerFn({ method: "GET" }).handler(async 
       if (i.photo_url) {
         if (i.photo_url.startsWith("http")) url = i.photo_url;
         else {
-          const { data: signed } = await supabaseAdmin.storage
+          const { data: signed, error: signError } = await supabaseAdmin.storage
             .from(PHOTO_BUCKET)
             .createSignedUrl(i.photo_url, 60 * 60);
-          url = signed?.signedUrl ?? null;
+          if (!signError && signed?.signedUrl) {
+            url = signed.signedUrl;
+          } else {
+            const { data: backup } = await supabaseAdmin.storage
+              .from(BACKUP_BUCKET)
+              .createSignedUrl(`photos/${i.photo_url}`, 60 * 60);
+            url = backup?.signedUrl ?? null;
+          }
         }
       }
       return {
