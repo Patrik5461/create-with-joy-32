@@ -156,18 +156,22 @@ function categoryClass(code?: string | null) {
 function FurniturePhoto({ value, alt, className }: { value: string | null; alt: string; className?: string }) {
   const isHttp = value?.startsWith("http");
   const [broken, setBroken] = useState(false);
+  const qc = useQueryClient();
   useEffect(() => { setBroken(false); }, [value]);
   const { data: signed } = useQuery({
     queryKey: ["furniture-photo", value],
     enabled: !!value && !isHttp,
-    staleTime: 1000 * 60 * 30,
+    // Signed URLs are minted for 7 days; keep the cached URL fresh well
+    // within that window so we never serve an expired link.
+    staleTime: 1000 * 60 * 60 * 24 * 6,
+    gcTime: 1000 * 60 * 60 * 24 * 7,
     retry: false,
     queryFn: async () => {
-      const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(value!, 60 * 60);
+      const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(value!, 60 * 60 * 24 * 7);
       if (!error && data?.signedUrl) return data.signedUrl;
 
       const backupPath = `photos/${value!}`;
-      const { data: backup, error: backupError } = await supabase.storage.from(BACKUP_BUCKET).createSignedUrl(backupPath, 60 * 60);
+      const { data: backup, error: backupError } = await supabase.storage.from(BACKUP_BUCKET).createSignedUrl(backupPath, 60 * 60 * 24 * 7);
       if (!backupError && backup?.signedUrl) return backup.signedUrl;
 
       logBrokenPhoto(value!, alt, error ?? backupError);
@@ -188,7 +192,14 @@ function FurniturePhoto({ value, alt, className }: { value: string | null; alt: 
       alt={alt}
       className={`object-contain bg-muted ${className ?? ""}`}
       onError={() => {
-        setBroken(true);
+        // A likely-expired signed URL: drop it from cache and refetch a
+        // fresh one. Only mark broken if the file is genuinely gone (the
+        // refetch will throw and leave `signed` undefined).
+        if (value && !isHttp) {
+          qc.invalidateQueries({ queryKey: ["furniture-photo", value] });
+        } else {
+          setBroken(true);
+        }
         if (value) logBrokenPhoto(value, alt);
       }}
     />
