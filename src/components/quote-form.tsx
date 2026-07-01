@@ -103,11 +103,22 @@ export function QuoteForm({ initial, quoteId }: Props) {
   const furniture = useQuery({
     queryKey: ["furniture-pricing"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("furniture_items").select("id, name, internal_code, price_per_day, price_fixed").eq("active", true).order("name");
+      const { data, error } = await supabase.from("furniture_items").select("id, name, internal_code, price_per_day, price_fixed, category_id").eq("active", true).order("name");
       if (error) throw error;
       return data;
     },
   });
+
+  const categories = useQuery({
+    queryKey: ["furniture-categories-quote"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("furniture_categories").select("id, name, display_order").order("display_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const [categoryFilter, setCategoryFilter] = useState<Record<string, string>>({});
 
   const totals = useMemo(() => computeTotals({
     lines,
@@ -343,12 +354,33 @@ export function QuoteForm({ initial, quoteId }: Props) {
               {l.kind === "furniture" ? (
                 <div className="md:col-span-4 space-y-1">
                   <Label className="text-xs">Nábytok</Label>
-                  <Select value={l.furniture_item_id ?? ""} onValueChange={(v) => onPickFurniture(l.id, v)}>
-                    <SelectTrigger><SelectValue placeholder="Vyberte" /></SelectTrigger>
-                    <SelectContent>
-                      {furniture.data?.map((f: any) => <SelectItem key={f.id} value={f.id}>{f.name} ({f.internal_code})</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select
+                      value={categoryFilter[l.id] ?? "__all"}
+                      onValueChange={(v) => setCategoryFilter((c) => ({ ...c, [l.id]: v }))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Kategória" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all">Všetky kategórie</SelectItem>
+                        {categories.data?.map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={l.furniture_item_id ?? ""} onValueChange={(v) => onPickFurniture(l.id, v)}>
+                      <SelectTrigger><SelectValue placeholder="Vyberte" /></SelectTrigger>
+                      <SelectContent>
+                        {furniture.data
+                          ?.filter((f: any) => {
+                            const cf = categoryFilter[l.id];
+                            return !cf || cf === "__all" || f.category_id === cf;
+                          })
+                          .map((f: any) => (
+                            <SelectItem key={f.id} value={f.id}>{f.name} ({f.internal_code})</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               ) : (
                 <div className="md:col-span-4 space-y-1">
