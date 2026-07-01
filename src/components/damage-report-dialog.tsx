@@ -243,9 +243,10 @@ function Inner({ item, reservedNow, onClose }: { item: DamageReportTarget; reser
 export function PhotoThumb({ path }: { path: string }) {
   const { data } = useQuery({
     queryKey: ["damage-photo", path],
-    staleTime: 1000 * 60 * 30,
+    staleTime: 1000 * 60 * 60 * 24 * 6,
+    gcTime: 1000 * 60 * 60 * 24 * 7,
     queryFn: async () => {
-      const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, 60 * 60);
+      const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7);
       if (error) throw error;
       return data.signedUrl;
     },

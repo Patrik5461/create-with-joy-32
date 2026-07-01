@@ -40,15 +40,17 @@ function ScanView() {
   const photoUrl = useQuery({
     queryKey: ["furniture_scan_photo", item.data?.photo_url],
     enabled: !!item.data?.photo_url && !item.data.photo_url.startsWith("http"),
+    staleTime: 1000 * 60 * 60 * 24 * 6,
+    gcTime: 1000 * 60 * 60 * 24 * 7,
     queryFn: async () => {
       const { data, error } = await supabase.storage
         .from(PHOTO_BUCKET)
-        .createSignedUrl(item.data!.photo_url, 60 * 60);
+        .createSignedUrl(item.data!.photo_url, 60 * 60 * 24 * 7);
       if (!error && data?.signedUrl) return data.signedUrl;
 
       const { data: backup, error: backupError } = await supabase.storage
         .from(BACKUP_BUCKET)
-        .createSignedUrl(`photos/${item.data!.photo_url}`, 60 * 60);
+        .createSignedUrl(`photos/${item.data!.photo_url}`, 60 * 60 * 24 * 7);
       if (!backupError && backup?.signedUrl) return backup.signedUrl;
 
       throw error ?? backupError;
