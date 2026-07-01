@@ -652,6 +652,17 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
         contentType: file.type,
       });
       if (error) throw error;
+      // Okamžite zrkadli fotku do zálohy — ak sa primárny súbor niekedy stratí,
+      // FurniturePhoto ju automaticky načíta zo `warehouse-backups`.
+      try {
+        await supabase.storage.from(BACKUP_BUCKET).upload(`photos/${path}`, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type,
+        });
+      } catch {
+        // záloha nesmie blokovať uloženie produktu — denný cron doplní chýbajúce
+      }
       setForm((f) => ({ ...f, photo_url: path }));
       toast.success("Fotka nahraná");
     } catch (e: any) {
