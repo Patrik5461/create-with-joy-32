@@ -11,6 +11,9 @@ import { QrScannerDialog } from "@/components/qr-scanner-dialog";
 import { useNavigate } from "@tanstack/react-router";
 import { QRCode, buildFurnitureScanUrl } from "@/components/qr-code";
 
+const PHOTO_BUCKET = "furniture-photos";
+const BACKUP_BUCKET = "warehouse-backups";
+
 export const Route = createFileRoute("/_authenticated/warehouse/scan/$id")({
   head: () => ({ meta: [{ title: "Skenovaná položka · Mima Production CRM" }] }),
   component: ScanView,
@@ -39,10 +42,16 @@ function ScanView() {
     enabled: !!item.data?.photo_url && !item.data.photo_url.startsWith("http"),
     queryFn: async () => {
       const { data, error } = await supabase.storage
-        .from("furniture-photos")
+        .from(PHOTO_BUCKET)
         .createSignedUrl(item.data!.photo_url, 60 * 60);
-      if (error) throw error;
-      return data.signedUrl;
+      if (!error && data?.signedUrl) return data.signedUrl;
+
+      const { data: backup, error: backupError } = await supabase.storage
+        .from(BACKUP_BUCKET)
+        .createSignedUrl(`photos/${item.data!.photo_url}`, 60 * 60);
+      if (!backupError && backup?.signedUrl) return backup.signedUrl;
+
+      throw error ?? backupError;
     },
   });
 

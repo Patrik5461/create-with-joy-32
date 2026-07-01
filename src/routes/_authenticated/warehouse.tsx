@@ -164,11 +164,14 @@ function FurniturePhoto({ value, alt, className }: { value: string | null; alt: 
     retry: false,
     queryFn: async () => {
       const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(value!, 60 * 60);
-      if (error) {
-        logBrokenPhoto(value!, alt, error);
-        throw error;
-      }
-      return data.signedUrl;
+      if (!error && data?.signedUrl) return data.signedUrl;
+
+      const backupPath = `photos/${value!}`;
+      const { data: backup, error: backupError } = await supabase.storage.from(BACKUP_BUCKET).createSignedUrl(backupPath, 60 * 60);
+      if (!backupError && backup?.signedUrl) return backup.signedUrl;
+
+      logBrokenPhoto(value!, alt, error ?? backupError);
+      throw error ?? backupError;
     },
   });
   const src = isHttp ? value : signed;
@@ -282,9 +285,6 @@ function Warehouse() {
 
   const deleteItem = useMutation({
     mutationFn: async (row: FurnitureRow) => {
-      if (row.photo_url && !row.photo_url.startsWith("http")) {
-        await supabase.storage.from(PHOTO_BUCKET).remove([row.photo_url]).catch(() => {});
-      }
       const { error } = await supabase.from("furniture_items").delete().eq("id", row.id);
       if (error) throw error;
     },
@@ -652,10 +652,6 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
         contentType: file.type,
       });
       if (error) throw error;
-      // Remove previous file if it was in storage
-      if (form.photo_url && !form.photo_url.startsWith("http")) {
-        await supabase.storage.from(PHOTO_BUCKET).remove([form.photo_url]).catch(() => {});
-      }
       setForm((f) => ({ ...f, photo_url: path }));
       toast.success("Fotka nahraná");
     } catch (e: any) {
@@ -666,9 +662,6 @@ function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | n
   };
 
   const removePhoto = async () => {
-    if (form.photo_url && !form.photo_url.startsWith("http")) {
-      await supabase.storage.from(PHOTO_BUCKET).remove([form.photo_url]).catch(() => {});
-    }
     setForm((f) => ({ ...f, photo_url: "" }));
   };
 
