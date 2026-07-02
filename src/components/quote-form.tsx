@@ -156,7 +156,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
 
   const addFurnitureRow = () => {
     const f = furniture.data?.[0];
-    setLines((ls) => [...ls, {
+    setLines((ls) => [{
       id: uid(),
       kind: "furniture",
       furniture_item_id: f?.id ?? null,
@@ -165,10 +165,10 @@ export function QuoteForm({ initial, quoteId }: Props) {
       price_mode: f?.price_per_day != null ? "per_day" : "fixed",
       unit_price: Number(f?.price_per_day ?? f?.price_fixed) || 0,
       days: 1,
-    }]);
+    }, ...ls]);
   };
   const addServiceRow = () => {
-    setLines((ls) => [...ls, {
+    setLines((ls) => [{
       id: uid(),
       kind: "service",
       furniture_item_id: null,
@@ -177,7 +177,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
       price_mode: "service",
       unit_price: 0,
       days: 1,
-    }]);
+    }, ...ls]);
   };
 
   const updateLine = (id: string, patch: Partial<QuoteLine>) => {
