@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Truck, Package, Plus, Pencil, Trash2, Car } from "lucide-react";
+import { ChevronLeft, ChevronRight, Truck, Package, Plus, Pencil, Trash2, Car, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -156,10 +156,13 @@ function Logistics() {
         </div>
 
         {view === "day" ? (
-          <div className="grid lg:grid-cols-2 gap-4">
-            <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
-            <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
-          </div>
+          <>
+            <div className="grid lg:grid-cols-2 gap-4">
+              <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
+              <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
+            </div>
+            <StaffDay day={cursor} />
+          </>
         ) : (
           <RangeList range={range} byDay={byDay} onSave={(p: any) => saveNote.mutate(p)} onPickDay={(d) => { setCursor(d); setView("day"); }} />
         )}
