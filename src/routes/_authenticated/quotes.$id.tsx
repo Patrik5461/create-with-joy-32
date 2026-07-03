@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Printer, Copy, Trash2, Mail, Loader2, History } from "lucide-react";
+import { CalendarPlus, ExternalLink, RefreshCw, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { QuoteForm } from "@/components/quote-form";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, type QuoteLine } from "@/lib/quote-utils";
+import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow } from "@/lib/quote-reservation-link";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
   head: () => ({ meta: [{ title: "Kalkulácia · Mima Production CRM" }] }),
@@ -34,6 +36,7 @@ function QuoteDetail() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
 
   const quote = useQuery({
     queryKey: ["quote", id],
@@ -75,6 +78,50 @@ function QuoteDetail() {
       }
       return (data ?? []).map((v: any) => ({ ...v, creator: v.created_by ? profileMap.get(v.created_by) ?? null : null }));
     },
+  });
+
+  // Reservation linked to this quote-group (obojsmerná väzba cez quote_group_id).
+  const linkedReservation = useQuery({
+    queryKey: ["quote-linked-reservation", (quote.data as any)?.quote_group_id],
+    enabled: !!(quote.data as any)?.quote_group_id,
+    queryFn: async () => {
+      const gid = (quote.data as any).quote_group_id as string;
+      const { data, error } = await supabase
+        .from("reservations")
+        .select("id, event_name, status, load_at, available_from_at, reservation_items(id, qty, furniture_item_id, furniture_items(name))")
+        .eq("quote_group_id", gid)
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+
+  const createRes = useMutation({
+    mutationFn: async () => createReservationFromQuote((quote.data as any).id),
+    onSuccess: (rid) => {
+      qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+      toast.success("Rezervácia vytvorená z kalkulácie");
+      navigate({ to: "/reservations/$id", params: { id: rid } });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Nepodarilo sa vytvoriť rezerváciu"),
+  });
+
+  const syncRes = useMutation({
+    mutationFn: async () => {
+      const r = linkedReservation.data;
+      if (!r) throw new Error("Nie je prepojená rezervácia.");
+      await syncReservationFromQuote(r.id, (quote.data as any).id);
+      return r.id;
+    },
+    onSuccess: (rid) => {
+      qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
+      qc.invalidateQueries({ queryKey: ["reservation", rid] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+      toast.success("Rezervácia zosúladená s aktuálnou verziou kalkulácie");
+      setSyncOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Zosúladenie zlyhalo"),
   });
 
   const remove = useMutation({
@@ -165,6 +212,20 @@ function QuoteDetail() {
   const maxVersion = Math.max(q.version_number ?? 1, ...(versions.data?.map((v) => v.version_number) ?? [1]));
   const nextVersion = maxVersion + 1;
 
+  const res = linkedReservation.data as any | null;
+  const diffs: DiffRow[] = res && q.is_current
+    ? computeItemsDiff(
+        (q.quote_items ?? []).map((it: any) => ({
+          furniture_item_id: it.furniture_item_id,
+          name: it.name,
+          qty: Number(it.qty),
+          kind: it.kind,
+        })),
+        (res.reservation_items ?? []) as any,
+      )
+    : [];
+  const isMismatched = diffs.length > 0;
+
   if (editing) {
     const items: QuoteLine[] = (q.quote_items ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order).map((it: any) => ({
       id: it.id,
@@ -211,6 +272,17 @@ function QuoteDetail() {
               v{q.version_number}{q.is_current ? " · aktuálna" : " · staršia"}
             </Badge>
             <Badge variant={QUOTE_STATUS_VARIANT[q.status as keyof typeof QUOTE_STATUS_VARIANT]}>{QUOTE_STATUS_LABEL[q.status as keyof typeof QUOTE_STATUS_LABEL]}</Badge>
+            {res && (
+              isMismatched ? (
+                <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-800">
+                  <AlertTriangle className="size-3 mr-1" />Nezosúladené s rezerváciou
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-emerald-400 bg-emerald-50 text-emerald-800">
+                  Zosúladené s rezerváciou
+                </Badge>
+              )
+            )}
             {versions.data && versions.data.length > 1 && (
               <div className="flex items-center gap-1.5">
                 <History className="size-3.5 text-muted-foreground" />
@@ -234,6 +306,36 @@ function QuoteDetail() {
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => window.print()}><Printer className="size-4 mr-1" />Tlačiť / PDF</Button>
             <Button variant="outline" onClick={sendEmail}><Mail className="size-4 mr-1" />Odoslať emailom</Button>
+            {res ? (
+              <>
+                <Button variant="outline" onClick={() => navigate({ to: "/reservations/$id", params: { id: res.id } })}>
+                  <ExternalLink className="size-4 mr-1" />Zobraziť rezerváciu
+                </Button>
+                {q.is_current && isMismatched && (
+                  <Button variant="outline" onClick={() => setSyncOpen(true)}>
+                    <RefreshCw className="size-4 mr-1" />Zosúladiť rezerváciu
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                variant={q.status === "approved" ? "default" : "outline"}
+                onClick={() => {
+                  if (q.status !== "approved") {
+                    const ok = window.confirm(
+                      'Kalkulácia ešte nie je v stave „Schválená". Naozaj chcete vytvoriť rezerváciu?',
+                    );
+                    if (!ok) return;
+                  }
+                  createRes.mutate();
+                }}
+                disabled={createRes.isPending || !q.is_current}
+                title={!q.is_current ? "Rezerváciu možno vytvoriť len z aktuálnej verzie" : undefined}
+              >
+                {createRes.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : <CalendarPlus className="size-4 mr-1" />}
+                Vytvoriť rezerváciu
+              </Button>
+            )}
             <Button variant="outline" onClick={() => duplicate.mutate()} disabled={duplicate.isPending}>
               {duplicate.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Copy className="size-4 mr-1" />}
               Duplikovať
@@ -265,6 +367,21 @@ function QuoteDetail() {
             </AlertDialog>
           </div>
         </div>
+
+        {res && (
+          <div className={`rounded-md border p-3 text-sm ${isMismatched ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-300 bg-emerald-50 text-emerald-900"}`}>
+            Prepojená rezervácia:{" "}
+            <button className="font-semibold underline" onClick={() => navigate({ to: "/reservations/$id", params: { id: res.id } })}>
+              {res.event_name}
+            </button>
+            {isMismatched && q.is_current && (
+              <>
+                {" · "}
+                <button className="underline font-medium" onClick={() => setSyncOpen(true)}>Zosúladiť podľa v{q.version_number}</button>
+              </>
+            )}
+          </div>
+        )}
 
         {!q.is_current && (
           <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-900 p-3 text-sm">
@@ -351,6 +468,31 @@ function QuoteDetail() {
 
       {/* Print-only view */}
       <PrintView quote={q} />
+
+      <AlertDialog open={syncOpen} onOpenChange={setSyncOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aktualizovať rezerváciu podľa aktuálnej verzie kalkulácie?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Kalkulácia sa zmenila oproti prepojenej rezervácii. Skontrolujte zmeny nižšie a potvrďte aktualizáciu.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-72 overflow-auto rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+            {diffs.length === 0 && <div className="text-muted-foreground">Žiadne rozdiely.</div>}
+            {diffs.map((d, i) => {
+              if (d.type === "added") return <div key={i} className="text-emerald-800">+ Pridané: <b>{d.name}</b> {d.qty} ks</div>;
+              if (d.type === "removed") return <div key={i} className="text-rose-800">− Odobrané: <b>{d.name}</b> {d.qty} ks</div>;
+              return <div key={i} className="text-amber-800">↻ <b>{d.name}</b>: {d.from} → {d.to} ks</div>;
+            })}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Ponechať rezerváciu</AlertDialogCancel>
+            <AlertDialogAction onClick={() => syncRes.mutate()} disabled={syncRes.isPending}>
+              {syncRes.isPending ? "Aktualizujem…" : "Aktualizovať rezerváciu"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
