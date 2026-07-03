@@ -1,108 +1,86 @@
-## Modul Chat - interný real-time chat
+# Plán: Rozcestník rolí v natívnej appke + Helper režim
 
-### Dátový model (migrácia)
+## 1. Detekcia natívnej platformy
 
-**Tabuľky v `public`:**
+- Nový util `src/lib/platform.ts` — `isNativeApp()` cez `(window as any).Capacitor?.isNativePlatform?.() === true`. Bezpečne vráti `false` na webe aj keď Capacitor ešte nie je nainštalovaný.
+- Capacitor teraz **neinštalujem** — detekcia je pripravená a začne vracať `true` až keď sa neskôr pridá Capacitor runtime.
 
-1. `conversations`
-   - `id uuid pk`
-   - `type text` ('global' | 'direct')
-   - `created_at timestamptz`
-   - unique partial index: jedna 'global' konverzácia; pre 'direct' deterministický kľúč cez pomocné pole
+## 2. Nový vstupný bod
 
-2. `conversation_participants`
-   - `conversation_id uuid fk → conversations`
-   - `user_id uuid fk → profiles`
-   - `last_read_at timestamptz default now()`
-   - PK (conversation_id, user_id)
+- `src/routes/index.tsx` už len redirectuje na `/dashboard`. Zmením na:
+  - Ak `isNativeApp()` → render rozcestníka (tri veľké tlačidlá: **Helper**, **Prihlásenie**, **Katalóg**).
+  - Inak → `redirect({ to: "/auth" })` ak neprihlásený, alebo `/dashboard` ak prihlásený (súčasné správanie web nezmení — web ide rovno na login/dashboard).
+- Rozcestník: `ssr: false`, plný-výška mobile layout, tri karty s ikonami (HardHat, LogIn, BookOpen). Odkazy:
+  - Helper → `/helper`
+  - Prihlásenie → `/auth`
+  - Katalóg → `/katalog` (existuje)
 
-3. `messages`
-   - `id uuid pk`
-   - `conversation_id uuid fk`
-   - `sender_id uuid fk → profiles`
-   - `body text`
-   - `attachment_url text`, `attachment_name text`, `attachment_mime text`
-   - `created_at timestamptz`
+## 3. Databáza — helperi + dochádzka
 
-4. `message_mentions`
-   - `message_id uuid fk → messages on delete cascade`
-   - `user_id uuid fk → profiles`
-   - PK (message_id, user_id)
+Migrácia:
 
-**Security definer fn `public.is_conversation_participant(_conv uuid, _user uuid)`** — kvôli RLS bez rekurzie. Pre 'global' konverzáciu vracia true pre každého prihláseného (každý profil je účastník).
+- `public.helpers` — meno, `pin_hash` (bcrypt/sha256+salt), `is_active`, poznámka.
+  - GRANT `SELECT, INSERT, UPDATE, DELETE` len `authenticated` + `ALL` `service_role`. **Anon nemá prístup.**
+  - RLS: `has_role(auth.uid(), 'admin')` na všetky operácie. Manager môže `SELECT` (aby videl mená v súhrnoch). Nikto okrem admina nevidí `pin_hash`.
+- `public.attendance` — pridám nullable stĺpce:
+  - `helper_id uuid references public.helpers(id)`
+  - `is_helper boolean default false`
+  - Constraint: `user_id IS NOT NULL OR helper_id IS NOT NULL`.
+- RPC `public.verify_helper_pin(_name text, _pin text) returns uuid` — security definer, vráti `helper_id` ak sedí, inak NULL. Neexponuje hashe.
+- RPC `public.helper_punch(_helper_id uuid, _action text) returns jsonb` — security definer, otvorí/uzavrie dochádzkový záznam pre helpera (pracuje s `attendance` cez service-level práva). Kontroluje `is_active`.
+  - Volá sa **len zo server function** s bearer tokenom `x-helper-token` (helper session token, pozri nižšie). RPC samo neverifikuje token — verifikuje ho server fn.
 
-**RLS politiky:**
-- `conversations`: SELECT pre účastníkov (cez fn) + pre type='global'. INSERT pre authenticated. UPDATE/DELETE iba service_role.
-- `conversation_participants`: SELECT ak je user účastník danej konverzácie. INSERT/DELETE: user môže pridať seba; alebo do priamej konverzácie môže pridať druhú stranu pri vytvorení.
-- `messages`: SELECT ak je účastník. INSERT ak `sender_id = auth.uid()` AND je účastník. UPDATE/DELETE iba vlastné.
-- `message_mentions`: SELECT ak je účastník konverzácie správy. INSERT odosielateľom správy.
+## 4. Helper flow (bez Supabase auth)
 
-**Pomocné RPC:**
-- `get_or_create_direct_conversation(_other uuid) returns uuid` — security definer; nájde existujúcu 'direct' konverzáciu s presne dvoma účastníkmi {auth.uid(), _other} alebo vytvorí.
-- `ensure_global_conversation()` — vloží jeden riadok pri inicializácii (seed v migrácii) + trigger na `profiles` AFTER INSERT pridá nového profilu medzi účastníkov globálnej konverzácie.
-- Migrácia tiež pridá všetkých existujúcich profilov ako účastníkov globálnej konverzácie.
+Nová route `src/routes/helper.tsx` (`ssr: false`, verejná):
 
-**Realtime publication:**
-- `ALTER PUBLICATION supabase_realtime ADD TABLE public.messages, public.message_mentions, public.conversation_participants;`
-- `ALTER TABLE ... REPLICA IDENTITY FULL` na týchto tabuľkách.
+1. Krok 1: dropdown/list mien z verejného server fn `listHelperNames()` — vracia len `{id, name}` aktívnych helperov (žiadny PIN).
+2. Krok 2: číselník PIN (4 cifry).
+3. Overenie: server fn `verifyHelperPin({helperId, pin})` — v handleri `import supabaseAdmin` (dynamický `.server` import), zavolá `verify_helper_pin`. Ak OK, vráti krátky JWT/HMAC token (podpísaný `HELPER_SESSION_SECRET`, TTL 8h, obsahuje `helper_id`).
+4. Klient uloží token do sessionStorage → obrazovka **Štart / Prestávka / Koniec** s aktuálnym stavom (načíta cez `helperStatus({token})`).
+5. Pichnutie: `helperPunch({token, action})` → server fn overí token, zavolá `helper_punch` RPC cez `supabaseAdmin`.
+6. Po Koniec → wipe token → späť na rozcestník.
 
-**GRANTy** pre `authenticated` (SELECT/INSERT/UPDATE/DELETE podľa potreby) a `service_role ALL` na všetkých nových tabuľkách.
+Server fns v `src/lib/helper.functions.ts` + `src/lib/helper.server.ts` (HMAC token, admin import). Žiadne Node-only knižnice — HMAC cez WebCrypto.
 
-### Storage
+## 5. Admin UI — správa helperov
 
-Nový bucket `chat-attachments` (privátny) cez `supabase--storage_create_bucket`. RLS politiky na `storage.objects`:
-- INSERT/SELECT authenticated v rámci `chat-attachments` (cestou `{conversation_id}/{filename}`); SELECT povolíme len účastníkom konverzácie cez join na `conversation_participants` (resp. zjednodušene: každý authenticated, keďže URL nikde nezdieľame). Praktický kompromis: SELECT pre authenticated, keďže URL sa vždy generuje signed.
-- Použijeme **signed URLs** (1h) pri zobrazení príloh.
+- Nová route `src/routes/_authenticated/settings.helpers.tsx` — admin-only tab.
+  - Tabuľka: meno, aktívny, vytvorený.
+  - Akcie: Pridať helpera (meno + PIN alebo "vygenerovať 4-miestny"), Regenerovať PIN, Deaktivovať/Zmazať.
+  - PIN sa zobrazí **len raz po vytvorení/regenerácii** (potom je hash).
+- Pridám do sidebar sekcie **Nastavenia** (admin-only, ikona `Users` alebo `HardHat`).
 
-### Frontend
+## 6. Zobrazenie helper hodín v súhrnoch
 
-**Nová route `src/routes/_authenticated/chat.tsx`** (`ssr: false` aby sa SSR nepokúšalo o realtime/localStorage):
-- Layout: ľavý panel (sidebar konverzácií) + pravý panel (správy + input).
-- Responzívne: na mobile prepínanie medzi zoznamom a aktívnym chatom (`useIsMobile`).
+- Miesta, kde sa listuje `attendance`, upravím tak, aby JOIN cez `helper_id → helpers.name` a označilo záznam štítkom "Helper". Filter aj po helperoch.
 
-**Komponenty (`src/components/chat/`):**
-- `conversation-list.tsx` — Všetci (global) + zoznam direct konverzácií + tlačidlo "Nová správa" → dialog so zoznamom používateľov.
-- `message-list.tsx` — virtualizácia nie nutná, scroll na koniec; bubliny: vlastné vpravo (primary), cudzie vľavo; meno + čas; render `@mentions` ako badge; obrázky inline (`<img>` so signed URL), iné súbory ako odkaz s ikonou.
-- `message-composer.tsx` — textarea s autosize, attach button (upload do Storage), `@` mention popover s filtered zoznamom profiles, Enter na odoslanie, Shift+Enter newline.
-- `unread-badge.tsx` — používa hook.
+## 7. Bezpečnosť — zhrnutie
 
-**Hooky (`src/hooks/`):**
-- `use-chat-conversations.ts` — query na konverzácie kde som účastník + last message + unread count (na základe `last_read_at` vs `messages.created_at`).
-- `use-chat-messages.ts` — query messages danej konv. + realtime subscription (INSERT/DELETE) v `useEffect` s cleanup cez `removeChannel`. Mark-as-read: pri otvorení/novej správe update `last_read_at` na `now()` pre (conv, me).
-- `use-unread-total.ts` — globálne počítadlo cez query (sum unreadov), invalidate pri realtime INSERT.
-- `use-online-profiles.ts` (voliteľné, vynechané pre jednoduchosť).
+- Helper nikdy nedostane Supabase JWT. Všetka jeho interakcia ide cez podpísaný HMAC token → server fn → admin klient s **úzko obmedzenými** RPC (`helper_punch`, `helperStatus`). Žiadny prístup ku klientom, rezerváciám, cenám.
+- `listHelperNames` je jediný verejný endpoint a vracia iba `{id, name}` aktívnych — bez PINov, bez emailov.
+- Sekret `HELPER_SESSION_SECRET` v env (pridám cez add_secret).
+- Rate-limit na `verifyHelperPin` (in-memory throttle per IP + per helperId; jednoduchý counter v pamäti — best effort na edge).
 
-**Sidebar:** v `src/components/app-sidebar.tsx` pridať položku "Chat" s `MessageSquare` ikonou a badge s počtom neprečítaných (z `use-unread-total`). Pri @mention navyše toast (sonner) keď príde realtime mention pre mňa — riešené v root listener-i alebo v `use-unread-total`.
+## 8. Čo sa NEmení
 
-**Globálny notifikátor:** v `_authenticated/route.tsx` (alebo nový tichý komponent v rámci sidebaru) namountujeme `useChatNotifications()` ktorý subscribuje na všetky moje konverzácie cez jeden kanál `messages:user:{me}` a:
-- invaliduje queries
-- ak mention obsahuje moje id → `toast("Spomenuli ťa: ...")`
-- ak správa nie je v aktívnej konv → `toast` s názvom odosielateľa
+- Web (`crm.mimapro.sk`) — `isNativeApp()` je `false`, `/` presmeruje ako doteraz.
+- `/auth`, `/dashboard`, existujúce role gating, Resend integrácia, katalóg — bez zmeny.
 
-### Server functions
+## Technické súbory
 
-Žiadne — všetko cez priamy `supabase` klient s RLS (vrátane uploadu prílohy). RPC `get_or_create_direct_conversation` voláme cez `supabase.rpc()`.
+**Nové:**
+- `src/lib/platform.ts`
+- `src/lib/helper.functions.ts`, `src/lib/helper.server.ts`
+- `src/routes/helper.tsx`
+- `src/routes/_authenticated/settings.helpers.tsx`
+- migrácia (helpers tabuľka, RPC, GRANTy, attendance stĺpce)
 
-### Riziká / SSR
+**Zmenené:**
+- `src/routes/index.tsx` — rozcestník vs redirect
+- `src/components/app-sidebar.tsx` — link na Helperov (admin)
+- Miesta so súhrnmi dochádzky — JOIN helpers
 
-- Route `chat.tsx` má `ssr: false`.
-- Realtime subscription výhradne v `useEffect`, cleanup `removeChannel` — zabraňuje účtovacej slučke.
-- Upload prílohy: `supabase.storage.from('chat-attachments').upload(...)`.
-- Žiadne node-only knižnice.
+## Otvorená otázka
 
-### Pri publish/self-host
-Funguje proti nášmu Supabase projektu (env je `VITE_SUPABASE_URL` + publishable key), realtime cez ten istý projekt.
-
-### Súbory na vytvorenie/úpravu
-
-- migrácia (tabuľky, RLS, RPC, triggery, realtime publication, seed global)
-- `src/routes/_authenticated/chat.tsx`
-- `src/components/chat/conversation-list.tsx`
-- `src/components/chat/message-list.tsx`
-- `src/components/chat/message-composer.tsx`
-- `src/components/chat/chat-notifications.tsx`
-- `src/hooks/use-chat-conversations.ts`
-- `src/hooks/use-chat-messages.ts`
-- `src/hooks/use-unread-total.ts`
-- úprava `src/components/app-sidebar.tsx` (položka Chat + badge + mount notifications)
-- bucket `chat-attachments`
+Chceš, aby helper zaznamenal aj **prestávku** (start/end break), alebo len Štart práce / Koniec práce? Píšeš oboje aj "a prípadne prestávka" — potvrď, či implementujem prestávku hneď alebo neskôr.
