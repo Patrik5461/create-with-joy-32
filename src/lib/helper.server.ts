@@ -59,10 +59,11 @@ export async function verifyHelperToken(token: string | null | undefined): Promi
   if (!body || !sigPart) return null;
   try {
     const key = await hmacKey();
+    const sigBytes = b64urlDecode(sigPart);
     const ok = await crypto.subtle.verify(
       "HMAC",
       key,
-      b64urlDecode(sigPart),
+      sigBytes as unknown as BufferSource,
       new TextEncoder().encode(body),
     );
     if (!ok) return null;
