@@ -189,6 +189,56 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
   });
   const [contacts, setContacts] = useState<DraftContact[]>([createDraftContact(true)]);
   const [removedContactIds, setRemovedContactIds] = useState<string[]>([]);
+  const lookupIco = useServerFn(lookupCompanyByIco);
+  const searchName = useServerFn(searchCompaniesByName);
+  const [icoLoading, setIcoLoading] = useState(false);
+  const [nameQuery, setNameQuery] = useState("");
+  const [nameResults, setNameResults] = useState<RpoCompany[]>([]);
+  const [nameOpen, setNameOpen] = useState(false);
+  const [nameLoading, setNameLoading] = useState(false);
+
+  const applyRpo = (c: RpoCompany) => {
+    setForm((f) => ({
+      ...f,
+      ico: c.ico || f.ico,
+      company_name: c.name || f.company_name,
+      address: c.addressLine || f.address,
+    }));
+    toast.success(`Načítané: ${c.name}`);
+  };
+
+  const handleIcoLookup = async () => {
+    const ico = form.ico.replace(/\s+/g, "");
+    if (!/^\d{8}$/.test(ico)) {
+      toast.error("IČO musí obsahovať 8 číslic");
+      return;
+    }
+    setIcoLoading(true);
+    try {
+      const res = await lookupIco({ data: { ico } });
+      if (!res) toast.error("Firma s týmto IČO sa nenašla");
+      else applyRpo(res);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Nepodarilo sa načítať údaje z RPO");
+    } finally {
+      setIcoLoading(false);
+    }
+  };
+
+  const handleNameSearch = async (q: string) => {
+    setNameQuery(q);
+    if (q.trim().length < 3) { setNameResults([]); return; }
+    setNameLoading(true);
+    try {
+      const res = await searchName({ data: { query: q.trim() } });
+      setNameResults(res);
+      setNameOpen(true);
+    } catch (e: any) {
+      setNameResults([]);
+    } finally {
+      setNameLoading(false);
+    }
+  };
 
   useQuery({
     queryKey: ["client-contacts-edit", item?.id],
