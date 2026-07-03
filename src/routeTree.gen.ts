@@ -32,6 +32,7 @@ import { Route as AuthenticatedReservationsIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedQuotesIndexRouteImport } from './routes/_authenticated/quotes.index'
 import { Route as AuthenticatedClientsIndexRouteImport } from './routes/_authenticated/clients.index'
 import { Route as AuthenticatedWarehouseQrPrintRouteImport } from './routes/_authenticated/warehouse.qr-print'
+import { Route as AuthenticatedSettingsHelpersRouteImport } from './routes/_authenticated/settings.helpers'
 import { Route as AuthenticatedSettingsEmailRouteImport } from './routes/_authenticated/settings.email'
 import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings.calendar'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings.account'
@@ -169,6 +170,12 @@ const AuthenticatedWarehouseQrPrintRoute =
     path: '/qr-print',
     getParentRoute: () => AuthenticatedWarehouseRoute,
   } as any)
+const AuthenticatedSettingsHelpersRoute =
+  AuthenticatedSettingsHelpersRouteImport.update({
+    id: '/helpers',
+    path: '/helpers',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedSettingsEmailRoute =
   AuthenticatedSettingsEmailRouteImport.update({
     id: '/email',
@@ -289,6 +296,7 @@ export interface FileRoutesByFullPath {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/email': typeof AuthenticatedSettingsEmailRoute
+  '/settings/helpers': typeof AuthenticatedSettingsHelpersRoute
   '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/clients/': typeof AuthenticatedClientsIndexRoute
   '/quotes/': typeof AuthenticatedQuotesIndexRoute
@@ -327,6 +335,7 @@ export interface FileRoutesByTo {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/email': typeof AuthenticatedSettingsEmailRoute
+  '/settings/helpers': typeof AuthenticatedSettingsHelpersRoute
   '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/clients': typeof AuthenticatedClientsIndexRoute
   '/quotes': typeof AuthenticatedQuotesIndexRoute
@@ -369,6 +378,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/_authenticated/settings/email': typeof AuthenticatedSettingsEmailRoute
+  '/_authenticated/settings/helpers': typeof AuthenticatedSettingsHelpersRoute
   '/_authenticated/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/_authenticated/clients/': typeof AuthenticatedClientsIndexRoute
   '/_authenticated/quotes/': typeof AuthenticatedQuotesIndexRoute
@@ -411,6 +421,7 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/calendar'
     | '/settings/email'
+    | '/settings/helpers'
     | '/warehouse/qr-print'
     | '/clients/'
     | '/quotes/'
@@ -449,6 +460,7 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/calendar'
     | '/settings/email'
+    | '/settings/helpers'
     | '/warehouse/qr-print'
     | '/clients'
     | '/quotes'
@@ -490,6 +502,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/calendar'
     | '/_authenticated/settings/email'
+    | '/_authenticated/settings/helpers'
     | '/_authenticated/warehouse/qr-print'
     | '/_authenticated/clients/'
     | '/_authenticated/quotes/'
@@ -679,6 +692,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWarehouseQrPrintRouteImport
       parentRoute: typeof AuthenticatedWarehouseRoute
     }
+    '/_authenticated/settings/helpers': {
+      id: '/_authenticated/settings/helpers'
+      path: '/helpers'
+      fullPath: '/settings/helpers'
+      preLoaderRoute: typeof AuthenticatedSettingsHelpersRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
     '/_authenticated/settings/email': {
       id: '/_authenticated/settings/email'
       path: '/email'
@@ -798,6 +818,7 @@ interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
   AuthenticatedSettingsCalendarRoute: typeof AuthenticatedSettingsCalendarRoute
   AuthenticatedSettingsEmailRoute: typeof AuthenticatedSettingsEmailRoute
+  AuthenticatedSettingsHelpersRoute: typeof AuthenticatedSettingsHelpersRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
 }
 
@@ -805,6 +826,7 @@ const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
   AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
   AuthenticatedSettingsCalendarRoute: AuthenticatedSettingsCalendarRoute,
   AuthenticatedSettingsEmailRoute: AuthenticatedSettingsEmailRoute,
+  AuthenticatedSettingsHelpersRoute: AuthenticatedSettingsHelpersRoute,
   AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
 }
 
