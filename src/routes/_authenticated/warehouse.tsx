@@ -147,6 +147,8 @@ const CATEGORY_STYLES: Record<string, string> = {
   lighting: "bg-yellow-100 text-yellow-900 border-yellow-200",
   accessories: "bg-emerald-100 text-emerald-900 border-emerald-200",
   other: "bg-slate-100 text-slate-900 border-slate-200",
+  textil: "bg-teal-100 text-teal-900 border-teal-200",
+  led: "bg-cyan-100 text-cyan-900 border-cyan-200",
 };
 
 function categoryClass(code?: string | null) {
