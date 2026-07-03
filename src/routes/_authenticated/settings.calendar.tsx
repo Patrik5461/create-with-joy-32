@@ -51,7 +51,7 @@ function CalendarSettings() {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Chyba"),
   });
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const { getPublicAppUrl } = await import("@/lib/public-url").catch(() => ({ getPublicAppUrl: () => "" }));
   const icsUrl = data?.token ? `${origin}/api/public/calendar/${data.token}.ics` : "";
   const webcalUrl = data?.token ? `webcal://${origin.replace(/^https?:\/\//, "")}/api/public/calendar/${data.token}.ics` : "";
   const googleAddUrl = icsUrl
