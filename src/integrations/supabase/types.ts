@@ -923,8 +923,11 @@ export type Database = {
           discount_type: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value: number
           id: string
+          is_current: boolean
           issue_date: string
           notes: string | null
+          parent_version_id: string | null
+          quote_group_id: string
           quote_number: string
           reservation_id: string | null
           status: Database["public"]["Enums"]["quote_status"]
@@ -938,6 +941,7 @@ export type Database = {
           valid_until: string | null
           vat_amount: number
           vat_rate: number
+          version_number: number
         }
         Insert: {
           client_id?: string | null
@@ -947,8 +951,11 @@ export type Database = {
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value?: number
           id?: string
+          is_current?: boolean
           issue_date?: string
           notes?: string | null
+          parent_version_id?: string | null
+          quote_group_id?: string
           quote_number: string
           reservation_id?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
@@ -962,6 +969,7 @@ export type Database = {
           valid_until?: string | null
           vat_amount?: number
           vat_rate?: number
+          version_number?: number
         }
         Update: {
           client_id?: string | null
@@ -971,8 +979,11 @@ export type Database = {
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value?: number
           id?: string
+          is_current?: boolean
           issue_date?: string
           notes?: string | null
+          parent_version_id?: string | null
+          quote_group_id?: string
           quote_number?: string
           reservation_id?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
@@ -986,6 +997,7 @@ export type Database = {
           valid_until?: string | null
           vat_amount?: number
           vat_rate?: number
+          version_number?: number
         }
         Relationships: [
           {
@@ -1000,6 +1012,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "client_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_parent_version_id_fkey"
+            columns: ["parent_version_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
           {
