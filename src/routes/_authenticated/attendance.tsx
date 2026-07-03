@@ -174,7 +174,7 @@ function ClockPanel({ userId }: { userId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Pichanie hodín</CardTitle>
+        <CardTitle className="text-base">Dochádzkový systém&nbsp;</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className={`rounded-lg border px-4 py-3 text-center text-base font-semibold ${status.cls}`}>
@@ -556,7 +556,7 @@ function AttendancePage() {
 
       <Tabs defaultValue="clock">
         <TabsList>
-          <TabsTrigger value="clock">Pichanie</TabsTrigger>
+          <TabsTrigger value="clock">Dochádzka</TabsTrigger>
           <TabsTrigger value="summary">Súhrn</TabsTrigger>
           <TabsTrigger value="daily">Denný záznam</TabsTrigger>
         </TabsList>
