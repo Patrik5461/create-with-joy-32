@@ -323,12 +323,22 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
     },
   });
 
+  const helpersQ = useQuery({
+    queryKey: ["helpers-attendance", isAdmin],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data } = await (supabase.from as any)("helpers").select("id, name").order("name");
+      return (data ?? []) as { id: string; name: string }[];
+    },
+  });
+
   const list = useQuery({
     queryKey: ["attendance-list", from.toISOString(), to.toISOString(), isAdmin, selectedUser, currentUserId],
     queryFn: async () => {
       let q: any = (supabase.from as any)("attendance").select("*")
         .gte("clock_in", from.toISOString()).lte("clock_in", to.toISOString());
       if (!isAdmin) q = q.eq("user_id", currentUserId);
+      else if (selectedUser.startsWith("helper:")) q = q.eq("helper_id", selectedUser.slice(7));
       else if (selectedUser !== "all") q = q.eq("user_id", selectedUser);
       const { data, error } = await q;
       if (error) throw error;
@@ -344,6 +354,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
         .not("actual_arrival", "is", null).not("actual_departure", "is", null)
         .gte("actual_arrival", from.toISOString()).lte("actual_arrival", to.toISOString());
       if (!isAdmin) staffQ = staffQ.eq("user_id", currentUserId);
+      else if (selectedUser.startsWith("helper:")) staffQ = staffQ.eq("user_id", "00000000-0000-0000-0000-000000000000");
       else if (selectedUser !== "all") staffQ = staffQ.eq("user_id", selectedUser);
       const { data: staffData } = await staffQ;
       const staff = (staffData ?? []) as StaffRow[];
@@ -353,11 +364,24 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
 
   const users = useMemo(() => {
     const src = profiles.data ?? [];
-    const filtered = isAdmin
-      ? (selectedUser === "all" ? src : src.filter((p) => p.id === selectedUser))
-      : src.filter((p) => p.id === currentUserId);
-    return filtered.map((p) => ({ id: p.id, name: p.full_name || p.email || "—" }));
-  }, [profiles.data, isAdmin, selectedUser, currentUserId]);
+    const helpers = helpersQ.data ?? [];
+    if (!isAdmin) {
+      return src.filter((p) => p.id === currentUserId)
+        .map((p) => ({ id: p.id, name: p.full_name || p.email || "—", isHelper: false }));
+    }
+    if (selectedUser === "all") {
+      return [
+        ...src.map((p) => ({ id: p.id, name: p.full_name || p.email || "—", isHelper: false })),
+        ...helpers.map((h) => ({ id: h.id, name: `${h.name} (helper)`, isHelper: true })),
+      ];
+    }
+    if (selectedUser.startsWith("helper:")) {
+      const hid = selectedUser.slice(7);
+      return helpers.filter((h) => h.id === hid).map((h) => ({ id: h.id, name: `${h.name} (helper)`, isHelper: true }));
+    }
+    return src.filter((p) => p.id === selectedUser)
+      .map((p) => ({ id: p.id, name: p.full_name || p.email || "—", isHelper: false }));
+  }, [profiles.data, helpersQ.data, isAdmin, selectedUser, currentUserId]);
 
   const summary = useMemo(() => {
     if (!list.data) return [];
@@ -421,6 +445,9 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                   <SelectItem value="all">Všetci</SelectItem>
                   {(profiles.data ?? []).map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
+                  ))}
+                  {(helpersQ.data ?? []).map((h) => (
+                    <SelectItem key={`helper-${h.id}`} value={`helper:${h.id}`}>{h.name} (helper)</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
