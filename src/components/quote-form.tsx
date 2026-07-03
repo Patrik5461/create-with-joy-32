@@ -23,6 +23,8 @@ interface QuoteRecord {
   status: "draft" | "sent" | "approved" | "rejected";
   issue_date: string;
   valid_until: string | null;
+  event_start_at: string | null;
+  event_end_at: string | null;
   vat_rate: number;
   discount_type: AdjustType;
   discount_value: number;
@@ -61,6 +63,8 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
     status: "draft",
     issue_date: new Date().toISOString().slice(0, 10),
     valid_until: null,
+    event_start_at: null,
+    event_end_at: null,
     vat_rate: 23,
     discount_type: "none",
     discount_value: 0,
@@ -292,6 +296,8 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         status: form.status,
         issue_date: form.issue_date,
         valid_until: form.valid_until,
+        event_start_at: form.event_start_at,
+        event_end_at: form.event_end_at,
         vat_rate: form.vat_rate,
         discount_type: form.discount_type,
         discount_value: form.discount_value,
@@ -439,6 +445,22 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           <div className="space-y-1.5">
             <Label>Platnosť do</Label>
             <Input type="date" value={form.valid_until ?? ""} onChange={(e) => setForm({ ...form, valid_until: e.target.value || null })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Začiatok eventu</Label>
+            <Input
+              type="datetime-local"
+              value={form.event_start_at ? form.event_start_at.slice(0, 16) : ""}
+              onChange={(e) => setForm({ ...form, event_start_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Koniec eventu</Label>
+            <Input
+              type="datetime-local"
+              value={form.event_end_at ? form.event_end_at.slice(0, 16) : ""}
+              onChange={(e) => setForm({ ...form, event_end_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Stav</Label>
