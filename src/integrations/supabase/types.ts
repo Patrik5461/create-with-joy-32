@@ -1081,6 +1081,68 @@ export type Database = {
           },
         ]
       }
+      reservation_staff: {
+        Row: {
+          actual_arrival: string | null
+          actual_departure: string | null
+          arrived: boolean
+          created_at: string
+          created_by: string | null
+          departed: boolean
+          external_name: string | null
+          id: string
+          note: string | null
+          planned_end: string | null
+          planned_start: string | null
+          reservation_id: string
+          role: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          actual_arrival?: string | null
+          actual_departure?: string | null
+          arrived?: boolean
+          created_at?: string
+          created_by?: string | null
+          departed?: boolean
+          external_name?: string | null
+          id?: string
+          note?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          reservation_id: string
+          role?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          actual_arrival?: string | null
+          actual_departure?: string | null
+          arrived?: boolean
+          created_at?: string
+          created_by?: string | null
+          departed?: boolean
+          external_name?: string | null
+          id?: string
+          note?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          reservation_id?: string
+          role?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservation_staff_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reservation_status_history: {
         Row: {
           changed_by: string | null
@@ -1317,6 +1379,13 @@ export type Database = {
       get_or_create_direct_conversation: {
         Args: { _other: string }
         Returns: string
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
       }
       is_conversation_participant: {
         Args: { _conv: string; _user: string }
