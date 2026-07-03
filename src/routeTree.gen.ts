@@ -25,6 +25,7 @@ import { Route as AuthenticatedLayoutsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedInquiriesRouteImport } from './routes/_authenticated/inquiries'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
+import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings.index'
 import { Route as AuthenticatedReservationsIndexRouteImport } from './routes/_authenticated/reservations.index'
 import { Route as AuthenticatedQuotesIndexRouteImport } from './routes/_authenticated/quotes.index'
@@ -124,6 +125,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
 const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
   id: '/chat',
   path: '/chat',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsIndexRoute =
@@ -248,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/katalog': typeof KatalogRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/attendance': typeof AuthenticatedAttendanceRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/inquiries': typeof AuthenticatedInquiriesRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/katalog': typeof KatalogRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/attendance': typeof AuthenticatedAttendanceRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/inquiries': typeof AuthenticatedInquiriesRoute
@@ -322,6 +330,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/katalog': typeof KatalogRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/inquiries': typeof AuthenticatedInquiriesRoute
@@ -361,6 +370,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/katalog'
     | '/reset-password'
+    | '/attendance'
     | '/chat'
     | '/dashboard'
     | '/inquiries'
@@ -398,6 +408,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/katalog'
     | '/reset-password'
+    | '/attendance'
     | '/chat'
     | '/dashboard'
     | '/inquiries'
@@ -434,6 +445,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/katalog'
     | '/reset-password'
+    | '/_authenticated/attendance'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
     | '/_authenticated/inquiries'
@@ -590,6 +602,13 @@ declare module '@tanstack/react-router' {
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof AuthenticatedChatRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/attendance': {
+      id: '/_authenticated/attendance'
+      path: '/attendance'
+      fullPath: '/attendance'
+      preLoaderRoute: typeof AuthenticatedAttendanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings/': {
@@ -787,6 +806,7 @@ const AuthenticatedReservationsIdRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedInquiriesRoute: typeof AuthenticatedInquiriesRoute
@@ -811,6 +831,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedInquiriesRoute: AuthenticatedInquiriesRoute,
