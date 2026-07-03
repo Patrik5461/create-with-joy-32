@@ -323,7 +323,7 @@ function QuoteDetail() {
                 onClick={() => {
                   if (q.status !== "approved") {
                     const ok = window.confirm(
-                      "Kalkulácia ešte nie je v stave „Schválená". Naozaj chcete vytvoriť rezerváciu?",
+                      'Kalkulácia ešte nie je v stave „Schválená". Naozaj chcete vytvoriť rezerváciu?',
                     );
                     if (!ok) return;
                   }
