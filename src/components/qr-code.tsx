@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { publicUrl } from "@/lib/public-url";
 
 type Props = {
   value: string;
@@ -60,9 +61,6 @@ export function QRCode({ value, size = 192, className, alt }: Props) {
 
 /** Convenience: builds an absolute URL pointing at the scan route. */
 export function buildFurnitureScanUrl(id: string): string {
-  // Import lazily to avoid circular deps in some bundlers.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { publicUrl } = require("@/lib/public-url") as typeof import("@/lib/public-url");
   return publicUrl(`/warehouse/scan/${id}`);
 }
 
