@@ -239,12 +239,19 @@ function ClockPanel({ userId }: { userId: string }) {
   );
 }
 
-type Range = "week" | "month" | "custom";
+type Range = "day" | "week" | "month" | "custom";
 
-function useRange(range: Range, from: string, to: string): { from: Date; to: Date } {
+function useRange(range: Range, dayVal: string, monthVal: string, from: string, to: string): { from: Date; to: Date } {
   const now = new Date();
+  if (range === "day") {
+    const d = dayVal ? new Date(dayVal) : now;
+    return { from: startOfDay(d), to: endOfDay(d) };
+  }
   if (range === "week") return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
-  if (range === "month") return { from: startOfMonth(now), to: endOfMonth(now) };
+  if (range === "month") {
+    const d = monthVal ? new Date(`${monthVal}-01T00:00:00`) : now;
+    return { from: startOfMonth(d), to: endOfMonth(d) };
+  }
   return { from: from ? startOfDay(new Date(from)) : startOfDay(now), to: to ? endOfDay(new Date(to)) : endOfDay(now) };
 }
 
@@ -312,8 +319,11 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
   const [range, setRange] = useState<Range>("week");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [dayVal, setDayVal] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [monthVal, setMonthVal] = useState<string>(format(new Date(), "yyyy-MM"));
+  const [category, setCategory] = useState<"all" | "employees" | "helpers">("all");
   const [selectedUser, setSelectedUser] = useState<string>("all");
-  const { from, to } = useRange(range, customFrom, customTo);
+  const { from, to } = useRange(range, dayVal, monthVal, customFrom, customTo);
 
   const profiles = useQuery({
     queryKey: ["profiles-attendance", isAdmin],
@@ -333,13 +343,15 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
   });
 
   const list = useQuery({
-    queryKey: ["attendance-list", from.toISOString(), to.toISOString(), isAdmin, selectedUser, currentUserId],
+    queryKey: ["attendance-list", from.toISOString(), to.toISOString(), isAdmin, selectedUser, category, currentUserId],
     queryFn: async () => {
       let q: any = (supabase.from as any)("attendance").select("*")
         .gte("clock_in", from.toISOString()).lte("clock_in", to.toISOString());
       if (!isAdmin) q = q.eq("user_id", currentUserId);
       else if (selectedUser.startsWith("helper:")) q = q.eq("helper_id", selectedUser.slice(7));
       else if (selectedUser !== "all") q = q.eq("user_id", selectedUser);
+      else if (category === "employees") q = q.is("helper_id", null);
+      else if (category === "helpers") q = q.not("helper_id", "is", null);
       const { data, error } = await q;
       if (error) throw error;
       const rows = (data ?? []) as Attendance[];
@@ -356,6 +368,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
       if (!isAdmin) staffQ = staffQ.eq("user_id", currentUserId);
       else if (selectedUser.startsWith("helper:")) staffQ = staffQ.eq("user_id", "00000000-0000-0000-0000-000000000000");
       else if (selectedUser !== "all") staffQ = staffQ.eq("user_id", selectedUser);
+      else if (category === "helpers") staffQ = staffQ.eq("user_id", "00000000-0000-0000-0000-000000000000");
       const { data: staffData } = await staffQ;
       const staff = (staffData ?? []) as StaffRow[];
       return { rows, breaks, staff };
@@ -373,12 +386,13 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
       const helperIdsWithHours = new Set(
         (list.data?.rows ?? []).filter((r) => r.helper_id).map((r) => r.helper_id as string),
       );
-      return [
-        ...src.map((p) => ({ id: p.id, name: p.full_name || p.email || "—", isHelper: false })),
-        ...helpers
-          .filter((h) => helperIdsWithHours.has(h.id))
-          .map((h) => ({ id: h.id, name: `${h.name} (helper)`, isHelper: true })),
-      ];
+      const employees = src.map((p) => ({ id: p.id, name: p.full_name || p.email || "—", isHelper: false }));
+      const helperRows = helpers
+        .filter((h) => helperIdsWithHours.has(h.id))
+        .map((h) => ({ id: h.id, name: `${h.name} (helper)`, isHelper: true }));
+      if (category === "employees") return employees;
+      if (category === "helpers") return helperRows;
+      return [...employees, ...helperRows];
     }
     if (selectedUser.startsWith("helper:")) {
       const hid = selectedUser.slice(7);
@@ -386,7 +400,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
     }
     return src.filter((p) => p.id === selectedUser)
       .map((p) => ({ id: p.id, name: p.full_name || p.email || "—", isHelper: false }));
-  }, [profiles.data, helpersQ.data, list.data, isAdmin, selectedUser, currentUserId]);
+  }, [profiles.data, helpersQ.data, list.data, isAdmin, selectedUser, category, currentUserId]);
 
   const summary = useMemo(() => {
     if (!list.data) return [];
@@ -423,12 +437,25 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
             <Select value={range} onValueChange={(v) => setRange(v as Range)}>
               <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="day">Deň</SelectItem>
                 <SelectItem value="week">Tento týždeň</SelectItem>
-                <SelectItem value="month">Tento mesiac</SelectItem>
+                <SelectItem value="month">Mesiac</SelectItem>
                 <SelectItem value="custom">Vlastný rozsah</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {range === "day" && (
+            <div>
+              <Label className="text-xs">Dátum</Label>
+              <Input type="date" value={dayVal} onChange={(e) => setDayVal(e.target.value)} />
+            </div>
+          )}
+          {range === "month" && (
+            <div>
+              <Label className="text-xs">Mesiac</Label>
+              <Input type="month" value={monthVal} onChange={(e) => setMonthVal(e.target.value)} />
+            </div>
+          )}
           {range === "custom" && (
             <>
               <div>
@@ -443,15 +470,28 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
           )}
           {isAdmin && (
             <div>
-              <Label className="text-xs">Zamestnanec</Label>
+              <Label className="text-xs">Kategória</Label>
+              <Select value={category} onValueChange={(v) => { setCategory(v as any); setSelectedUser("all"); }}>
+                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Všetci</SelectItem>
+                  <SelectItem value="employees">Zamestnanci</SelectItem>
+                  <SelectItem value="helpers">Helperi</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {isAdmin && (
+            <div>
+              <Label className="text-xs">Osoba</Label>
               <Select value={selectedUser} onValueChange={setSelectedUser}>
                 <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Všetci</SelectItem>
-                  {(profiles.data ?? []).map((p) => (
+                  {category !== "helpers" && (profiles.data ?? []).map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
                   ))}
-                  {(helpersQ.data ?? []).map((h) => (
+                  {category !== "employees" && (helpersQ.data ?? []).map((h) => (
                     <SelectItem key={`helper-${h.id}`} value={`helper:${h.id}`}>{h.name} (helper)</SelectItem>
                   ))}
                 </SelectContent>
