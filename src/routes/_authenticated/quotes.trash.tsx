@@ -23,7 +23,7 @@ function QuotesTrash() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("id, quote_number, status, issue_date, total_with_vat, version_number, is_current, deleted_at, deleted_by, clients(company_name), reservations(event_name)")
+        .select("id, quote_number, status, issue_date, total_with_vat, version_number, is_current, quote_group_id, deleted_at, deleted_by, clients(company_name), reservations(event_name)")
         .not("deleted_at", "is", null)
         .order("deleted_at", { ascending: false });
       if (error) throw error;
