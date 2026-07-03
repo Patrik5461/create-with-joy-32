@@ -18,6 +18,7 @@ import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameDay,
 import { sk } from "date-fns/locale";
 import { toast } from "sonner";
 import { RESERVATION_STATUSES, STATUS_LABEL as RES_STATUS_LABEL, STATUS_DOT, type ReservationStatus } from "@/lib/reservation-status";
+import { ReservationStaffSection } from "@/components/reservation-staff-section";
 
 export const Route = createFileRoute("/_authenticated/logistics")({
   head: () => ({ meta: [{ title: "Logistika · Mima Production CRM" }] }),
@@ -161,7 +162,7 @@ function Logistics() {
               <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
               <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
             </div>
-            <StaffDay day={cursor} />
+            <StaffDay day={cursor} reservations={[...loadingsToday, ...returnsToday]} />
           </>
         ) : (
           <RangeList range={range} byDay={byDay} onSave={(p: any) => saveNote.mutate(p)} onPickDay={(d) => { setCursor(d); setView("day"); }} />
