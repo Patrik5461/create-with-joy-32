@@ -25,7 +25,7 @@ function mapResult(r: any): RpoCompany {
   const idObj = pickCurrent(r.identifiers) ?? r.identifiers?.[0];
   const nameObj = pickCurrent(r.fullNames) ?? r.fullNames?.[0];
   const addr = pickCurrent(r.addresses) ?? r.addresses?.[0];
-  const legal = pickCurrent(r.legalForms)?.value?.value ?? null;
+  const legal = (pickCurrent(r.legalForms) as any)?.value?.value ?? null;
   const street = addr?.street ?? null;
   const buildingNumber = addr?.buildingNumber != null ? String(addr.buildingNumber) : null;
   const postal = addr?.postalCodes?.[0] ?? null;
