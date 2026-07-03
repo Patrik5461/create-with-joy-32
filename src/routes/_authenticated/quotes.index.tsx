@@ -9,8 +9,28 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur } from "@/lib/quote-utils";
+import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
+import { sk } from "date-fns/locale";
+
+type RangeView = "day" | "week" | "month";
+
+function getRange(view: RangeView, anchor: Date): { start: Date; end: Date; label: string } {
+  if (view === "day") {
+    const start = new Date(anchor); start.setHours(0, 0, 0, 0);
+    const end = new Date(anchor); end.setHours(23, 59, 59, 999);
+    return { start, end, label: format(start, "d. MMMM yyyy", { locale: sk }) };
+  }
+  if (view === "week") {
+    const start = startOfWeek(anchor, { weekStartsOn: 1 });
+    const end = endOfWeek(anchor, { weekStartsOn: 1 });
+    return { start, end, label: `${format(start, "d.", { locale: sk })} – ${format(end, "d. MMMM yyyy", { locale: sk })}` };
+  }
+  const start = startOfMonth(anchor);
+  const end = endOfMonth(anchor);
+  return { start, end, label: format(anchor, "LLLL yyyy", { locale: sk }) };
+}
 
 export const Route = createFileRoute("/_authenticated/quotes/")({
   head: () => ({ meta: [{ title: "Kalkulácie · Mima Production CRM" }] }),
@@ -22,6 +42,15 @@ function QuotesList() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [clientId, setClientId] = useState<string>("all");
+  const [view, setView] = useState<RangeView>("month");
+  const [anchor, setAnchor] = useState<Date>(() => new Date());
+  const [dateFilterOn, setDateFilterOn] = useState(false);
+
+  const range = useMemo(() => getRange(view, anchor), [view, anchor]);
+  const shift = (dir: 1 | -1) => {
+    setAnchor((a) => (view === "day" ? addDays(a, dir) : view === "week" ? addWeeks(a, dir) : addMonths(a, dir)));
+    setDateFilterOn(true);
+  };
 
   const clients = useQuery({
     queryKey: ["clients-min"],
@@ -48,6 +77,10 @@ function QuotesList() {
     return (quotes.data ?? []).filter((q: any) => {
       if (status !== "all" && q.status !== status) return false;
       if (clientId !== "all" && q.client_id !== clientId) return false;
+      if (dateFilterOn) {
+        const d = new Date(q.issue_date);
+        if (d < range.start || d > range.end) return false;
+      }
       if (search) {
         const s = search.toLowerCase();
         if (!q.quote_number.toLowerCase().includes(s) &&
@@ -56,7 +89,7 @@ function QuotesList() {
       }
       return true;
     });
-  }, [quotes.data, status, clientId, search]);
+  }, [quotes.data, status, clientId, search, dateFilterOn, range]);
 
   return (
     <>
@@ -94,6 +127,29 @@ function QuotesList() {
               {clients.data?.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center gap-2 md:justify-between">
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" aria-label="Predchádzajúce obdobie" onClick={() => shift(-1)}><ChevronLeft className="size-4" /></Button>
+            <Button variant="outline" size="icon" aria-label="Nasledujúce obdobie" onClick={() => shift(1)}><ChevronRight className="size-4" /></Button>
+            <Button variant="outline" size="sm" onClick={() => { setAnchor(new Date()); setDateFilterOn(true); }}>Dnes</Button>
+            <div className="ml-2 text-sm font-medium capitalize">{range.label}</div>
+            {dateFilterOn && (
+              <Button variant="ghost" size="sm" className="ml-2" onClick={() => setDateFilterOn(false)}>Zrušiť filter dátumu</Button>
+            )}
+          </div>
+          <div className="inline-flex rounded-md border p-0.5 bg-muted/40 self-start">
+            {(["day", "week", "month"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => { setView(v); setDateFilterOn(true); }}
+                className={`px-3 py-1 text-sm rounded ${view === v ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+              >
+                {v === "day" ? "Deň" : v === "week" ? "Týždeň" : "Mesiac"}
+              </button>
+            ))}
+          </div>
         </div>
 
         <Card>
