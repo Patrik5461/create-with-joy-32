@@ -20,12 +20,14 @@ export type Database = {
           clock_out: string | null
           created_at: string
           edited_by: string | null
+          helper_id: string | null
           id: string
+          is_helper: boolean
           note: string | null
           reservation_id: string | null
           source: string
           updated_at: string
-          user_id: string
+          user_id: string | null
           work_date: string
         }
         Insert: {
@@ -33,12 +35,14 @@ export type Database = {
           clock_out?: string | null
           created_at?: string
           edited_by?: string | null
+          helper_id?: string | null
           id?: string
+          is_helper?: boolean
           note?: string | null
           reservation_id?: string | null
           source?: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           work_date?: string
         }
         Update: {
@@ -46,12 +50,14 @@ export type Database = {
           clock_out?: string | null
           created_at?: string
           edited_by?: string | null
+          helper_id?: string | null
           id?: string
+          is_helper?: boolean
           note?: string | null
           reservation_id?: string | null
           source?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           work_date?: string
         }
         Relationships: [
@@ -60,6 +66,13 @@ export type Database = {
             columns: ["edited_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_helper_id_fkey"
+            columns: ["helper_id"]
+            isOneToOne: false
+            referencedRelation: "helpers"
             referencedColumns: ["id"]
           },
           {
@@ -578,6 +591,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      helpers: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          note: string | null
+          pin_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          note?: string | null
+          pin_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          note?: string | null
+          pin_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       inquiries: {
         Row: {
@@ -1570,6 +1613,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      hash_helper_pin: {
+        Args: { _helper_id: string; _pin: string }
+        Returns: string
+      }
+      helper_punch: {
+        Args: { _action: string; _helper_id: string }
+        Returns: Json
+      }
+      helper_status: { Args: { _helper_id: string }; Returns: Json }
       is_conversation_participant: {
         Args: { _conv: string; _user: string }
         Returns: boolean
@@ -1579,6 +1631,10 @@ export type Database = {
         Returns: {
           reservation_id: string
         }[]
+      }
+      verify_helper_pin: {
+        Args: { _helper_id: string; _pin: string }
+        Returns: string
       }
     }
     Enums: {
