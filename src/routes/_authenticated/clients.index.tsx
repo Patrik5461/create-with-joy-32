@@ -181,6 +181,8 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
   const [form, setForm] = useState({
     company_name: item?.company_name ?? "",
     ico: item?.ico ?? "",
+    dic: item?.dic ?? "",
+    ic_dph: item?.ic_dph ?? "",
     contact_person: item?.contact_person ?? "",
     phone: item?.phone ?? "",
     email: item?.email ?? "",
@@ -416,6 +418,8 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
           </div>
         </div>
         <div className="space-y-1.5"><Label>Kontaktná osoba</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+        <div className="space-y-1.5"><Label>DIČ</Label><Input value={form.dic} onChange={(e) => setForm({ ...form, dic: e.target.value })} placeholder="napr. 2020291234" /></div>
+        <div className="space-y-1.5"><Label>IČ DPH</Label><Input value={form.ic_dph} onChange={(e) => setForm({ ...form, ic_dph: e.target.value })} placeholder="napr. SK2020291234" /></div>
         <div className="space-y-1.5"><Label>Telefón</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
         <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
         <div className="space-y-1.5 sm:col-span-2"><Label>Adresa</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>

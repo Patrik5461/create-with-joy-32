@@ -57,6 +57,8 @@ function ClientDetail() {
               </CardHeader>
               <CardContent className="text-sm space-y-2">
                 <Field label="IČO" value={client.data.ico} />
+                <Field label="DIČ" value={client.data.dic} />
+                <Field label="IČ DPH" value={client.data.ic_dph} />
                 <Field label="Hl. kontakt (legacy)" value={client.data.contact_person} />
                 <Field label="Telefón" value={client.data.phone} />
                 <Field label="Email" value={client.data.email} />
@@ -101,6 +103,8 @@ function EditClientButton({ client }: { client: any }) {
   const [form, setForm] = useState({
     company_name: client.company_name ?? "",
     ico: client.ico ?? "",
+    dic: client.dic ?? "",
+    ic_dph: client.ic_dph ?? "",
     contact_person: client.contact_person ?? "",
     phone: client.phone ?? "",
     email: client.email ?? "",
@@ -129,6 +133,8 @@ function EditClientButton({ client }: { client: any }) {
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) setForm({
       company_name: client.company_name ?? "",
       ico: client.ico ?? "",
+      dic: client.dic ?? "",
+      ic_dph: client.ic_dph ?? "",
       contact_person: client.contact_person ?? "",
       phone: client.phone ?? "",
       email: client.email ?? "",
@@ -143,6 +149,8 @@ function EditClientButton({ client }: { client: any }) {
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="space-y-1.5 sm:col-span-2"><Label>Názov firmy *</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>IČO</Label><Input value={form.ico} onChange={(e) => setForm({ ...form, ico: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>DIČ</Label><Input value={form.dic} onChange={(e) => setForm({ ...form, dic: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>IČ DPH</Label><Input value={form.ic_dph} onChange={(e) => setForm({ ...form, ic_dph: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Hl. kontakt (legacy)</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Telefón</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
