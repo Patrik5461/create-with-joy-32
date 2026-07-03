@@ -9,6 +9,7 @@ import { Copy, Mail, Link2, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
+import { publicUrl as buildPublicUrl } from "@/lib/public-url";
 
 const ACCESS_LABEL: Record<string, string> = {
   direct: "Priamy vjazd",
@@ -41,8 +42,7 @@ export function SurveyCard({ reservationId, email, canGenerate }: { reservationI
   });
 
   const s = survey.data as any;
-  const publicUrl = typeof window !== "undefined" && s?.token
-    ? `${window.location.origin}/dotaznik/${s.token}` : "";
+  const publicUrl = s?.token ? buildPublicUrl(`/dotaznik/${s.token}`) : "";
 
   const status = !s ? "missing" : s.status === "filled" ? "filled" : "sent";
 

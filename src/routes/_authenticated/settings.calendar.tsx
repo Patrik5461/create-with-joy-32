@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, Check, RefreshCw, ExternalLink, Calendar, Apple, Globe } from "lucide-react";
 import { toast } from "sonner";
+import { getPublicAppUrl } from "@/lib/public-url";
 
 export const Route = createFileRoute("/_authenticated/settings/calendar")({
   component: CalendarSettings,
@@ -51,7 +52,7 @@ function CalendarSettings() {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Chyba"),
   });
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = getPublicAppUrl();
   const icsUrl = data?.token ? `${origin}/api/public/calendar/${data.token}.ics` : "";
   const webcalUrl = data?.token ? `webcal://${origin.replace(/^https?:\/\//, "")}/api/public/calendar/${data.token}.ics` : "";
   const googleAddUrl = icsUrl
