@@ -34,6 +34,7 @@ import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_aut
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings.account'
 import { Route as AuthenticatedReservationsNewRouteImport } from './routes/_authenticated/reservations.new'
 import { Route as AuthenticatedReservationsIdRouteImport } from './routes/_authenticated/reservations.$id'
+import { Route as AuthenticatedQuotesTrashRouteImport } from './routes/_authenticated/quotes.trash'
 import { Route as AuthenticatedQuotesNewRouteImport } from './routes/_authenticated/quotes.new'
 import { Route as AuthenticatedQuotesIdRouteImport } from './routes/_authenticated/quotes.$id'
 import { Route as AuthenticatedClientsIdRouteImport } from './routes/_authenticated/clients.$id'
@@ -179,6 +180,12 @@ const AuthenticatedReservationsIdRoute =
     path: '/reservations/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedQuotesTrashRoute =
+  AuthenticatedQuotesTrashRouteImport.update({
+    id: '/quotes/trash',
+    path: '/quotes/trash',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedQuotesNewRoute = AuthenticatedQuotesNewRouteImport.update({
   id: '/quotes/new',
   path: '/quotes/new',
@@ -255,6 +262,7 @@ export interface FileRoutesByFullPath {
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/quotes/$id': typeof AuthenticatedQuotesIdRoute
   '/quotes/new': typeof AuthenticatedQuotesNewRoute
+  '/quotes/trash': typeof AuthenticatedQuotesTrashRoute
   '/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -290,6 +298,7 @@ export interface FileRoutesByTo {
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/quotes/$id': typeof AuthenticatedQuotesIdRoute
   '/quotes/new': typeof AuthenticatedQuotesNewRoute
+  '/quotes/trash': typeof AuthenticatedQuotesTrashRoute
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
@@ -327,6 +336,7 @@ export interface FileRoutesById {
   '/_authenticated/clients/$id': typeof AuthenticatedClientsIdRoute
   '/_authenticated/quotes/$id': typeof AuthenticatedQuotesIdRoute
   '/_authenticated/quotes/new': typeof AuthenticatedQuotesNewRoute
+  '/_authenticated/quotes/trash': typeof AuthenticatedQuotesTrashRoute
   '/_authenticated/reservations/$id': typeof AuthenticatedReservationsIdRouteWithChildren
   '/_authenticated/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/clients/$id'
     | '/quotes/$id'
     | '/quotes/new'
+    | '/quotes/trash'
     | '/reservations/$id'
     | '/reservations/new'
     | '/settings/account'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/clients/$id'
     | '/quotes/$id'
     | '/quotes/new'
+    | '/quotes/trash'
     | '/reservations/new'
     | '/settings/account'
     | '/settings/calendar'
@@ -436,6 +448,7 @@ export interface FileRouteTypes {
     | '/_authenticated/clients/$id'
     | '/_authenticated/quotes/$id'
     | '/_authenticated/quotes/new'
+    | '/_authenticated/quotes/trash'
     | '/_authenticated/reservations/$id'
     | '/_authenticated/reservations/new'
     | '/_authenticated/settings/account'
@@ -642,6 +655,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReservationsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/quotes/trash': {
+      id: '/_authenticated/quotes/trash'
+      path: '/quotes/trash'
+      fullPath: '/quotes/trash'
+      preLoaderRoute: typeof AuthenticatedQuotesTrashRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/quotes/new': {
       id: '/_authenticated/quotes/new'
       path: '/quotes/new'
@@ -780,6 +800,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClientsIdRoute: typeof AuthenticatedClientsIdRoute
   AuthenticatedQuotesIdRoute: typeof AuthenticatedQuotesIdRoute
   AuthenticatedQuotesNewRoute: typeof AuthenticatedQuotesNewRoute
+  AuthenticatedQuotesTrashRoute: typeof AuthenticatedQuotesTrashRoute
   AuthenticatedReservationsIdRoute: typeof AuthenticatedReservationsIdRouteWithChildren
   AuthenticatedReservationsNewRoute: typeof AuthenticatedReservationsNewRoute
   AuthenticatedClientsIndexRoute: typeof AuthenticatedClientsIndexRoute
@@ -803,6 +824,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedClientsIdRoute: AuthenticatedClientsIdRoute,
   AuthenticatedQuotesIdRoute: AuthenticatedQuotesIdRoute,
   AuthenticatedQuotesNewRoute: AuthenticatedQuotesNewRoute,
+  AuthenticatedQuotesTrashRoute: AuthenticatedQuotesTrashRoute,
   AuthenticatedReservationsIdRoute:
     AuthenticatedReservationsIdRouteWithChildren,
   AuthenticatedReservationsNewRoute: AuthenticatedReservationsNewRoute,

@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur } from "@/lib/quote-utils";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
@@ -67,7 +67,8 @@ function QuotesList() {
       const { data, error } = await supabase
         .from("quotes")
         .select("id, quote_number, status, issue_date, total_with_vat, client_id, version_number, is_current, clients(company_name), reservations(event_name)")
-        .eq("is_current", true)
+      .eq("is_current", true)
+      .is("deleted_at", null)
         .order("issue_date", { ascending: false });
       if (error) throw error;
       return data;
@@ -101,9 +102,14 @@ function QuotesList() {
             <h2 className="text-2xl font-semibold tracking-tight">Cenové ponuky</h2>
             <p className="text-sm text-muted-foreground">Vytváranie a správa kalkulácií pre klientov.</p>
           </div>
-          <Button asChild>
-            <Link to="/quotes/new"><Plus className="size-4 mr-1" />Nová kalkulácia</Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link to="/quotes/trash"><Trash2 className="size-4 mr-1" />Kôš</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/quotes/new"><Plus className="size-4 mr-1" />Nová kalkulácia</Link>
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row gap-2">

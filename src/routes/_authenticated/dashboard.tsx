@@ -38,7 +38,7 @@ function useDashboardData() {
         supabase.from("furniture_items").select("id,name,total_qty,damaged_qty,retired_qty").eq("active", true),
         supabase.from("reservation_items").select("qty,furniture_item_id,furniture_items(name)"),
         supabase.from("damaged_items").select("id,severity", { count: "exact" }).in("status", ["new", "in_progress"]),
-        supabase.from("quotes").select("status"),
+        supabase.from("quotes").select("status").is("deleted_at", null),
         supabase.from("reservations").select("status"),
       ]);
 
