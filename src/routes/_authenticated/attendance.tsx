@@ -556,7 +556,7 @@ function AttendancePage() {
 
       <Tabs defaultValue="clock">
         <TabsList>
-          <TabsTrigger value="clock">Pichanie</TabsTrigger>
+          <TabsTrigger value="clock">Dochádzka</TabsTrigger>
           <TabsTrigger value="summary">Súhrn</TabsTrigger>
           <TabsTrigger value="daily">Denný záznam</TabsTrigger>
         </TabsList>
