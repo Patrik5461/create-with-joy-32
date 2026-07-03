@@ -6,7 +6,7 @@ import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit3, Trash2, LayoutGrid, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Edit3, Trash2, LayoutGrid, AlertTriangle, FileText } from "lucide-react";
 import { ReservationForm } from "@/components/reservation-form";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
@@ -36,6 +36,23 @@ function ReservationDetail() {
         .from("reservations")
         .select("*, clients(id,company_name,ico,address,contact_person,email,phone), reservation_items(id,qty,furniture_item_id,furniture_items(name,internal_code))")
         .eq("id", id).maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+
+  const sourceQuote = useQuery({
+    queryKey: ["reservation-source-quote", (reservation.data as any)?.quote_group_id],
+    enabled: !!(reservation.data as any)?.quote_group_id,
+    queryFn: async () => {
+      const gid = (reservation.data as any).quote_group_id as string;
+      const { data, error } = await supabase
+        .from("quotes")
+        .select("id, quote_number, version_number, is_current")
+        .eq("quote_group_id", gid)
+        .is("deleted_at", null)
+        .eq("is_current", true)
+        .maybeSingle();
       if (error) throw error;
       return data as any;
     },
@@ -102,6 +119,17 @@ function ReservationDetail() {
 
         {!editing && r && (
           <div className="grid gap-4 lg:grid-cols-3">
+            {sourceQuote.data && (
+              <div className="lg:col-span-3">
+                <div className="rounded-md border border-sky-300 bg-sky-50 text-sky-900 p-3 text-sm flex items-center gap-2">
+                  <FileText className="size-4" />
+                  Vytvorené z kalkulácie:&nbsp;
+                  <Link to="/quotes/$id" params={{ id: sourceQuote.data.id }} className="font-semibold underline">
+                    {sourceQuote.data.quote_number} · v{sourceQuote.data.version_number}
+                  </Link>
+                </div>
+              </div>
+            )}
             <Card className="lg:col-span-2">
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
