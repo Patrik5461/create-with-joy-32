@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as KatalogRouteImport } from './routes/katalog'
+import { Route as HelperRouteImport } from './routes/helper'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -31,6 +32,7 @@ import { Route as AuthenticatedReservationsIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedQuotesIndexRouteImport } from './routes/_authenticated/quotes.index'
 import { Route as AuthenticatedClientsIndexRouteImport } from './routes/_authenticated/clients.index'
 import { Route as AuthenticatedWarehouseQrPrintRouteImport } from './routes/_authenticated/warehouse.qr-print'
+import { Route as AuthenticatedSettingsHelpersRouteImport } from './routes/_authenticated/settings.helpers'
 import { Route as AuthenticatedSettingsEmailRouteImport } from './routes/_authenticated/settings.email'
 import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings.calendar'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings.account'
@@ -56,6 +58,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const KatalogRoute = KatalogRouteImport.update({
   id: '/katalog',
   path: '/katalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelperRoute = HelperRouteImport.update({
+  id: '/helper',
+  path: '/helper',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -163,6 +170,12 @@ const AuthenticatedWarehouseQrPrintRoute =
     path: '/qr-print',
     getParentRoute: () => AuthenticatedWarehouseRoute,
   } as any)
+const AuthenticatedSettingsHelpersRoute =
+  AuthenticatedSettingsHelpersRouteImport.update({
+    id: '/helpers',
+    path: '/helpers',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedSettingsEmailRoute =
   AuthenticatedSettingsEmailRouteImport.update({
     id: '/email',
@@ -259,6 +272,7 @@ const AuthenticatedDocumentsContractIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/helper': typeof HelperRoute
   '/katalog': typeof KatalogRoute
   '/reset-password': typeof ResetPasswordRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
@@ -282,6 +296,7 @@ export interface FileRoutesByFullPath {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/email': typeof AuthenticatedSettingsEmailRoute
+  '/settings/helpers': typeof AuthenticatedSettingsHelpersRoute
   '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/clients/': typeof AuthenticatedClientsIndexRoute
   '/quotes/': typeof AuthenticatedQuotesIndexRoute
@@ -298,6 +313,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/helper': typeof HelperRoute
   '/katalog': typeof KatalogRoute
   '/reset-password': typeof ResetPasswordRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
@@ -319,6 +335,7 @@ export interface FileRoutesByTo {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/email': typeof AuthenticatedSettingsEmailRoute
+  '/settings/helpers': typeof AuthenticatedSettingsHelpersRoute
   '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/clients': typeof AuthenticatedClientsIndexRoute
   '/quotes': typeof AuthenticatedQuotesIndexRoute
@@ -337,6 +354,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/helper': typeof HelperRoute
   '/katalog': typeof KatalogRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
@@ -360,6 +378,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/_authenticated/settings/email': typeof AuthenticatedSettingsEmailRoute
+  '/_authenticated/settings/helpers': typeof AuthenticatedSettingsHelpersRoute
   '/_authenticated/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
   '/_authenticated/clients/': typeof AuthenticatedClientsIndexRoute
   '/_authenticated/quotes/': typeof AuthenticatedQuotesIndexRoute
@@ -378,6 +397,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/helper'
     | '/katalog'
     | '/reset-password'
     | '/attendance'
@@ -401,6 +421,7 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/calendar'
     | '/settings/email'
+    | '/settings/helpers'
     | '/warehouse/qr-print'
     | '/clients/'
     | '/quotes/'
@@ -417,6 +438,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/helper'
     | '/katalog'
     | '/reset-password'
     | '/attendance'
@@ -438,6 +460,7 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/calendar'
     | '/settings/email'
+    | '/settings/helpers'
     | '/warehouse/qr-print'
     | '/clients'
     | '/quotes'
@@ -455,6 +478,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/helper'
     | '/katalog'
     | '/reset-password'
     | '/_authenticated/attendance'
@@ -478,6 +502,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/calendar'
     | '/_authenticated/settings/email'
+    | '/_authenticated/settings/helpers'
     | '/_authenticated/warehouse/qr-print'
     | '/_authenticated/clients/'
     | '/_authenticated/quotes/'
@@ -496,6 +521,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  HelperRoute: typeof HelperRoute
   KatalogRoute: typeof KatalogRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   DotaznikTokenRoute: typeof DotaznikTokenRoute
@@ -517,6 +543,13 @@ declare module '@tanstack/react-router' {
       path: '/katalog'
       fullPath: '/katalog'
       preLoaderRoute: typeof KatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/helper': {
+      id: '/helper'
+      path: '/helper'
+      fullPath: '/helper'
+      preLoaderRoute: typeof HelperRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -659,6 +692,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWarehouseQrPrintRouteImport
       parentRoute: typeof AuthenticatedWarehouseRoute
     }
+    '/_authenticated/settings/helpers': {
+      id: '/_authenticated/settings/helpers'
+      path: '/helpers'
+      fullPath: '/settings/helpers'
+      preLoaderRoute: typeof AuthenticatedSettingsHelpersRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
     '/_authenticated/settings/email': {
       id: '/_authenticated/settings/email'
       path: '/email'
@@ -778,6 +818,7 @@ interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
   AuthenticatedSettingsCalendarRoute: typeof AuthenticatedSettingsCalendarRoute
   AuthenticatedSettingsEmailRoute: typeof AuthenticatedSettingsEmailRoute
+  AuthenticatedSettingsHelpersRoute: typeof AuthenticatedSettingsHelpersRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
 }
 
@@ -785,6 +826,7 @@ const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
   AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
   AuthenticatedSettingsCalendarRoute: AuthenticatedSettingsCalendarRoute,
   AuthenticatedSettingsEmailRoute: AuthenticatedSettingsEmailRoute,
+  AuthenticatedSettingsHelpersRoute: AuthenticatedSettingsHelpersRoute,
   AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
 }
 
@@ -885,6 +927,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  HelperRoute: HelperRoute,
   KatalogRoute: KatalogRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   DotaznikTokenRoute: DotaznikTokenRoute,

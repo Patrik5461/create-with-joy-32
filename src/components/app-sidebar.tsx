@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, ShieldCheck, LayoutPanelTop, Wrench, Calculator, ClipboardCheck, MessageSquare, Inbox, Clock, Calendar, Mail, KeyRound } from "lucide-react";
+import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, ShieldCheck, LayoutPanelTop, Wrench, Calculator, ClipboardCheck, MessageSquare, Inbox, Clock, Calendar, Mail, KeyRound, HardHat } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -109,6 +109,16 @@ export function AppSidebar() {
                     <Link to="/settings/email" className="flex items-center gap-3">
                       <Mail className="size-[18px]" />
                       <span>Email (Resend)</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {hasRole(user, "admin") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={isActive("/settings/helpers")} tooltip="Helperi (PIN)" className={itemClass}>
+                    <Link to="/settings/helpers" className="flex items-center gap-3">
+                      <HardHat className="size-[18px]" />
+                      <span>Helperi (PIN)</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
