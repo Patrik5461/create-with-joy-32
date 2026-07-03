@@ -28,11 +28,20 @@ function QuoteDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("*, clients(*), client_contacts(id, full_name, role, phone, email), reservations(event_name, venue), quote_items(*), profiles:created_by(full_name, email)")
+        .select("*, clients(*), client_contacts(id, full_name, role, phone, email), reservations(event_name, venue), quote_items(*)")
         .eq("id", id)
         .single();
       if (error) throw error;
-      return data;
+      let creator: { full_name: string | null; email: string | null } | null = null;
+      if ((data as any).created_by) {
+        const { data: p } = await supabase
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", (data as any).created_by)
+          .maybeSingle();
+        creator = (p as any) ?? null;
+      }
+      return { ...(data as any), creator };
     },
   });
 
@@ -42,11 +51,17 @@ function QuoteDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("id, version_number, is_current, created_at, profiles:created_by(full_name, email)")
+        .select("id, version_number, is_current, created_at, created_by")
         .eq("quote_group_id", (quote.data as any).quote_group_id)
         .order("version_number", { ascending: false });
       if (error) throw error;
-      return data as any[];
+      const ids = Array.from(new Set((data ?? []).map((v: any) => v.created_by).filter(Boolean)));
+      const profileMap = new Map<string, { full_name: string | null; email: string | null }>();
+      if (ids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+        for (const p of (profs ?? []) as any[]) profileMap.set(p.id, { full_name: p.full_name, email: p.email });
+      }
+      return (data ?? []).map((v: any) => ({ ...v, creator: v.created_by ? profileMap.get(v.created_by) ?? null : null }));
     },
   });
 
@@ -186,10 +201,10 @@ function QuoteDetail() {
                 >
                   <SelectTrigger className="h-8 w-[260px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {versions.data.map((v) => (
+              {versions.data.map((v: any) => (
                       <SelectItem key={v.id} value={v.id}>
                         v{v.version_number}{v.is_current ? " · aktuálna" : ""} — {new Date(v.created_at).toLocaleString("sk-SK")}
-                        {v.profiles?.full_name ? ` · ${v.profiles.full_name}` : ""}
+                  {v.creator?.full_name ? ` · ${v.creator.full_name}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -249,7 +264,7 @@ function QuoteDetail() {
               {q.valid_until && <div><span className="text-muted-foreground">Platnosť do:</span> {new Date(q.valid_until).toLocaleDateString("sk-SK")}</div>}
               {q.reservations && <div><span className="text-muted-foreground">Rezervácia:</span> {q.reservations.event_name}</div>}
               <div><span className="text-muted-foreground">DPH:</span> {q.vat_rate}%</div>
-              <div><span className="text-muted-foreground">Verzia:</span> v{q.version_number} · vytvorená {new Date(q.created_at).toLocaleString("sk-SK")}{q.profiles?.full_name ? ` · ${q.profiles.full_name}` : ""}</div>
+              <div><span className="text-muted-foreground">Verzia:</span> v{q.version_number} · vytvorená {new Date(q.created_at).toLocaleString("sk-SK")}{q.creator?.full_name ? ` · ${q.creator.full_name}` : ""}</div>
             </CardContent>
           </Card>
         </div>
