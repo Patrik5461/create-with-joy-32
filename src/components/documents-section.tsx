@@ -61,7 +61,7 @@ export function DocumentsSection({ reservation }: Props) {
       const snapshot = buildSnapshot();
       // Pull latest quote (if any) for totals
       const { data: q } = await supabase.from("quotes").select("id, total_with_vat")
-        .eq("reservation_id", reservation.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        .eq("reservation_id", reservation.id).is("deleted_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
       const { data, error } = await supabase.from("contracts").insert({
         reservation_id: reservation.id,
         quote_id: q?.id ?? null,
