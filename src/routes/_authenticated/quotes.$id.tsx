@@ -9,6 +9,17 @@ import { Printer, Copy, Trash2, Mail, Loader2, History } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { QuoteForm } from "@/components/quote-form";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, type QuoteLine } from "@/lib/quote-utils";
 
@@ -22,6 +33,7 @@ function QuoteDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const quote = useQuery({
     queryKey: ["quote", id],
@@ -229,9 +241,28 @@ function QuoteDetail() {
             <Button onClick={() => setEditing(true)} disabled={!q.is_current} title={!q.is_current ? "Upraviť je možné len aktuálnu verziu" : undefined}>
               Upraviť → v{nextVersion}
             </Button>
-            <Button variant="destructive" onClick={() => { if (confirm(q.is_current ? "Naozaj zmazať túto verziu kalkulácie?" : "Naozaj zmazať túto staršiu verziu?")) remove.mutate(); }}>
-              <Trash2 className="size-4 mr-1" />Zmazať
-            </Button>
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive"><Trash2 className="size-4 mr-1" />Zmazať</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{q.is_current ? "Zmazať túto verziu kalkulácie?" : "Zmazať túto staršiu verziu?"}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Kalkulácia bude presunutá do koša. Môžeš ju neskôr obnoviť cez Kalkulácie → Kôš.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setDeleteOpen(false)}>Zrušiť</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => remove.mutate()}
+                  >
+                    Zmazať
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 
