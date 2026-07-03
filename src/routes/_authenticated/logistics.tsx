@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameDay, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
 import { toast } from "sonner";
-import { RESERVATION_STATUSES, STATUS_LABEL, STATUS_DOT, type ReservationStatus } from "@/lib/reservation-status";
+import { RESERVATION_STATUSES, STATUS_LABEL as RES_STATUS_LABEL, STATUS_DOT, type ReservationStatus } from "@/lib/reservation-status";
 
 export const Route = createFileRoute("/_authenticated/logistics")({
   head: () => ({ meta: [{ title: "Logistika · Mima Production CRM" }] }),
@@ -139,7 +139,7 @@ function Logistics() {
                   <SelectItem key={s} value={s}>
                     <span className="inline-flex items-center gap-2">
                       <span className={`size-2 rounded-full ${STATUS_DOT[s]}`} />
-                      {STATUS_LABEL[s]}
+                      {RES_STATUS_LABEL[s]}
                     </span>
                   </SelectItem>
                 ))}
