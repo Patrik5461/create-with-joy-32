@@ -77,7 +77,7 @@ function HelpersAdmin() {
         <CardHeader className="flex-row items-start justify-between space-y-0">
           <div>
             <CardTitle className="flex items-center gap-2"><HardHat className="size-5" />Helperi</CardTitle>
-            <CardDescription>Brigádnici, ktorí si pichajú dochádzku cez PIN v natívnej appke.</CardDescription>
+            <CardDescription>Brigádnici, ktorí si potvrdzujú dochádzku cez PIN v natívnej appke.</CardDescription>
           </div>
           <CreateHelperDialog onCreated={(pin, id) => { setRevealed({ id, pin }); refresh(); }} />
         </CardHeader>
