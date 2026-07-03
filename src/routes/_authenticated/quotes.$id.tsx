@@ -378,9 +378,17 @@ function QuoteDetail() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{q.is_current ? "Zmazať túto verziu kalkulácie?" : "Zmazať túto staršiu verziu?"}</AlertDialogTitle>
+                  <AlertDialogTitle>Zmazať verziu v{q.version_number}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Kalkulácia bude presunutá do koša. Môžeš ju neskôr obnoviť cez Kalkulácie → Kôš.
+                    {(versions.data?.length ?? 1) > 1 ? (
+                      <>
+                        Zmaže sa <span className="font-semibold">iba verzia v{q.version_number}</span> — ostatné verzie kalkulácie <span className="font-mono">{q.quote_number}</span> zostanú zachované.
+                        {q.is_current && " Najnovšia zostávajúca verzia sa stane aktuálnou."}
+                        {" "}Verziu nájdeš v Kalkulácie → Kôš a môžeš ju obnoviť.
+                      </>
+                    ) : (
+                      <>Kalkulácia bude presunutá do koša. Môžeš ju neskôr obnoviť cez Kalkulácie → Kôš.</>
+                    )}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -389,7 +397,7 @@ function QuoteDetail() {
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     onClick={() => remove.mutate()}
                   >
-                    Zmazať
+                    {(versions.data?.length ?? 1) > 1 ? `Zmazať v${q.version_number}` : "Zmazať"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
