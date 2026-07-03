@@ -13,37 +13,60 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { addDays, format, isSameDay } from "date-fns";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameDay, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
 import { toast } from "sonner";
+import { RESERVATION_STATUSES, STATUS_LABEL as RES_STATUS_LABEL, STATUS_DOT, type ReservationStatus } from "@/lib/reservation-status";
 
 export const Route = createFileRoute("/_authenticated/logistics")({
   head: () => ({ meta: [{ title: "Logistika · Mima Production CRM" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    status: typeof s.status === "string" ? (s.status as ReservationStatus | "all") : "all",
+  }),
   component: Logistics,
 });
 
-function Logistics() {
-  const [day, setDay] = useState<Date>(new Date());
-  const qc = useQueryClient();
+type View = "day" | "week" | "month";
 
-  const from = new Date(day); from.setHours(0,0,0,0);
-  const to = new Date(day); to.setHours(23,59,59,999);
+function Logistics() {
+  const qc = useQueryClient();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const statusFilter = (search.status ?? "all") as ReservationStatus | "all";
+  const [view, setView] = useState<View>("day");
+  const [cursor, setCursor] = useState<Date>(new Date());
+
+  const range = useMemo(() => {
+    if (view === "day") {
+      const f = new Date(cursor); f.setHours(0,0,0,0);
+      const t = new Date(cursor); t.setHours(23,59,59,999);
+      return { from: f, to: t };
+    }
+    if (view === "week") return { from: startOfWeek(cursor, { weekStartsOn: 1 }), to: endOfWeek(cursor, { weekStartsOn: 1 }) };
+    return { from: startOfMonth(cursor), to: endOfMonth(cursor) };
+  }, [view, cursor]);
+
+  const from = range.from;
+  const to = range.to;
 
   const data = useQuery({
-    queryKey: ["logistics-day", day.toDateString()],
+    queryKey: ["logistics-range", from.toISOString(), to.toISOString(), statusFilter],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("reservations")
         .select("id,event_name,venue,address,load_at,depart_at,return_at,event_start_at,event_end_at,available_from_at,note,clients(company_name),logistics(id,internal_note,load_time,unload_time,return_time),logistics_surveys(status,floor,has_elevator,elevator_info,access_type,access_note,parking_note,distance_info,onsite_contact_name,onsite_contact_phone,time_restrictions)")
         .or(`and(load_at.gte.${from.toISOString()},load_at.lte.${to.toISOString()}),and(return_at.gte.${from.toISOString()},return_at.lte.${to.toISOString()})`)
         .neq("status", "cancelled");
+      if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      const { data, error } = await q;
       if (error) throw error;
       return data as any[];
     },
   });
 
-  const loadingsToday = useMemo(() => (data.data ?? []).filter((r) => isSameDay(new Date(r.load_at), day)).sort((a,b) => new Date(a.load_at).getTime() - new Date(b.load_at).getTime()), [data.data, day]);
-  const returnsToday = useMemo(() => (data.data ?? []).filter((r) => isSameDay(new Date(r.return_at), day)).sort((a,b) => new Date(a.return_at).getTime() - new Date(b.return_at).getTime()), [data.data, day]);
+  const loadingsToday = useMemo(() => (data.data ?? []).filter((r) => isSameDay(new Date(r.load_at), cursor)).sort((a,b) => new Date(a.load_at).getTime() - new Date(b.load_at).getTime()), [data.data, cursor]);
+  const returnsToday = useMemo(() => (data.data ?? []).filter((r) => isSameDay(new Date(r.return_at), cursor)).sort((a,b) => new Date(a.return_at).getTime() - new Date(b.return_at).getTime()), [data.data, cursor]);
 
   const saveNote = useMutation({
     mutationFn: async ({ reservationId, note, logisticsId }: { reservationId: string; note: string; logisticsId?: string }) => {
@@ -55,36 +78,156 @@ function Logistics() {
         if (error) throw error;
       }
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["logistics-day"] }); toast.success("Uložené"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["logistics-range"] }); toast.success("Uložené"); },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const move = (dir: 1 | -1) => {
+    if (view === "day") setCursor((d) => addDays(d, dir));
+    else if (view === "week") setCursor((d) => addWeeks(d, dir));
+    else setCursor((d) => addMonths(d, dir));
+  };
+
+  const headerLabel = view === "day"
+    ? format(cursor, "EEEE d. MMMM yyyy", { locale: sk })
+    : view === "week"
+      ? `${format(range.from, "d.")} – ${format(range.to, "d. MMMM yyyy", { locale: sk })}`
+      : format(cursor, "LLLL yyyy", { locale: sk });
+
+  const byDay = useMemo(() => {
+    const map = new Map<string, { loads: any[]; returns: any[] }>();
+    const items = data.data ?? [];
+    for (const r of items) {
+      for (const [key, dt] of [["loads", r.load_at], ["returns", r.return_at]] as const) {
+        const d = new Date(dt);
+        const k = format(d, "yyyy-MM-dd");
+        if (d < range.from || d > range.to) continue;
+        if (!map.has(k)) map.set(k, { loads: [], returns: [] });
+        map.get(k)![key].push(r);
+      }
+    }
+    return map;
+  }, [data.data, range.from, range.to]);
 
   return (
     <>
       <AppHeader title="Logistika" />
       <div className="p-4 md:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">Denný plán</h2>
-            <p className="text-sm text-muted-foreground">Odvozy a návraty nábytku.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" aria-label="Predchádzajúci deň" onClick={() => setDay((d) => addDays(d, -1))}><ChevronLeft className="size-4" /></Button>
-            <Input type="date" className="w-44" value={format(day, "yyyy-MM-dd")} onChange={(e) => setDay(new Date(e.target.value))} />
-            <Button variant="outline" size="icon" aria-label="Nasledujúci deň" onClick={() => setDay((d) => addDays(d, 1))}><ChevronRight className="size-4" /></Button>
-            <Button variant="outline" size="sm" onClick={() => setDay(new Date())}>Dnes</Button>
-          </div>
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Plán logistiky</h2>
+          <p className="text-sm text-muted-foreground">Prehľad nakládok a návratov nábytku.</p>
         </div>
-        <p className="text-sm text-muted-foreground capitalize">{format(day, "EEEE d. MMMM yyyy", { locale: sk })}</p>
 
-        <div className="grid lg:grid-cols-2 gap-4">
-          <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
-          <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" aria-label="Predchádzajúce" onClick={() => move(-1)}><ChevronLeft className="size-4" /></Button>
+            <Button variant="outline" size="sm" onClick={() => setCursor(new Date())}>Dnes</Button>
+            <Button variant="outline" size="icon" aria-label="Nasledujúce" onClick={() => move(1)}><ChevronRight className="size-4" /></Button>
+            <span className="font-medium text-sm ml-2 capitalize">{headerLabel}</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => navigate({ search: { status: v === "all" ? undefined : v } as any })}
+            >
+              <SelectTrigger className="h-9 w-44 text-xs">
+                <SelectValue placeholder="Všetky stavy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Všetky stavy</SelectItem>
+                {RESERVATION_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    <span className="inline-flex items-center gap-2">
+                      <span className={`size-2 rounded-full ${STATUS_DOT[s]}`} />
+                      {RES_STATUS_LABEL[s]}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Tabs value={view} onValueChange={(v) => setView(v as View)}>
+              <TabsList>
+                <TabsTrigger value="day">Deň</TabsTrigger>
+                <TabsTrigger value="week">Týždeň</TabsTrigger>
+                <TabsTrigger value="month">Mesiac</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
+
+        {view === "day" ? (
+          <div className="grid lg:grid-cols-2 gap-4">
+            <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
+            <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
+          </div>
+        ) : (
+          <RangeList range={range} byDay={byDay} onSave={(p: any) => saveNote.mutate(p)} onPickDay={(d) => { setCursor(d); setView("day"); }} />
+        )}
 
         <VehicleFleet />
       </div>
     </>
+  );
+}
+
+function RangeList({ range, byDay, onSave, onPickDay }: { range: { from: Date; to: Date }; byDay: Map<string, { loads: any[]; returns: any[] }>; onSave: (p: any) => void; onPickDay: (d: Date) => void }) {
+  const days: Date[] = [];
+  for (let d = new Date(range.from); d <= range.to; d = addDays(d, 1)) days.push(new Date(d));
+  return (
+    <div className="space-y-3">
+      {days.map((d) => {
+        const key = format(d, "yyyy-MM-dd");
+        const bucket = byDay.get(key);
+        const empty = !bucket || (bucket.loads.length === 0 && bucket.returns.length === 0);
+        return (
+          <Card key={key}>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm capitalize flex items-center justify-between">
+                <button className="hover:underline" onClick={() => onPickDay(d)}>{format(d, "EEEE d. MMMM", { locale: sk })}</button>
+                {!empty && (
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {bucket!.loads.length > 0 && <>Nakládky: {bucket!.loads.length}</>}
+                    {bucket!.loads.length > 0 && bucket!.returns.length > 0 && " · "}
+                    {bucket!.returns.length > 0 && <>Návraty: {bucket!.returns.length}</>}
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            {!empty && (
+              <CardContent className="grid md:grid-cols-2 gap-3 pt-0">
+                <MiniList title="Nakládky" icon={Truck} list={bucket!.loads} type="load" onSave={onSave} />
+                <MiniList title="Návraty" icon={Package} list={bucket!.returns} type="return" onSave={onSave} />
+              </CardContent>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function MiniList({ title, icon: Icon, list, type, onSave }: any) {
+  if (list.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><Icon className="size-3.5" />{title}</div>
+      {list.map((r: any) => {
+        const time = type === "load" ? r.load_at : r.return_at;
+        const log = r.logistics?.[0];
+        return (
+          <div key={`${type}-${r.id}`} className="rounded-md border p-2 space-y-1.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <Link to="/reservations/$id" params={{ id: r.id }} className="text-sm font-medium hover:underline block truncate">{r.event_name}</Link>
+                <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name} · {r.venue}</div>
+              </div>
+              <div className="text-sm font-mono font-semibold">{format(new Date(time), "HH:mm")}</div>
+            </div>
+            <NoteEditor reservationId={r.id} logisticsId={log?.id} initial={log?.internal_note ?? ""} onSave={onSave} />
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
