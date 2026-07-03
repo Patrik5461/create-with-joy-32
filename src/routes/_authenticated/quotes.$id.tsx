@@ -24,6 +24,9 @@ import {
 import { QuoteForm } from "@/components/quote-form";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, type QuoteLine } from "@/lib/quote-utils";
 import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow } from "@/lib/quote-reservation-link";
+import { useServerFn } from "@tanstack/react-start";
+import { sendQuoteEmail } from "@/lib/email.functions";
+import { buildQuotePdfBase64 } from "@/lib/quote-pdf";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
   head: () => ({ meta: [{ title: "Kalkulácia · Mima Production CRM" }] }),
@@ -37,6 +40,8 @@ function QuoteDetail() {
   const [editing, setEditing] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const sendQuoteFn = useServerFn(sendQuoteEmail);
 
   const quote = useQuery({
     queryKey: ["quote", id],
@@ -223,15 +228,29 @@ function QuoteDetail() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const sendEmail = () => {
+  const sendEmail = async () => {
     if (!quote.data) return;
     const q = quote.data as any;
-    const to = q.clients?.email ?? "";
-    const vLabel = `v${q.version_number}`;
-    const subject = `Cenová ponuka ${q.quote_number} (${vLabel})`;
-    const body = `Dobrý deň,\n\nzasielame Vám cenovú ponuku č. ${q.quote_number} (${vLabel}) v celkovej sume ${formatEur(Number(q.total_with_vat))} (s DPH).\n\nS pozdravom,\nMima Production`;
-    window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    supabase.from("quotes").update({ status: "sent" }).eq("id", id).then(() => qc.invalidateQueries({ queryKey: ["quote", id] }));
+    const to = q.client_contacts?.email ?? q.clients?.email ?? "";
+    if (!to) return toast.error("Klient nemá email");
+    setSendingEmail(true);
+    try {
+      const { base64, filename } = buildQuotePdfBase64(q);
+      await sendQuoteFn({
+        data: {
+          quoteId: q.id,
+          to,
+          pdfBase64: base64,
+          pdfFilename: filename,
+        },
+      });
+      toast.success(`Ponuka odoslaná na ${to}`);
+      qc.invalidateQueries({ queryKey: ["quote", id] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Odoslanie zlyhalo");
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   if (quote.isLoading) return <><AppHeader title="Kalkulácia" /><div className="p-6 text-muted-foreground">Načítavam…</div></>;
@@ -334,7 +353,10 @@ function QuoteDetail() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => window.print()}><Printer className="size-4 mr-1" />Tlačiť / PDF</Button>
-            <Button variant="outline" onClick={sendEmail}><Mail className="size-4 mr-1" />Odoslať emailom</Button>
+            <Button variant="outline" onClick={sendEmail} disabled={sendingEmail}>
+              {sendingEmail ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Mail className="size-4 mr-1" />}
+              Odoslať emailom
+            </Button>
             {res ? (
               <>
                 <Button variant="outline" onClick={() => navigate({ to: "/reservations/$id", params: { id: res.id } })}>
