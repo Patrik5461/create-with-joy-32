@@ -1,0 +1,2 @@
+ALTER TABLE public.attendance DROP CONSTRAINT IF EXISTS attendance_source_check;
+ALTER TABLE public.attendance ADD CONSTRAINT attendance_source_check CHECK (source = ANY (ARRAY['manual'::text, 'event'::text, 'helper_pin'::text]));
