@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as KatalogRouteImport } from './routes/katalog'
+import { Route as HelperRouteImport } from './routes/helper'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -56,6 +57,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const KatalogRoute = KatalogRouteImport.update({
   id: '/katalog',
   path: '/katalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelperRoute = HelperRouteImport.update({
+  id: '/helper',
+  path: '/helper',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -259,6 +265,7 @@ const AuthenticatedDocumentsContractIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/helper': typeof HelperRoute
   '/katalog': typeof KatalogRoute
   '/reset-password': typeof ResetPasswordRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
@@ -298,6 +305,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/helper': typeof HelperRoute
   '/katalog': typeof KatalogRoute
   '/reset-password': typeof ResetPasswordRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
@@ -337,6 +345,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/helper': typeof HelperRoute
   '/katalog': typeof KatalogRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
@@ -378,6 +387,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/helper'
     | '/katalog'
     | '/reset-password'
     | '/attendance'
@@ -417,6 +427,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/helper'
     | '/katalog'
     | '/reset-password'
     | '/attendance'
@@ -455,6 +466,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/helper'
     | '/katalog'
     | '/reset-password'
     | '/_authenticated/attendance'
@@ -496,6 +508,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  HelperRoute: typeof HelperRoute
   KatalogRoute: typeof KatalogRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   DotaznikTokenRoute: typeof DotaznikTokenRoute
@@ -517,6 +530,13 @@ declare module '@tanstack/react-router' {
       path: '/katalog'
       fullPath: '/katalog'
       preLoaderRoute: typeof KatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/helper': {
+      id: '/helper'
+      path: '/helper'
+      fullPath: '/helper'
+      preLoaderRoute: typeof HelperRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -885,6 +905,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  HelperRoute: HelperRoute,
   KatalogRoute: KatalogRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   DotaznikTokenRoute: DotaznikTokenRoute,
