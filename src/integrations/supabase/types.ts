@@ -1288,6 +1288,12 @@ export type Database = {
         Args: { _conv: string; _user: string }
         Returns: boolean
       }
+      overbooked_reservation_ids: {
+        Args: { _ids: string[] }
+        Returns: {
+          reservation_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "warehouse"

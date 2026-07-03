@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   type AdjustType, type PriceMode, type QuoteLine,
@@ -119,6 +119,58 @@ export function QuoteForm({ initial, quoteId }: Props) {
   });
 
   const [categoryFilter, setCategoryFilter] = useState<Record<string, string>>({});
+
+  // Availability window pulled from linked reservation (if any).
+  const reservationWindow = useQuery({
+    queryKey: ["quote-reservation-window", form.reservation_id],
+    enabled: !!form.reservation_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("reservations")
+        .select("id, load_at, available_from_at")
+        .eq("id", form.reservation_id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const [availability, setAvailability] = useState<Record<string, { qty: number; available: number }>>({});
+
+  useEffect(() => {
+    const win = reservationWindow.data;
+    if (!win?.load_at || !win?.available_from_at) {
+      setAvailability({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const results: Record<string, { qty: number; available: number }> = {};
+      await Promise.all(
+        lines
+          .filter((l) => l.kind === "furniture" && l.furniture_item_id)
+          .map(async (l) => {
+            const { data, error } = await supabase.rpc("check_item_availability", {
+              _item_id: l.furniture_item_id!,
+              _from: win.load_at,
+              _to: win.available_from_at,
+              _exclude_reservation: win.id,
+            });
+            if (!error && data?.[0]) {
+              results[l.id] = { qty: l.qty, available: data[0].available };
+            }
+          }),
+      );
+      if (!cancelled) setAvailability(results);
+    })();
+    return () => { cancelled = true; };
+  }, [reservationWindow.data, lines]);
+
+  const overbookLines = lines.filter((l) => {
+    const a = availability[l.id];
+    return a && l.qty > a.available;
+  });
+  const hasOverbook = overbookLines.length > 0;
 
   const totals = useMemo(() => computeTotals({
     lines,
@@ -257,6 +309,18 @@ export function QuoteForm({ initial, quoteId }: Props) {
     onError: (e: any) => toast.error(e.message ?? "Uloženie zlyhalo"),
   });
 
+  const handleSave = () => {
+    if (hasOverbook) {
+      const ok = typeof window !== "undefined"
+        ? window.confirm(
+            "Niektoré položky prekračujú skladovú dostupnosť v termíne prepojenej rezervácie.\n\nNaozaj chcete pokračovať v uložení kalkulácie?",
+          )
+        : true;
+      if (!ok) return;
+    }
+    save.mutate();
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -349,8 +413,22 @@ export function QuoteForm({ initial, quoteId }: Props) {
         </CardHeader>
         <CardContent className="space-y-2">
           {lines.length === 0 && <p className="text-sm text-muted-foreground">Pridajte položky nábytku alebo služby.</p>}
-          {lines.map((l) => (
-            <div key={l.id} className="rounded-md border p-3 grid gap-2 md:grid-cols-12 items-end">
+          {hasOverbook && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 text-amber-900 p-3 text-sm">
+              <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-medium">Prekročená skladová dostupnosť</div>
+                <div className="text-xs">
+                  Niektoré položky prekračujú počet voľných kusov v termíne prepojenej rezervácie. Kalkuláciu je možné uložiť, ale kusy bude potrebné dokúpiť alebo dopožičať.
+                </div>
+              </div>
+            </div>
+          )}
+          {lines.map((l) => {
+            const a = availability[l.id];
+            const over = a && l.qty > a.available;
+            return (
+            <div key={l.id} className={`rounded-md border p-3 grid gap-2 md:grid-cols-12 items-end ${over ? "border-amber-300 bg-amber-50/40" : ""}`}>
               {l.kind === "furniture" ? (
                 <div className="md:col-span-4 space-y-1">
                   <Label className="text-xs">Nábytok</Label>
@@ -422,8 +500,15 @@ export function QuoteForm({ initial, quoteId }: Props) {
                   <Trash2 className="size-4 text-rose-600" />
                 </Button>
               </div>
+              {over && (
+                <div className="md:col-span-12 text-[11px] text-amber-800 flex items-center gap-1">
+                  <AlertTriangle className="size-3" />
+                  Pozor: požadovaných {l.qty} ks, na sklade dostupných len {a.available} ks v termíne rezervácie (chýba {l.qty - a.available} ks).
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 
@@ -511,7 +596,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={() => navigate({ to: "/quotes" })}>Späť</Button>
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+        <Button onClick={handleSave} disabled={save.isPending}>
           {save.isPending && <Loader2 className="size-4 mr-1 animate-spin" />}
           {quoteId ? "Uložiť zmeny" : "Vytvoriť kalkuláciu"}
         </Button>

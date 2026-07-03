@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { RESERVATION_STATUSES, STATUS_LABEL, type ReservationStatus } from "@/lib/reservation-status";
 
@@ -149,7 +149,10 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.load_at, form.available_from_at, items.map((i) => i.furniture_item_id).join(",")]);
 
-  const hasConflict = useMemo(() => items.some((i) => i.availability && (i.availability.available < i.qty)), [items]);
+  const hasOverbook = useMemo(
+    () => items.some((i) => i.availability && i.availability.available < i.qty),
+    [items],
+  );
 
   const save = useMutation({
     mutationFn: async () => {
@@ -205,13 +208,21 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
       navigate({ to: "/reservations/$id", params: { id } });
     },
     onError: (e: any) => {
-      if (typeof e?.message === "string" && e.message.includes("INSUFFICIENT_STOCK")) {
-        toast.error("Nie je dostupný dostatočný počet kusov v zvolenom čase.");
-      } else {
-        toast.error(e?.message ?? "Chyba pri ukladaní");
-      }
+      toast.error(e?.message ?? "Chyba pri ukladaní");
     },
   });
+
+  const handleSave = () => {
+    if (hasOverbook) {
+      const ok = typeof window !== "undefined"
+        ? window.confirm(
+            "Niektoré položky prekračujú skladovú dostupnosť v zvolenom termíne.\n\nNaozaj chcete pokračovať v uložení?",
+          )
+        : true;
+      if (!ok) return;
+    }
+    save.mutate();
+  };
 
   const setClient = (id: string) => {
     const c = clients.data?.find((x: any) => x.id === id);
@@ -360,10 +371,27 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
                 <div className="col-span-7 md:col-span-4 text-xs">
                   {row.loading && <span className="text-muted-foreground">Kontrola…</span>}
                   {row.availability && (
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant="outline">Celkom: {row.availability.total}</Badge>
-                      <Badge variant="secondary">Rezervované: {row.availability.reserved}</Badge>
-                      <Badge variant={conflict ? "destructive" : "default"}>Voľné: {row.availability.available}</Badge>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant="outline">Celkom: {row.availability.total}</Badge>
+                        <Badge variant="secondary">Rezervované: {row.availability.reserved}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={
+                            conflict
+                              ? "border-amber-500 bg-amber-50 text-amber-800"
+                              : "border-emerald-500 bg-emerald-50 text-emerald-800"
+                          }
+                        >
+                          Voľné: {row.availability.available}
+                        </Badge>
+                      </div>
+                      {conflict && (
+                        <div className="text-[11px] text-amber-800">
+                          Pozor: požadovaných {row.qty} ks, dostupných len {row.availability.available} ks
+                          (chýba {row.qty - row.availability.available} ks).
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -373,10 +401,15 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
               </div>
             );
           })}
-          {hasConflict && (
-            <div className="flex items-center gap-2 rounded-md bg-destructive/10 text-destructive p-3 text-sm">
-              <AlertCircle className="size-4" />
-              <span>Niektoré položky nemajú dostatočný počet kusov v zvolenom čase. Uloženie nebude možné.</span>
+          {hasOverbook && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 text-amber-900 p-3 text-sm">
+              <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-medium">Prekročená skladová dostupnosť</div>
+                <div className="text-xs">
+                  Niektoré položky prekračujú počet dostupných kusov v zvolenom čase. Rezerváciu je možné uložiť, ale kusy bude potrebné dokúpiť alebo dopožičať.
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
@@ -430,7 +463,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={() => navigate({ to: "/reservations" })}>Zrušiť</Button>
-        <Button onClick={() => save.mutate()} disabled={save.isPending || !form.event_name || !form.load_at || !form.available_from_at || hasConflict}>
+        <Button onClick={handleSave} disabled={save.isPending || !form.event_name || !form.load_at || !form.available_from_at}>
           {existingId ? "Uložiť zmeny" : "Vytvoriť rezerváciu"}
         </Button>
       </div>
