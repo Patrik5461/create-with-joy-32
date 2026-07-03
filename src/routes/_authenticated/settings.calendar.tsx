@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, Check, RefreshCw, ExternalLink, Calendar, Apple, Globe } from "lucide-react";
 import { toast } from "sonner";
+import { getPublicAppUrl } from "@/lib/public-url";
 
 export const Route = createFileRoute("/_authenticated/settings/calendar")({
   component: CalendarSettings,
