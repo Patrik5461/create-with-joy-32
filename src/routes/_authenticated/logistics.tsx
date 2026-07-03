@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Truck, Package, Plus, Pencil, Trash2, Car } from "lucide-react";
+import { ChevronLeft, ChevronRight, Truck, Package, Plus, Pencil, Trash2, Car, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -156,10 +156,13 @@ function Logistics() {
         </div>
 
         {view === "day" ? (
-          <div className="grid lg:grid-cols-2 gap-4">
-            <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
-            <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
-          </div>
+          <>
+            <div className="grid lg:grid-cols-2 gap-4">
+              <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
+              <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
+            </div>
+            <StaffDay day={cursor} />
+          </>
         ) : (
           <RangeList range={range} byDay={byDay} onSave={(p: any) => saveNote.mutate(p)} onPickDay={(d) => { setCursor(d); setView("day"); }} />
         )}
@@ -495,5 +498,100 @@ function SurveySummary({ survey }: { survey?: any }) {
       {contact && <div>Kontakt na mieste: <strong>{contact}</strong></div>}
       {lines.map((l, i) => <div key={i}>{l}</div>)}
     </div>
+  );
+}
+
+type StaffDayRow = {
+  id: string;
+  reservation_id: string;
+  user_id: string | null;
+  external_name: string | null;
+  role: string | null;
+  planned_start: string | null;
+  planned_end: string | null;
+  arrived: boolean;
+  departed: boolean;
+};
+
+function StaffDay({ day }: { day: Date }) {
+  const from = new Date(day); from.setHours(0, 0, 0, 0);
+  const to = new Date(day); to.setHours(23, 59, 59, 999);
+  const query = useQuery({
+    queryKey: ["logistics-staff-day", from.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from as any)("reservation_staff")
+        .select("id, reservation_id, user_id, external_name, role, planned_start, planned_end, arrived, departed")
+        .not("planned_start", "is", null)
+        .gte("planned_start", from.toISOString())
+        .lte("planned_start", to.toISOString())
+        .order("planned_start", { ascending: true });
+      if (error) throw error;
+      const rows = (data ?? []) as StaffDayRow[];
+      const userIds = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean))) as string[];
+      const resIds = Array.from(new Set(rows.map((r) => r.reservation_id)));
+      const [{ data: profs }, { data: reservations }] = await Promise.all([
+        userIds.length
+          ? supabase.from("profiles").select("id, full_name, email, phone").in("id", userIds)
+          : Promise.resolve({ data: [] as any[] }),
+        resIds.length
+          ? supabase.from("reservations").select("id, event_name, venue, clients(company_name)").in("id", resIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const pMap = new Map<string, any>();
+      for (const p of (profs ?? []) as any[]) pMap.set(p.id, p);
+      const rMap = new Map<string, any>();
+      for (const r of (reservations ?? []) as any[]) rMap.set(r.id, r);
+      return rows.map((r) => ({ ...r, profile: r.user_id ? pMap.get(r.user_id) ?? null : null, reservation: rMap.get(r.reservation_id) ?? null }));
+    },
+  });
+
+  const rows = query.data ?? [];
+  const byRes = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const arr = byRes.get(r.reservation_id) ?? [];
+    arr.push(r);
+    byRes.set(r.reservation_id, arr);
+  }
+
+  return (
+    <Card>
+      <CardHeader className="py-3">
+        <CardTitle className="text-base flex items-center gap-2"><Users className="size-4" />Personál na dnes ({rows.length})</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {query.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
+        {!query.isLoading && rows.length === 0 && (
+          <p className="text-sm text-muted-foreground">Na tento deň nie je naplánovaný žiadny personál.</p>
+        )}
+        <div className="grid gap-3 md:grid-cols-2">
+          {Array.from(byRes.entries()).map(([resId, list]) => (
+            <div key={resId} className="rounded-md border p-3">
+              <Link to="/reservations/$id" params={{ id: resId }} className="text-sm font-medium hover:underline block">
+                {list[0].reservation?.event_name ?? "Rezervácia"}
+              </Link>
+              <div className="text-xs text-muted-foreground mb-2">
+                {[list[0].reservation?.clients?.company_name, list[0].reservation?.venue].filter(Boolean).join(" · ")}
+              </div>
+              <div className="space-y-1.5">
+                {list.map((r) => {
+                  const name = r.user_id ? (r.profile?.full_name || r.profile?.email || "—") : (r.external_name || "—");
+                  const cls = r.departed ? "bg-slate-100 text-slate-700" : r.arrived ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900";
+                  const time = `${r.planned_start ? format(new Date(r.planned_start), "HH:mm") : "—"}–${r.planned_end ? format(new Date(r.planned_end), "HH:mm") : "—"}`;
+                  return (
+                    <div key={r.id} className={`flex items-center justify-between gap-2 text-xs rounded px-2 py-1.5 ${cls}`}>
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{name}{r.role ? ` · ${r.role}` : ""}</div>
+                        {r.profile?.phone && <div className="text-[11px] opacity-80">{r.profile.phone}</div>}
+                      </div>
+                      <div className="font-mono whitespace-nowrap">{time}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
