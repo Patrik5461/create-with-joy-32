@@ -82,16 +82,24 @@ export async function syncReservationFromQuote(reservationId: string, quoteId: s
 export async function createReservationFromQuote(quoteId: string): Promise<string> {
   const { data: q, error } = await supabase
     .from("quotes")
-    .select("id, quote_number, quote_group_id, client_id, contact_id, issue_date, notes, valid_until, client_contacts(full_name, phone, email)")
+    .select("id, quote_number, quote_group_id, client_id, contact_id, issue_date, event_start_at, event_end_at, notes, valid_until, client_contacts(full_name, phone, email)")
     .eq("id", quoteId)
     .maybeSingle();
   if (error) throw error;
   if (!q) throw new Error("Kalkulácia sa nenašla.");
 
-  // Reasonable default time window derived from issue_date.
-  const base = q.issue_date ? new Date(q.issue_date + "T08:00:00") : new Date();
-  const loadAt = base.toISOString();
-  const availableFrom = new Date(base.getTime() + 2 * 24 * 3600 * 1000).toISOString();
+  // Prefer explicit event window from the quote; fall back to a sane default around issue_date.
+  const anyQ = q as any;
+  let loadAt: string;
+  let availableFrom: string;
+  if (anyQ.event_start_at && anyQ.event_end_at) {
+    loadAt = new Date(anyQ.event_start_at).toISOString();
+    availableFrom = new Date(anyQ.event_end_at).toISOString();
+  } else {
+    const base = q.issue_date ? new Date(q.issue_date + "T08:00:00") : new Date();
+    loadAt = base.toISOString();
+    availableFrom = new Date(base.getTime() + 2 * 24 * 3600 * 1000).toISOString();
+  }
 
   const contact = (q as any).client_contacts;
   const insertPayload: any = {
