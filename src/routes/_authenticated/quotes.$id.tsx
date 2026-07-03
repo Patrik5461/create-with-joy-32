@@ -156,6 +156,8 @@ function QuoteDetail() {
         status: "draft",
         issue_date: new Date().toISOString().slice(0, 10),
         valid_until: q.valid_until,
+        event_start_at: q.event_start_at,
+        event_end_at: q.event_end_at,
         vat_rate: q.vat_rate,
         discount_type: q.discount_type,
         discount_value: q.discount_value,
@@ -417,6 +419,8 @@ function QuoteDetail() {
             <CardContent className="text-sm space-y-1">
               <div><span className="text-muted-foreground">Dátum vystavenia:</span> {new Date(q.issue_date).toLocaleDateString("sk-SK")}</div>
               {q.valid_until && <div><span className="text-muted-foreground">Platnosť do:</span> {new Date(q.valid_until).toLocaleDateString("sk-SK")}</div>}
+              {q.event_start_at && <div><span className="text-muted-foreground">Začiatok eventu:</span> {new Date(q.event_start_at).toLocaleString("sk-SK")}</div>}
+              {q.event_end_at && <div><span className="text-muted-foreground">Koniec eventu:</span> {new Date(q.event_end_at).toLocaleString("sk-SK")}</div>}
               {q.reservations && <div><span className="text-muted-foreground">Rezervácia:</span> {q.reservations.event_name}</div>}
               <div><span className="text-muted-foreground">DPH:</span> {q.vat_rate}%</div>
               <div><span className="text-muted-foreground">Verzia:</span> v{q.version_number} · vytvorená {new Date(q.created_at).toLocaleString("sk-SK")}{q.creator?.full_name ? ` · ${q.creator.full_name}` : ""}</div>
