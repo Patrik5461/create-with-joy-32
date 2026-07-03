@@ -139,7 +139,7 @@ export function QrScannerDialog({
 
         <div
           id={SCANNER_ID}
-          className="w-full aspect-square bg-black rounded-md overflow-hidden"
+          className="w-full aspect-square bg-black rounded-md overflow-hidden relative [&_video]:!w-full [&_video]:!h-full [&_video]:!object-cover"
         />
 
         {error && (
