@@ -91,7 +91,11 @@ export const helperPunch = createServerFn({ method: "POST" })
       _action: data.action,
     });
     if (error) throw new Error(error.message);
-    return row as Record<string, unknown>;
+    return (row ?? null) as unknown as {
+      id: string;
+      clock_in: string;
+      clock_out: string | null;
+    } | null;
   });
 
 // -------- Admin (authenticated + admin role): manage helpers --------
@@ -199,7 +203,7 @@ export const adminUpdateHelper = createServerFn({ method: "POST" })
   })
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
-    const patch: Record<string, unknown> = {};
+    const patch: { name?: string; is_active?: boolean; note?: string | null } = {};
     if (data.name !== undefined) patch.name = data.name;
     if (data.is_active !== undefined) patch.is_active = data.is_active;
     if (data.note !== undefined) patch.note = data.note;
