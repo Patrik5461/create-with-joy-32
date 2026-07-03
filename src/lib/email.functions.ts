@@ -13,7 +13,7 @@ function cleanEmail(v: unknown): string | null {
 async function requireAdminOrManager(context: any): Promise<string[]> {
   const { supabase, userId } = context;
   const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-  const roles = (data ?? []).map((r: any) => r.role as string);
+  const roles = ((data ?? []) as any[]).map((r) => r.role as string);
   if (!roles.some((r) => r === "admin" || r === "manager")) {
     throw new Error("Forbidden");
   }
@@ -75,7 +75,7 @@ export const updateEmailSettings = createServerFn({ method: "POST" })
       if (typeof data[k] === "string") patch[k] = (data[k] as string).trim().slice(0, 300);
     }
 
-    const { error } = await supabase.from("email_settings").update(patch).eq("id", 1);
+    const { error } = await supabase.from("email_settings").update(patch as any).eq("id", 1);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
