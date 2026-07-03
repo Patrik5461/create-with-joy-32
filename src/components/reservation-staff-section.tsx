@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Users, Plus, Trash2, Pencil, Clock, Phone, Mail } from "lucide-react";
+import { Users, Plus, Trash2, Pencil, Clock, Phone, Mail, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { format } from "date-fns";
@@ -191,7 +191,10 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
       const { error } = await (supabase.from as any)("reservation_staff").update(patch).eq("id", row.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["reservation-staff", reservationId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reservation-staff", reservationId] });
+      qc.invalidateQueries({ queryKey: ["logistics-staff-day"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -204,7 +207,10 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
       const { error } = await (supabase.from as any)("reservation_staff").update(patch).eq("id", row.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["reservation-staff", reservationId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reservation-staff", reservationId] });
+      qc.invalidateQueries({ queryKey: ["logistics-staff-day"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -214,7 +220,10 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
       const { error } = await (supabase.from as any)("reservation_staff").update({ [field]: iso }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["reservation-staff", reservationId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reservation-staff", reservationId] });
+      qc.invalidateQueries({ queryKey: ["logistics-staff-day"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -224,6 +233,13 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
     const done = list.filter((r) => r.departed).length;
     const waiting = list.filter((r) => !r.arrived).length;
     return { total: list.length, present, done, waiting };
+  }, [staff.data]);
+
+  const overdue = useMemo(() => {
+    const now = Date.now();
+    return (staff.data ?? []).filter(
+      (r) => !r.arrived && r.planned_start && new Date(r.planned_start).getTime() < now,
+    );
   }, [staff.data]);
 
   return (
@@ -247,6 +263,25 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
       </CardHeader>
       <CardContent className="space-y-2">
         {staff.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
+        {overdue.length > 0 && (
+          <div className="rounded-md border border-red-300 bg-red-50 text-red-900 p-3 flex items-start gap-2">
+            <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+            <div className="text-xs">
+              <div className="font-semibold mb-1">
+                Nedorazili ({overdue.length}) — plánovaný čas už uplynul
+              </div>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {overdue.map((r) => (
+                  <li key={r.id}>
+                    {displayName(r)}
+                    {r.role ? ` · ${r.role}` : ""}
+                    {r.planned_start ? ` · ${format(new Date(r.planned_start), "d.M. HH:mm", { locale: sk })}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
         {!staff.isLoading && (staff.data?.length ?? 0) === 0 && (
           <p className="text-sm text-muted-foreground">
             Zatiaľ žiadny personál.{canManage ? " Pridajte prvého človeka tlačidlom vyššie." : ""}

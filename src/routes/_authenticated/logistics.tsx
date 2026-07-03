@@ -560,6 +560,10 @@ function StaffDay({ day, reservations }: { day: Date; reservations: any[] }) {
     arr.push(r);
     byRes.set(r.reservation_id, arr);
   }
+  const nowMs = Date.now();
+  const overdueRows = rows.filter(
+    (r: any) => !r.arrived && r.planned_start && new Date(r.planned_start).getTime() < nowMs,
+  );
 
   return (
     <Card>
@@ -567,6 +571,36 @@ function StaffDay({ day, reservations }: { day: Date; reservations: any[] }) {
         <CardTitle className="text-base flex items-center gap-2"><Users className="size-4" />Personál na dnes ({rows.length})</CardTitle>
       </CardHeader>
       <CardContent>
+        {overdueRows.length > 0 && (
+          <div className="mb-3 rounded-md border border-red-300 bg-red-50 text-red-900 p-3 text-xs">
+            <div className="font-semibold mb-1">
+              ⚠ Nedorazili ({overdueRows.length}) — plánovaný čas už uplynul
+            </div>
+            <ul className="space-y-0.5">
+              {overdueRows.map((s: any) => {
+                const name = s.user_id ? (s.profile?.full_name || s.profile?.email || "—") : (s.external_name || "—");
+                return (
+                  <li key={s.id} className="flex justify-between gap-2">
+                    <span className="truncate">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFor(s.reservation_id)}
+                        className="underline underline-offset-2 hover:no-underline"
+                      >
+                        {name}
+                      </button>
+                      {s.role ? ` · ${s.role}` : ""}
+                      {s.reservation?.event_name ? ` · ${s.reservation.event_name}` : ""}
+                    </span>
+                    <span className="font-mono whitespace-nowrap">
+                      {s.planned_start ? format(new Date(s.planned_start), "HH:mm") : "—"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         {query.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
         {!query.isLoading && uniqueReservations.length === 0 && (
           <p className="text-sm text-muted-foreground">Na tento deň nie sú žiadne akcie (nakládky ani návraty).</p>
