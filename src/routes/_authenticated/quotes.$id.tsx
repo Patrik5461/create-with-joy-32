@@ -132,14 +132,41 @@ function QuoteDetail() {
         .update({ deleted_at: new Date().toISOString(), deleted_by: userData?.user?.id ?? null })
         .eq("id", id);
       if (error) throw error;
+
+      // Ak sme zmazali aktuálnu verziu, povýš najvyššiu zostávajúcu verziu skupiny na aktuálnu,
+      // aby sa kalkulácia nestratila zo zoznamu (zoznam filtruje is_current=true).
+      const q = quote.data as any;
+      if (q?.is_current && q?.quote_group_id) {
+        const { data: remaining } = await supabase
+          .from("quotes")
+          .select("id, version_number")
+          .eq("quote_group_id", q.quote_group_id)
+          .is("deleted_at", null)
+          .order("version_number", { ascending: false })
+          .limit(1);
+        const next = (remaining ?? [])[0];
+        if (next) {
+          await supabase.from("quotes").update({ is_current: true }).eq("id", next.id);
+        }
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
       qc.invalidateQueries({ queryKey: ["quotes-trash"] });
-      toast.success("Kalkulácia presunutá do koša", {
-        description: "Nájdeš ju v Kalkulácie → Kôš a môžeš ju obnoviť.",
-      });
-      navigate({ to: "/quotes" });
+      qc.invalidateQueries({ queryKey: ["quote-versions"] });
+      const q = quote.data as any;
+      const others = (versions.data ?? []).filter((v: any) => v.id !== q.id);
+      toast.success(
+        others.length > 0 ? `Verzia v${q.version_number} presunutá do koša` : "Kalkulácia presunutá do koša",
+        { description: "Nájdeš ju v Kalkulácie → Kôš a môžeš ju obnoviť." },
+      );
+      if (others.length > 0) {
+        // Prejdi na najnovšiu zostávajúcu verziu.
+        const next = [...others].sort((a: any, b: any) => b.version_number - a.version_number)[0];
+        navigate({ to: "/quotes/$id", params: { id: next.id } });
+      } else {
+        navigate({ to: "/quotes" });
+      }
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -351,9 +378,17 @@ function QuoteDetail() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{q.is_current ? "Zmazať túto verziu kalkulácie?" : "Zmazať túto staršiu verziu?"}</AlertDialogTitle>
+                  <AlertDialogTitle>Zmazať verziu v{q.version_number}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Kalkulácia bude presunutá do koša. Môžeš ju neskôr obnoviť cez Kalkulácie → Kôš.
+                    {(versions.data?.length ?? 1) > 1 ? (
+                      <>
+                        Zmaže sa <span className="font-semibold">iba verzia v{q.version_number}</span> — ostatné verzie kalkulácie <span className="font-mono">{q.quote_number}</span> zostanú zachované.
+                        {q.is_current && " Najnovšia zostávajúca verzia sa stane aktuálnou."}
+                        {" "}Verziu nájdeš v Kalkulácie → Kôš a môžeš ju obnoviť.
+                      </>
+                    ) : (
+                      <>Kalkulácia bude presunutá do koša. Môžeš ju neskôr obnoviť cez Kalkulácie → Kôš.</>
+                    )}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -362,7 +397,7 @@ function QuoteDetail() {
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     onClick={() => remove.mutate()}
                   >
-                    Zmazať
+                    {(versions.data?.length ?? 1) > 1 ? `Zmazať v${q.version_number}` : "Zmazať"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
