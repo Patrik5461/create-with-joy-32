@@ -35,11 +35,22 @@ interface QuoteRecord {
 interface Props {
   initial?: QuoteRecord & { items?: QuoteLine[] };
   quoteId?: string;
+  /**
+   * Ak je vyplnené, uloženie vytvorí NOVÚ verziu v rovnakej skupine
+   * (rovnaké quote_number, version_number = next_version, is_current = true)
+   * a doterajšie verzie skupiny sa označia ako neaktuálne.
+   */
+  versionParent?: {
+    quote_group_id: string;
+    quote_number: string;
+    next_version: number;
+    prev_id: string;
+  };
 }
 
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
-export function QuoteForm({ initial, quoteId }: Props) {
+export function QuoteForm({ initial, quoteId, versionParent }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -274,7 +285,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
     mutationFn: async () => {
       if (!form.client_id) throw new Error("Vyberte klienta.");
       if (lines.length === 0) throw new Error("Pridajte aspoň jednu položku.");
-      const payload = {
+      const basePayload = {
         client_id: form.client_id,
         contact_id: form.contact_id,
         reservation_id: form.reservation_id,
@@ -293,13 +304,36 @@ export function QuoteForm({ initial, quoteId }: Props) {
         vat_amount: totals.vatAmount,
         total_with_vat: totals.totalWithVat,
       };
-      let id = quoteId;
-      if (id) {
-        const { error } = await supabase.from("quotes").update(payload).eq("id", id);
+      const { data: userData } = await supabase.auth.getUser();
+      const createdBy = userData?.user?.id ?? null;
+      let id: string;
+      if (versionParent) {
+        // Označ všetky staršie verzie skupiny ako neaktuálne PRED vložením novej,
+        // aby partial-unique index (jedna aktuálna na skupinu) neblokoval insert.
+        const { error: eOff } = await supabase
+          .from("quotes")
+          .update({ is_current: false })
+          .eq("quote_group_id", versionParent.quote_group_id);
+        if (eOff) throw eOff;
+        const { data, error } = await supabase.from("quotes").insert({
+          ...basePayload,
+          quote_number: versionParent.quote_number,
+          quote_group_id: versionParent.quote_group_id,
+          version_number: versionParent.next_version,
+          is_current: true,
+          parent_version_id: versionParent.prev_id,
+          created_by: createdBy,
+        }).select("id").single();
         if (error) throw error;
-        await supabase.from("quote_items").delete().eq("quote_id", id);
+        id = data.id;
       } else {
-        const { data, error } = await supabase.from("quotes").insert({ ...payload, quote_number: "" }).select("id").single();
+        const { data, error } = await supabase.from("quotes").insert({
+          ...basePayload,
+          quote_number: "",
+          is_current: true,
+          version_number: 1,
+          created_by: createdBy,
+        }).select("id").single();
         if (error) throw error;
         id = data.id;
       }
@@ -324,7 +358,8 @@ export function QuoteForm({ initial, quoteId }: Props) {
     onSuccess: (id) => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
       qc.invalidateQueries({ queryKey: ["quote", id] });
-      toast.success("Kalkulácia uložená");
+      qc.invalidateQueries({ queryKey: ["quote-versions"] });
+      toast.success(versionParent ? `Uložené ako nová verzia v${versionParent.next_version}` : "Kalkulácia uložená");
       navigate({ to: "/quotes/$id", params: { id } });
     },
     onError: (e: any) => toast.error(e.message ?? "Uloženie zlyhalo"),
@@ -625,7 +660,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
         <Button variant="outline" onClick={() => navigate({ to: "/quotes" })}>Späť</Button>
         <Button onClick={handleSave} disabled={save.isPending}>
           {save.isPending && <Loader2 className="size-4 mr-1 animate-spin" />}
-          {quoteId ? "Uložiť zmeny" : "Vytvoriť kalkuláciu"}
+          {versionParent ? `Uložiť ako novú verziu (v${versionParent.next_version})` : "Vytvoriť kalkuláciu"}
         </Button>
       </div>
     </div>
