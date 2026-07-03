@@ -66,7 +66,8 @@ function QuotesList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("id, quote_number, status, issue_date, total_with_vat, client_id, clients(company_name), reservations(event_name)")
+        .select("id, quote_number, status, issue_date, total_with_vat, client_id, version_number, is_current, clients(company_name), reservations(event_name)")
+        .eq("is_current", true)
         .order("issue_date", { ascending: false });
       if (error) throw error;
       return data;
@@ -158,6 +159,7 @@ function QuotesList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Číslo</TableHead>
+                  <TableHead className="w-16">Verzia</TableHead>
                   <TableHead>Klient</TableHead>
                   <TableHead>Event</TableHead>
                   <TableHead>Dátum</TableHead>
@@ -166,11 +168,12 @@ function QuotesList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quotes.isLoading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Načítavam…</TableCell></TableRow>}
-                {!quotes.isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Žiadne kalkulácie.</TableCell></TableRow>}
+                {quotes.isLoading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Načítavam…</TableCell></TableRow>}
+                {!quotes.isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Žiadne kalkulácie.</TableCell></TableRow>}
                 {filtered.map((q: any) => (
                   <TableRow key={q.id} className="cursor-pointer" onClick={() => navigate({ to: "/quotes/$id", params: { id: q.id } })}>
                     <TableCell className="font-mono font-medium">{q.quote_number}</TableCell>
+                    <TableCell><Badge variant={q.version_number > 1 ? "secondary" : "outline"} className="font-mono">v{q.version_number}</Badge></TableCell>
                     <TableCell>{q.clients?.company_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{q.reservations?.event_name ?? "—"}</TableCell>
                     <TableCell>{new Date(q.issue_date).toLocaleDateString("sk-SK")}</TableCell>
