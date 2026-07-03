@@ -924,6 +924,8 @@ export type Database = {
           deleted_by: string | null
           discount_type: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value: number
+          event_end_at: string | null
+          event_start_at: string | null
           id: string
           is_current: boolean
           issue_date: string
@@ -954,6 +956,8 @@ export type Database = {
           deleted_by?: string | null
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value?: number
+          event_end_at?: string | null
+          event_start_at?: string | null
           id?: string
           is_current?: boolean
           issue_date?: string
@@ -984,6 +988,8 @@ export type Database = {
           deleted_by?: string | null
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value?: number
+          event_end_at?: string | null
+          event_start_at?: string | null
           id?: string
           is_current?: boolean
           issue_date?: string
