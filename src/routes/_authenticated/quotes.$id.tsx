@@ -5,7 +5,8 @@ import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Printer, Copy, Trash2, Mail, Loader2 } from "lucide-react";
+import { Printer, Copy, Trash2, Mail, Loader2, History } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useState } from "react";
 import { QuoteForm } from "@/components/quote-form";
@@ -31,7 +32,36 @@ function QuoteDetail() {
         .eq("id", id)
         .single();
       if (error) throw error;
-      return data;
+      let creator: { full_name: string | null; email: string | null } | null = null;
+      if ((data as any).created_by) {
+        const { data: p } = await supabase
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", (data as any).created_by)
+          .maybeSingle();
+        creator = (p as any) ?? null;
+      }
+      return { ...(data as any), creator };
+    },
+  });
+
+  const versions = useQuery({
+    queryKey: ["quote-versions", (quote.data as any)?.quote_group_id],
+    enabled: !!(quote.data as any)?.quote_group_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("quotes")
+        .select("id, version_number, is_current, created_at, created_by")
+        .eq("quote_group_id", (quote.data as any).quote_group_id)
+        .order("version_number", { ascending: false });
+      if (error) throw error;
+      const ids = Array.from(new Set((data ?? []).map((v: any) => v.created_by).filter(Boolean)));
+      const profileMap = new Map<string, { full_name: string | null; email: string | null }>();
+      if (ids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+        for (const p of (profs ?? []) as any[]) profileMap.set(p.id, { full_name: p.full_name, email: p.email });
+      }
+      return (data ?? []).map((v: any) => ({ ...v, creator: v.created_by ? profileMap.get(v.created_by) ?? null : null }));
     },
   });
 
@@ -71,6 +101,8 @@ function QuoteDetail() {
         total_without_vat: q.total_without_vat,
         vat_amount: q.vat_amount,
         total_with_vat: q.total_with_vat,
+        version_number: 1,
+        is_current: true,
       }).select("id").single();
       if (error) throw error;
       const rows = (q.quote_items ?? []).map((it: any, idx: number) => ({
@@ -100,8 +132,9 @@ function QuoteDetail() {
     if (!quote.data) return;
     const q = quote.data as any;
     const to = q.clients?.email ?? "";
-    const subject = `Cenová ponuka ${q.quote_number}`;
-    const body = `Dobrý deň,\n\nzasielame Vám cenovú ponuku č. ${q.quote_number} v celkovej sume ${formatEur(Number(q.total_with_vat))} (s DPH).\n\nS pozdravom,\nMima Production`;
+    const vLabel = `v${q.version_number}`;
+    const subject = `Cenová ponuka ${q.quote_number} (${vLabel})`;
+    const body = `Dobrý deň,\n\nzasielame Vám cenovú ponuku č. ${q.quote_number} (${vLabel}) v celkovej sume ${formatEur(Number(q.total_with_vat))} (s DPH).\n\nS pozdravom,\nMima Production`;
     window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     supabase.from("quotes").update({ status: "sent" }).eq("id", id).then(() => qc.invalidateQueries({ queryKey: ["quote", id] }));
   };
@@ -110,6 +143,8 @@ function QuoteDetail() {
   if (!quote.data) return <><AppHeader title="Kalkulácia" /><div className="p-6">Nenájdené.</div></>;
 
   const q = quote.data as any;
+  const maxVersion = Math.max(q.version_number ?? 1, ...(versions.data?.map((v) => v.version_number) ?? [1]));
+  const nextVersion = maxVersion + 1;
 
   if (editing) {
     const items: QuoteLine[] = (q.quote_items ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order).map((it: any) => ({
@@ -124,10 +159,23 @@ function QuoteDetail() {
     }));
     return (
       <>
-        <AppHeader title={`Upraviť ${q.quote_number}`} />
+        <AppHeader title={`Upraviť ${q.quote_number} → v${nextVersion}`} />
         <div className="p-4 md:p-6 max-w-5xl">
-          <Button variant="outline" size="sm" onClick={() => setEditing(false)} className="mb-3">Zrušiť úpravu</Button>
-          <QuoteForm quoteId={id} initial={{ ...q, items }} />
+          <div className="mb-3 flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Zrušiť úpravu</Button>
+            <div className="text-xs text-muted-foreground">
+              Úpravou sa vytvorí nová verzia <span className="font-semibold">v{nextVersion}</span>; verzia v{q.version_number} zostane zachovaná.
+            </div>
+          </div>
+          <QuoteForm
+            initial={{ ...q, items }}
+            versionParent={{
+              quote_group_id: q.quote_group_id,
+              quote_number: q.quote_number,
+              next_version: nextVersion,
+              prev_id: q.id,
+            }}
+          />
         </div>
       </>
     );
@@ -140,7 +188,29 @@ function QuoteDetail() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-semibold tracking-tight">{q.quote_number}</h2>
+            <Badge variant={q.is_current ? "default" : "outline"} className="font-mono">
+              v{q.version_number}{q.is_current ? " · aktuálna" : " · staršia"}
+            </Badge>
             <Badge variant={QUOTE_STATUS_VARIANT[q.status as keyof typeof QUOTE_STATUS_VARIANT]}>{QUOTE_STATUS_LABEL[q.status as keyof typeof QUOTE_STATUS_LABEL]}</Badge>
+            {versions.data && versions.data.length > 1 && (
+              <div className="flex items-center gap-1.5">
+                <History className="size-3.5 text-muted-foreground" />
+                <Select
+                  value={q.id}
+                  onValueChange={(vid) => { if (vid !== q.id) navigate({ to: "/quotes/$id", params: { id: vid } }); }}
+                >
+                  <SelectTrigger className="h-8 w-[260px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+              {versions.data.map((v: any) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        v{v.version_number}{v.is_current ? " · aktuálna" : ""} — {new Date(v.created_at).toLocaleString("sk-SK")}
+                  {v.creator?.full_name ? ` · ${v.creator.full_name}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => window.print()}><Printer className="size-4 mr-1" />Tlačiť / PDF</Button>
@@ -149,12 +219,21 @@ function QuoteDetail() {
               {duplicate.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Copy className="size-4 mr-1" />}
               Duplikovať
             </Button>
-            <Button onClick={() => setEditing(true)}>Upraviť</Button>
-            <Button variant="destructive" onClick={() => { if (confirm("Naozaj zmazať túto kalkuláciu?")) remove.mutate(); }}>
+            <Button onClick={() => setEditing(true)} disabled={!q.is_current} title={!q.is_current ? "Upraviť je možné len aktuálnu verziu" : undefined}>
+              Upraviť → v{nextVersion}
+            </Button>
+            <Button variant="destructive" onClick={() => { if (confirm(q.is_current ? "Naozaj zmazať túto verziu kalkulácie?" : "Naozaj zmazať túto staršiu verziu?")) remove.mutate(); }}>
               <Trash2 className="size-4 mr-1" />Zmazať
             </Button>
           </div>
         </div>
+
+        {!q.is_current && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-900 p-3 text-sm">
+            Prezeráte staršiu verziu <span className="font-semibold">v{q.version_number}</span> (len na čítanie).
+            Kliknutím na dropdown verzií prejdite na aktuálnu.
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-4">
           <Card>
@@ -185,6 +264,7 @@ function QuoteDetail() {
               {q.valid_until && <div><span className="text-muted-foreground">Platnosť do:</span> {new Date(q.valid_until).toLocaleDateString("sk-SK")}</div>}
               {q.reservations && <div><span className="text-muted-foreground">Rezervácia:</span> {q.reservations.event_name}</div>}
               <div><span className="text-muted-foreground">DPH:</span> {q.vat_rate}%</div>
+              <div><span className="text-muted-foreground">Verzia:</span> v{q.version_number} · vytvorená {new Date(q.created_at).toLocaleString("sk-SK")}{q.creator?.full_name ? ` · ${q.creator.full_name}` : ""}</div>
             </CardContent>
           </Card>
         </div>
