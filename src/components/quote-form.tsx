@@ -228,6 +228,18 @@ export function QuoteForm({ initial, quoteId }: Props) {
       days: 1,
     }, ...ls]);
   };
+  const addCustomFurnitureRow = () => {
+    setLines((ls) => [{
+      id: uid(),
+      kind: "furniture",
+      furniture_item_id: null,
+      name: "",
+      qty: 1,
+      price_mode: "fixed",
+      unit_price: 0,
+      days: 1,
+    }, ...ls]);
+  };
   const addServiceRow = () => {
     setLines((ls) => [{
       id: uid(),
@@ -417,6 +429,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
           <CardTitle className="text-base">Položky</CardTitle>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={addFurnitureRow}><Plus className="size-3.5 mr-1" />Nábytok</Button>
+            <Button size="sm" variant="outline" onClick={addCustomFurnitureRow}><Plus className="size-3.5 mr-1" />Mimo skladu</Button>
             <Button size="sm" variant="outline" onClick={addServiceRow}><Plus className="size-3.5 mr-1" />Služba</Button>
           </div>
         </CardHeader>
@@ -438,7 +451,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
             const over = a && l.qty > a.available;
             return (
             <div key={l.id} className={`rounded-md border p-3 grid gap-2 md:grid-cols-12 items-end ${over ? "border-amber-300 bg-amber-50/40" : ""}`}>
-              {l.kind === "furniture" ? (
+              {l.kind === "furniture" && l.furniture_item_id !== null ? (
                 <div className="md:col-span-4 space-y-1">
                   <Label className="text-xs">Nábytok</Label>
                   <div className="grid grid-cols-2 gap-2">
@@ -468,6 +481,11 @@ export function QuoteForm({ initial, quoteId }: Props) {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+              ) : l.kind === "furniture" ? (
+                <div className="md:col-span-4 space-y-1">
+                  <Label className="text-xs">Nábytok mimo skladu</Label>
+                  <Input value={l.name} onChange={(e) => updateLine(l.id, { name: e.target.value })} placeholder="napr. Špeciálny stôl (dopožičaný)" />
                 </div>
               ) : (
                 <div className="md:col-span-4 space-y-1">
