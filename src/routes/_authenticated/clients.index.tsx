@@ -370,8 +370,51 @@ function ClientDialog({ item, onClose }: { item: any; onClose: () => void }) {
         <DialogDescription>Údaje o klientovi.</DialogDescription>
       </DialogHeader>
       <div className="grid sm:grid-cols-2 gap-3">
-        <div className="space-y-1.5 sm:col-span-2"><Label>Názov firmy</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} /></div>
-        <div className="space-y-1.5"><Label>IČO</Label><Input value={form.ico} onChange={(e) => setForm({ ...form, ico: e.target.value })} /></div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label>Názov firmy</Label>
+          <Popover open={nameOpen && nameResults.length > 0} onOpenChange={setNameOpen}>
+            <PopoverTrigger asChild>
+              <div className="relative">
+                <Input
+                  value={form.company_name}
+                  onChange={(e) => { setForm({ ...form, company_name: e.target.value }); handleNameSearch(e.target.value); }}
+                  placeholder="Zadajte názov firmy (min. 3 znaky pre vyhľadávanie v RPO)"
+                />
+                {nameLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 size-4 animate-spin text-muted-foreground" />}
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="p-0 w-[--radix-popover-trigger-width] max-h-72 overflow-auto" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+              <ul className="py-1 text-sm">
+                {nameResults.map((r) => (
+                  <li key={r.ico}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-accent"
+                      onClick={() => { applyRpo(r); setNameOpen(false); setNameResults([]); }}
+                    >
+                      <div className="font-medium">{r.name}</div>
+                      <div className="text-xs text-muted-foreground">IČO: {r.ico}{r.addressLine ? ` · ${r.addressLine}` : ""}</div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div className="space-y-1.5">
+          <Label>IČO</Label>
+          <div className="flex gap-2">
+            <Input
+              value={form.ico}
+              onChange={(e) => setForm({ ...form, ico: e.target.value.replace(/[^\d]/g, "").slice(0, 8) })}
+              inputMode="numeric"
+              placeholder="8-miestne IČO"
+            />
+            <Button type="button" variant="outline" onClick={handleIcoLookup} disabled={icoLoading || form.ico.length !== 8} aria-label="Načítať z RPO">
+              {icoLoading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            </Button>
+          </div>
+        </div>
         <div className="space-y-1.5"><Label>Kontaktná osoba</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
         <div className="space-y-1.5"><Label>Telefón</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
         <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
