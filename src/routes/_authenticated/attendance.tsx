@@ -27,9 +27,11 @@ type Attendance = {
   work_date: string;
   clock_in: string;
   clock_out: string | null;
-  source: "manual" | "event";
+  source: "manual" | "event" | "helper_pin";
   reservation_id: string | null;
   note: string | null;
+  helper_id?: string | null;
+  is_helper?: boolean | null;
 };
 type StaffRow = {
   id: string;
@@ -256,7 +258,7 @@ type ComputedRow = {
 };
 
 function computeSummary(
-  users: { id: string; name: string }[],
+  users: { id: string; name: string; isHelper?: boolean }[],
   attendance: Attendance[],
   breaks: Break[],
   staff: StaffRow[],
@@ -271,7 +273,9 @@ function computeSummary(
   }
 
   return users.map((u) => {
-    const attRows = attendance.filter((a) => a.user_id === u.id);
+    const attRows = attendance.filter((a) =>
+      u.isHelper ? a.helper_id === u.id : a.user_id === u.id,
+    );
     const manualIntervals: Interval[] = [];
     const daySet = new Set<string>();
     for (const a of attRows) {
@@ -288,7 +292,7 @@ function computeSummary(
       daySet.add(a.work_date);
     }
     const eventIntervals: Interval[] = [];
-    for (const s of staff) {
+    for (const s of (u.isHelper ? [] : staff)) {
       if (s.user_id !== u.id) continue;
       if (!s.actual_arrival || !s.actual_departure) continue;
       const iv = clip(new Date(s.actual_arrival).getTime(), new Date(s.actual_departure).getTime());
