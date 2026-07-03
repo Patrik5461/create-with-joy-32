@@ -1,1 +1,0 @@
-ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS dic text, ADD COLUMN IF NOT EXISTS ic_dph text;
