@@ -514,7 +514,14 @@ type StaffDayRow = {
   departed: boolean;
 };
 
-function StaffDay({ day }: { day: Date }) {
+function StaffDay({ day, reservations }: { day: Date; reservations: any[] }) {
+  const [openFor, setOpenFor] = useState<string | null>(null);
+  const uniqueReservations = useMemo(() => {
+    const seen = new Map<string, any>();
+    for (const r of reservations) if (!seen.has(r.id)) seen.set(r.id, r);
+    return Array.from(seen.values());
+  }, [reservations]);
+
   const from = new Date(day); from.setHours(0, 0, 0, 0);
   const to = new Date(day); to.setHours(23, 59, 59, 999);
   const query = useQuery({
@@ -561,38 +568,59 @@ function StaffDay({ day }: { day: Date }) {
       </CardHeader>
       <CardContent>
         {query.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
-        {!query.isLoading && rows.length === 0 && (
-          <p className="text-sm text-muted-foreground">Na tento deň nie je naplánovaný žiadny personál.</p>
+        {!query.isLoading && uniqueReservations.length === 0 && (
+          <p className="text-sm text-muted-foreground">Na tento deň nie sú žiadne akcie (nakládky ani návraty).</p>
         )}
         <div className="grid gap-3 md:grid-cols-2">
-          {Array.from(byRes.entries()).map(([resId, list]) => (
-            <div key={resId} className="rounded-md border p-3">
-              <Link to="/reservations/$id" params={{ id: resId }} className="text-sm font-medium hover:underline block">
-                {list[0].reservation?.event_name ?? "Rezervácia"}
-              </Link>
-              <div className="text-xs text-muted-foreground mb-2">
-                {[list[0].reservation?.clients?.company_name, list[0].reservation?.venue].filter(Boolean).join(" · ")}
-              </div>
-              <div className="space-y-1.5">
-                {list.map((r) => {
-                  const name = r.user_id ? (r.profile?.full_name || r.profile?.email || "—") : (r.external_name || "—");
-                  const cls = r.departed ? "bg-slate-100 text-slate-700" : r.arrived ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900";
-                  const time = `${r.planned_start ? format(new Date(r.planned_start), "HH:mm") : "—"}–${r.planned_end ? format(new Date(r.planned_end), "HH:mm") : "—"}`;
-                  return (
-                    <div key={r.id} className={`flex items-center justify-between gap-2 text-xs rounded px-2 py-1.5 ${cls}`}>
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{name}{r.role ? ` · ${r.role}` : ""}</div>
-                        {r.profile?.phone && <div className="text-[11px] opacity-80">{r.profile.phone}</div>}
-                      </div>
-                      <div className="font-mono whitespace-nowrap">{time}</div>
+          {uniqueReservations.map((r: any) => {
+            const list = byRes.get(r.id) ?? [];
+            return (
+              <div key={r.id} className="rounded-md border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <Link to="/reservations/$id" params={{ id: r.id }} className="text-sm font-medium hover:underline block truncate">
+                      {r.event_name}
+                    </Link>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {[r.clients?.company_name, r.venue].filter(Boolean).join(" · ")}
                     </div>
-                  );
-                })}
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setOpenFor(r.id)}>
+                    <Plus className="size-3.5 mr-1" />Personál ({list.length})
+                  </Button>
+                </div>
+                {list.length > 0 && (
+                  <div className="space-y-1.5 mt-2">
+                    {list.map((s: any) => {
+                      const name = s.user_id ? (s.profile?.full_name || s.profile?.email || "—") : (s.external_name || "—");
+                      const cls = s.departed ? "bg-slate-100 text-slate-700" : s.arrived ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900";
+                      const time = `${s.planned_start ? format(new Date(s.planned_start), "HH:mm") : "—"}–${s.planned_end ? format(new Date(s.planned_end), "HH:mm") : "—"}`;
+                      return (
+                        <div key={s.id} className={`flex items-center justify-between gap-2 text-xs rounded px-2 py-1.5 ${cls}`}>
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{name}{s.role ? ` · ${s.role}` : ""}</div>
+                            {s.profile?.phone && <div className="text-[11px] opacity-80">{s.profile.phone}</div>}
+                          </div>
+                          <div className="font-mono whitespace-nowrap">{time}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
+
+      <Dialog open={!!openFor} onOpenChange={(o) => !o && setOpenFor(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Personál rezervácie</DialogTitle>
+          </DialogHeader>
+          {openFor && <ReservationStaffSection reservationId={openFor} />}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
