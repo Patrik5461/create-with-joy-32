@@ -58,7 +58,14 @@ export function QrScannerDialog({
         scannerRef.current = scanner;
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 240, height: 240 } },
+          {
+            fps: 10,
+            aspectRatio: 1,
+            qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+              const side = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
+              return { width: side, height: side };
+            },
+          },
           (decoded: string) => {
             const id = parseFurnitureId(decoded);
             if (id) {
@@ -132,7 +139,7 @@ export function QrScannerDialog({
 
         <div
           id={SCANNER_ID}
-          className="w-full aspect-square bg-black rounded-md overflow-hidden"
+          className="w-full aspect-square bg-black rounded-md overflow-hidden relative [&_video]:!w-full [&_video]:!h-full [&_video]:!object-cover"
         />
 
         {error && (
