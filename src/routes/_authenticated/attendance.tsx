@@ -370,9 +370,14 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
         .map((p) => ({ id: p.id, name: p.full_name || p.email || "—", isHelper: false }));
     }
     if (selectedUser === "all") {
+      const helperIdsWithHours = new Set(
+        (list.data?.rows ?? []).filter((r) => r.helper_id).map((r) => r.helper_id as string),
+      );
       return [
         ...src.map((p) => ({ id: p.id, name: p.full_name || p.email || "—", isHelper: false })),
-        ...helpers.map((h) => ({ id: h.id, name: `${h.name} (helper)`, isHelper: true })),
+        ...helpers
+          .filter((h) => helperIdsWithHours.has(h.id))
+          .map((h) => ({ id: h.id, name: `${h.name} (helper)`, isHelper: true })),
       ];
     }
     if (selectedUser.startsWith("helper:")) {
@@ -381,7 +386,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
     }
     return src.filter((p) => p.id === selectedUser)
       .map((p) => ({ id: p.id, name: p.full_name || p.email || "—", isHelper: false }));
-  }, [profiles.data, helpersQ.data, isAdmin, selectedUser, currentUserId]);
+  }, [profiles.data, helpersQ.data, list.data, isAdmin, selectedUser, currentUserId]);
 
   const summary = useMemo(() => {
     if (!list.data) return [];
