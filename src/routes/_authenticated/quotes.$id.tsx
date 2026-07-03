@@ -67,12 +67,19 @@ function QuoteDetail() {
 
   const remove = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("quotes").delete().eq("id", id);
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("quotes")
+        .update({ deleted_at: new Date().toISOString(), deleted_by: userData?.user?.id ?? null })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
-      toast.success("Kalkulácia zmazaná");
+      qc.invalidateQueries({ queryKey: ["quotes-trash"] });
+      toast.success("Kalkulácia presunutá do koša", {
+        description: "Nájdeš ju v Kalkulácie → Kôš a môžeš ju obnoviť.",
+      });
       navigate({ to: "/quotes" });
     },
     onError: (e: any) => toast.error(e.message),
