@@ -33,6 +33,7 @@ function QuoteDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const quote = useQuery({
     queryKey: ["quote", id],
