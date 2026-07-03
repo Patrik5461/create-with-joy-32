@@ -920,6 +920,8 @@ export type Database = {
           contact_id: string | null
           created_at: string
           created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           discount_type: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value: number
           id: string
@@ -948,6 +950,8 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value?: number
           id?: string
@@ -976,6 +980,8 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value?: number
           id?: string
