@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { SurveyCard } from "@/components/survey-card";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
+import { publicUrl as buildPublicUrl } from "@/lib/public-url";
 
 export const Route = createFileRoute("/_authenticated/surveys")({
   head: () => ({ meta: [{ title: "Logistické dotazníky · Mima Production CRM" }] }),
@@ -56,7 +57,7 @@ function SurveysPage() {
                 const raw = r.logistics_surveys;
                 const s = Array.isArray(raw) ? raw[0] : raw;
                 const status: "missing" | "sent" | "filled" = !s ? "missing" : s.status === "filled" ? "filled" : "sent";
-                const url = typeof window !== "undefined" && s?.token ? `${window.location.origin}/dotaznik/${s.token}` : "";
+                const url = s?.token ? buildPublicUrl(`/dotaznik/${s.token}`) : "";
                 return (
                   <div key={r.id} className="py-3 flex flex-wrap items-center gap-3">
                     <div className="flex-1 min-w-[220px]">
