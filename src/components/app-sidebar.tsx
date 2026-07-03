@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, ShieldCheck, LayoutPanelTop, Settings, Wrench, Calculator, ClipboardCheck, MessageSquare, Inbox, Clock } from "lucide-react";
+import { LayoutDashboard, Package, CalendarRange, Users, Truck, UserCog, ShieldCheck, LayoutPanelTop, Wrench, Calculator, ClipboardCheck, MessageSquare, Inbox, Clock, Calendar, Mail, KeyRound } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -96,10 +96,28 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={isActive("/settings")} tooltip="Nastavenia" className={itemClass}>
+                <SidebarMenuButton asChild isActive={isActive("/settings/calendar")} tooltip="Kalendár" className={itemClass}>
                   <Link to="/settings/calendar" className="flex items-center gap-3">
-                    <Settings className="size-[18px]" />
-                    <span>Prepojenie kalendára</span>
+                    <Calendar className="size-[18px]" />
+                    <span>Kalendár</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {hasRole(user, "admin") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={isActive("/settings/email")} tooltip="Email (Resend)" className={itemClass}>
+                    <Link to="/settings/email" className="flex items-center gap-3">
+                      <Mail className="size-[18px]" />
+                      <span>Email (Resend)</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive("/settings/account")} tooltip="Účet a heslo" className={itemClass}>
+                  <Link to="/settings/account" className="flex items-center gap-3">
+                    <KeyRound className="size-[18px]" />
+                    <span>Účet a heslo</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
