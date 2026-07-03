@@ -6,7 +6,7 @@ import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit3, Trash2, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Edit3, Trash2, LayoutGrid, AlertTriangle } from "lucide-react";
 import { ReservationForm } from "@/components/reservation-form";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
@@ -40,6 +40,33 @@ function ReservationDetail() {
       return data as any;
     },
   });
+
+  const overbookedItems = useQuery({
+    queryKey: ["reservation-overbooked-items", id],
+    enabled: !!reservation.data,
+    queryFn: async () => {
+      const r = reservation.data;
+      const results: Record<string, { qty: number; available: number }> = {};
+      await Promise.all(
+        (r.reservation_items ?? []).map(async (ri: any) => {
+          const { data } = await supabase.rpc("check_item_availability", {
+            _item_id: ri.furniture_item_id,
+            _from: r.load_at,
+            _to: r.available_from_at,
+            _exclude_reservation: r.id,
+          });
+          const row = data?.[0];
+          if (row && ri.qty > row.available) {
+            results[ri.id] = { qty: ri.qty, available: row.available };
+          }
+        }),
+      );
+      return results;
+    },
+  });
+
+  const overbookedMap = overbookedItems.data ?? {};
+  const hasOverbook = Object.keys(overbookedMap).length > 0;
 
   const remove = useMutation({
     mutationFn: async () => {
@@ -84,6 +111,11 @@ function ReservationDetail() {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge variant={STATUS_BADGE_VARIANT[r.status as ReservationStatus]}>{STATUS_LABEL[r.status as ReservationStatus]}</Badge>
+                    {hasOverbook && (
+                      <Badge variant="outline" className="border-amber-500 bg-amber-50 text-amber-800">
+                        <AlertTriangle className="size-3 mr-1" />Prekročený sklad
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -122,15 +154,24 @@ function ReservationDetail() {
               <CardHeader><CardTitle className="text-base">Položky rezervácie</CardTitle></CardHeader>
               <CardContent className="space-y-2">
                 {r.reservation_items.length === 0 && <p className="text-sm text-muted-foreground">Žiadne položky.</p>}
-                {r.reservation_items.map((ri: any) => (
-                  <div key={ri.id} className="flex items-center justify-between p-2 rounded border">
-                    <div>
-                      <div className="text-sm font-medium">{ri.furniture_items?.name}</div>
-                      <div className="text-xs text-muted-foreground">{ri.furniture_items?.internal_code}</div>
+                {r.reservation_items.map((ri: any) => {
+                  const ob = overbookedMap[ri.id];
+                  return (
+                    <div key={ri.id} className={`flex items-center justify-between p-2 rounded border ${ob ? "border-amber-300 bg-amber-50" : ""}`}>
+                      <div>
+                        <div className="text-sm font-medium">{ri.furniture_items?.name}</div>
+                        <div className="text-xs text-muted-foreground">{ri.furniture_items?.internal_code}</div>
+                        {ob && (
+                          <div className="text-[11px] text-amber-800 mt-0.5 flex items-center gap-1">
+                            <AlertTriangle className="size-3" />
+                            Chýba {ob.qty - ob.available} ks (dostupných {ob.available} z {ob.qty} požadovaných)
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant="secondary">{ri.qty} ks</Badge>
                     </div>
-                    <Badge variant="secondary">{ri.qty} ks</Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
 
