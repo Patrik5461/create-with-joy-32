@@ -1,0 +1,2 @@
+ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS quote_group_id uuid NULL;
+CREATE INDEX IF NOT EXISTS reservations_quote_group_id_idx ON public.reservations(quote_group_id) WHERE quote_group_id IS NOT NULL;

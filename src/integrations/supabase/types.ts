@@ -1133,6 +1133,7 @@ export type Database = {
           load_at: string
           note: string | null
           phone: string | null
+          quote_group_id: string | null
           return_at: string | null
           status: Database["public"]["Enums"]["reservation_status"]
           trip_count: number
@@ -1159,6 +1160,7 @@ export type Database = {
           load_at: string
           note?: string | null
           phone?: string | null
+          quote_group_id?: string | null
           return_at?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
           trip_count?: number
@@ -1185,6 +1187,7 @@ export type Database = {
           load_at?: string
           note?: string | null
           phone?: string | null
+          quote_group_id?: string | null
           return_at?: string | null
           status?: Database["public"]["Enums"]["reservation_status"]
           trip_count?: number
