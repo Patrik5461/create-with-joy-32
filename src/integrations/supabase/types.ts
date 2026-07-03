@@ -68,7 +68,9 @@ export type Database = {
           contact_person: string | null
           created_at: string
           created_by: string | null
+          dic: string | null
           email: string | null
+          ic_dph: string | null
           ico: string | null
           id: string
           notes: string | null
@@ -81,7 +83,9 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
+          dic?: string | null
           email?: string | null
+          ic_dph?: string | null
           ico?: string | null
           id?: string
           notes?: string | null
@@ -94,7 +98,9 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
+          dic?: string | null
           email?: string | null
+          ic_dph?: string | null
           ico?: string | null
           id?: string
           notes?: string | null
