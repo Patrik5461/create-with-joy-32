@@ -103,7 +103,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
   const furniture = useQuery({
     queryKey: ["furniture-pricing"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("furniture_items").select("id, name, internal_code, price_per_day, price_fixed, category_id").eq("active", true).order("name");
+      const { data, error } = await supabase.from("furniture_items").select("id, name, internal_code, price_per_day, price_fixed, category_id, total_qty, damaged_qty, retired_qty").eq("active", true).order("name");
       if (error) throw error;
       return data;
     },
@@ -140,7 +140,16 @@ export function QuoteForm({ initial, quoteId }: Props) {
   useEffect(() => {
     const win = reservationWindow.data;
     if (!win?.load_at || !win?.available_from_at) {
-      setAvailability({});
+      // Fallback: no reservation linked → check against physical stock (total − damaged − retired).
+      const results: Record<string, { qty: number; available: number }> = {};
+      for (const l of lines) {
+        if (l.kind !== "furniture" || !l.furniture_item_id) continue;
+        const f: any = furniture.data?.find((x: any) => x.id === l.furniture_item_id);
+        if (!f) continue;
+        const available = Math.max(0, (f.total_qty ?? 0) - (f.damaged_qty ?? 0) - (f.retired_qty ?? 0));
+        results[l.id] = { qty: l.qty, available };
+      }
+      setAvailability(results);
       return;
     }
     let cancelled = false;
@@ -164,7 +173,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
       if (!cancelled) setAvailability(results);
     })();
     return () => { cancelled = true; };
-  }, [reservationWindow.data, lines]);
+  }, [reservationWindow.data, lines, furniture.data]);
 
   const overbookLines = lines.filter((l) => {
     const a = availability[l.id];
@@ -503,7 +512,7 @@ export function QuoteForm({ initial, quoteId }: Props) {
               {over && (
                 <div className="md:col-span-12 text-[11px] text-amber-800 flex items-center gap-1">
                   <AlertTriangle className="size-3" />
-                  Pozor: požadovaných {l.qty} ks, na sklade dostupných len {a.available} ks v termíne rezervácie (chýba {l.qty - a.available} ks).
+                  Pozor: požadovaných {l.qty} ks, na sklade dostupných len {a.available} ks{form.reservation_id ? " v termíne rezervácie" : ""} (chýba {l.qty - a.available} ks).
                 </div>
               )}
             </div>
