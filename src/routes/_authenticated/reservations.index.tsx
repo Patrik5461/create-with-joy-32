@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
@@ -54,6 +54,18 @@ function Reservations() {
       return data as any[];
     },
   });
+
+  const ids = (reservations.data ?? []).map((r) => r.id);
+  const overbooked = useQuery({
+    queryKey: ["reservations-overbooked", ids.join(",")],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("overbooked_reservation_ids", { _ids: ids });
+      if (error) throw error;
+      return new Set((data ?? []).map((r: any) => r.reservation_id));
+    },
+  });
+  const overbookedSet: Set<string> = overbooked.data ?? new Set();
 
   const openNewAt = (day: Date, hour = 9) => {
     if (!canCreate) return;
@@ -126,18 +138,18 @@ function Reservations() {
         </div>
 
         {view === "month" ? (
-          <MonthGrid cursor={cursor} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} />
+          <MonthGrid cursor={cursor} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
         ) : view === "week" ? (
-          <WeekList from={range.from} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} />
+          <WeekList from={range.from} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
         ) : (
-          <DayList day={cursor} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} />
+          <DayList day={cursor} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
         )}
       </div>
     </>
   );
 }
 
-function ReservationCard({ r }: { r: any }) {
+function ReservationCard({ r, overbooked }: { r: any; overbooked?: boolean }) {
   const cls = STATUS_COLOR[r.status as ReservationStatus] ?? "";
   const color = r.color as string | null;
   return (
@@ -155,7 +167,14 @@ function ReservationCard({ r }: { r: any }) {
                 {format(new Date(r.event_start_at), "d.M. HH:mm")} → {format(new Date(r.event_end_at), "HH:mm")}
               </div>
             </div>
-            <Badge variant="outline" className="text-[10px] shrink-0 bg-background/60">{STATUS_LABEL[r.status as ReservationStatus]}</Badge>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <Badge variant="outline" className="text-[10px] bg-background/60">{STATUS_LABEL[r.status as ReservationStatus]}</Badge>
+              {overbooked && (
+                <Badge variant="outline" className="text-[10px] border-amber-500 bg-amber-50 text-amber-800" title="Prekročená skladová dostupnosť">
+                  <AlertTriangle className="size-2.5 mr-0.5" />Sklad
+                </Badge>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -163,7 +182,7 @@ function ReservationCard({ r }: { r: any }) {
   );
 }
 
-function DayList({ day, reservations, onSlot, canCreate }: { day: Date; reservations: any[]; onSlot: (d: Date, h?: number) => void; canCreate: boolean }) {
+function DayList({ day, reservations, onSlot, canCreate, overbookedSet }: { day: Date; reservations: any[]; onSlot: (d: Date, h?: number) => void; canCreate: boolean; overbookedSet: Set<string> }) {
   const list = reservations.filter((r) => isSameDay(new Date(r.event_start_at), day));
   const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 7..20
   return (
@@ -180,7 +199,7 @@ function DayList({ day, reservations, onSlot, canCreate }: { day: Date; reservat
             >
               {slotItems.length === 0 ? (
                 canCreate && <span className="text-[11px] text-muted-foreground/50">+ Nová rezervácia</span>
-              ) : slotItems.map((r) => <ReservationCard key={r.id} r={r} />)}
+              ) : slotItems.map((r) => <ReservationCard key={r.id} r={r} overbooked={overbookedSet.has(r.id)} />)}
             </button>
           </div>
         );
@@ -189,7 +208,7 @@ function DayList({ day, reservations, onSlot, canCreate }: { day: Date; reservat
   );
 }
 
-function WeekList({ from, reservations, onSlot, canCreate }: { from: Date; reservations: any[]; onSlot: (d: Date) => void; canCreate: boolean }) {
+function WeekList({ from, reservations, onSlot, canCreate, overbookedSet }: { from: Date; reservations: any[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string> }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(from, i));
   return (
     <div className="grid gap-3 md:grid-cols-7">
@@ -202,7 +221,7 @@ function WeekList({ from, reservations, onSlot, canCreate }: { from: Date; reser
               <button type="button" onClick={() => canCreate && onSlot(d)} className={`w-full text-xs text-muted-foreground/60 border border-dashed rounded-md p-3 text-center ${canCreate ? "hover:bg-muted/40 hover:text-foreground" : ""}`}>
                 {canCreate ? "+ Pridať" : "—"}
               </button>
-            ) : list.map((r) => <ReservationCard key={r.id} r={r} />)}
+            ) : list.map((r) => <ReservationCard key={r.id} r={r} overbooked={overbookedSet.has(r.id)} />)}
           </div>
         );
       })}
@@ -210,7 +229,7 @@ function WeekList({ from, reservations, onSlot, canCreate }: { from: Date; reser
   );
 }
 
-function MonthGrid({ cursor, reservations, onSlot, canCreate }: { cursor: Date; reservations: any[]; onSlot: (d: Date) => void; canCreate: boolean }) {
+function MonthGrid({ cursor, reservations, onSlot, canCreate, overbookedSet }: { cursor: Date; reservations: any[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string> }) {
   const monthStart = startOfMonth(cursor);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 });
@@ -245,7 +264,7 @@ function MonthGrid({ cursor, reservations, onSlot, canCreate }: { cursor: Date; 
                 className={`block truncate rounded px-1 py-0.5 mb-0.5 border ${r.color ? "text-white border-transparent" : STATUS_COLOR[r.status as ReservationStatus] ?? ""}`}
                 style={r.color ? { backgroundColor: r.color } : undefined}
               >
-                {format(new Date(r.event_start_at), "HH:mm")} {r.event_name}
+                {overbookedSet.has(r.id) && "⚠ "}{format(new Date(r.event_start_at), "HH:mm")} {r.event_name}
               </Link>
               ))}
               {list.length > 3 && <div className="text-muted-foreground">+{list.length - 3}</div>}
