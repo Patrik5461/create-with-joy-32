@@ -83,10 +83,47 @@ export const submitSurveyByToken = createServerFn({ method: "POST" })
       .eq("id", existing.id);
     if (error) throw new Error(error.message);
 
-    // Best-effort: log notification (email service not configured)
+    // Best-effort: pošli internú notifikáciu firme.
     try {
-      console.info("[logistics-survey] submitted", { reservation_id: existing.reservation_id });
-    } catch {}
+      const { data: cfg } = await supabaseAdmin.from("email_settings").select("*").eq("id", 1).maybeSingle();
+      const recipients: string[] = (cfg?.notification_recipients as any) ?? [];
+      if (cfg && recipients.length > 0) {
+        const { data: r } = await supabaseAdmin
+          .from("reservations")
+          .select("event_name,venue,event_start_at,clients(company_name)")
+          .eq("id", existing.reservation_id)
+          .maybeSingle();
+        const { sendResendEmail, formatSender, renderTemplate, escapeHtml } = await import("./email.server");
+        const subject = renderTemplate(cfg.survey_filled_subject_template || "Logistický dotazník vyplnený — {{event_name}}", {
+          event_name: (r as any)?.event_name ?? "",
+        });
+        const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.5;color:#111">
+          <p>Klient vyplnil logistický dotazník.</p>
+          <p><strong>Akcia:</strong> ${escapeHtml((r as any)?.event_name ?? "")}<br/>
+          <strong>Miesto:</strong> ${escapeHtml((r as any)?.venue ?? "")}<br/>
+          <strong>Klient:</strong> ${escapeHtml((r as any)?.clients?.company_name ?? "")}</p>
+        </div>`;
+        const result = await sendResendEmail({
+          from: formatSender(cfg.from_name, cfg.from_email),
+          to: recipients,
+          reply_to: cfg.reply_to_email ?? undefined,
+          subject,
+          html,
+          tags: [{ name: "kind", value: "survey_filled" }],
+        });
+        await supabaseAdmin.from("email_send_log").insert({
+          kind: "survey_filled",
+          recipient: recipients.join(","),
+          subject,
+          status: result.ok ? "sent" : "failed",
+          error_message: result.error ?? null,
+          provider_id: result.id ?? null,
+          metadata: { reservation_id: existing.reservation_id },
+        });
+      }
+    } catch (e) {
+      console.warn("[logistics-survey] notify failed", e);
+    }
 
     return { ok: true };
   });

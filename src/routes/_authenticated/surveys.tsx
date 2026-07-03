@@ -4,8 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ClipboardCheck, ExternalLink, Eye } from "lucide-react";
+import { ClipboardCheck, ExternalLink, Eye, Send, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { ensureSurveyForReservation } from "@/lib/logistics-survey.functions";
+import { sendSurveyLinkEmail } from "@/lib/email.functions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SurveyCard } from "@/components/survey-card";
 import { format } from "date-fns";
@@ -21,6 +25,29 @@ export const Route = createFileRoute("/_authenticated/surveys")({
 
 function SurveysPage() {
   const [previewId, setPreviewId] = useState<{ id: string; email?: string | null } | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const ensureFn = useServerFn(ensureSurveyForReservation);
+  const sendFn = useServerFn(sendSurveyLinkEmail);
+
+  const sendSurveyLink = async (reservationId: string, email: string | null | undefined, existingToken: string | null | undefined) => {
+    if (!email) return toast.error("Rezervácia nemá klientský email");
+    setSendingId(reservationId);
+    try {
+      let token = existingToken;
+      if (!token) {
+        const res = await ensureFn({ data: { reservationId } });
+        token = res.token;
+      }
+      const url = buildPublicUrl(`/dotaznik/${token}`);
+      await sendFn({ data: { reservationId, to: email, publicUrl: url } });
+      toast.success(`Odkaz odoslaný na ${email}`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Odoslanie zlyhalo");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
   const q = useQuery({
     queryKey: ["surveys-overview"],
     queryFn: async () => {
@@ -76,6 +103,15 @@ function SurveysPage() {
                         <a href={url} target="_blank" rel="noreferrer"><ExternalLink className="size-4 mr-1" />Verejný odkaz</a>
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      onClick={() => sendSurveyLink(r.id, r.email, s?.token)}
+                      disabled={sendingId === r.id || !r.email}
+                      title={!r.email ? "Rezervácia nemá email klienta" : undefined}
+                    >
+                      {sendingId === r.id ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Send className="size-4 mr-1" />}
+                      Poslať klientovi
+                    </Button>
                     <Button asChild size="sm" variant="secondary">
                       <Link to="/reservations/$id" params={{ id: r.id }}>Otvoriť rezerváciu</Link>
                     </Button>

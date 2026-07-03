@@ -406,6 +406,81 @@ export type Database = {
           },
         ]
       }
+      email_send_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          kind: string
+          metadata: Json
+          provider_id: string | null
+          recipient: string
+          status: string
+          subject: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          kind: string
+          metadata?: Json
+          provider_id?: string | null
+          recipient: string
+          status: string
+          subject: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          provider_id?: string | null
+          recipient?: string
+          status?: string
+          subject?: string
+        }
+        Relationships: []
+      }
+      email_settings: {
+        Row: {
+          from_email: string
+          from_name: string
+          id: number
+          inquiry_notify_subject_template: string
+          notification_recipients: string[]
+          quote_subject_template: string
+          reply_to_email: string | null
+          survey_filled_subject_template: string
+          survey_link_subject_template: string
+          updated_at: string
+        }
+        Insert: {
+          from_email?: string
+          from_name?: string
+          id?: number
+          inquiry_notify_subject_template?: string
+          notification_recipients?: string[]
+          quote_subject_template?: string
+          reply_to_email?: string | null
+          survey_filled_subject_template?: string
+          survey_link_subject_template?: string
+          updated_at?: string
+        }
+        Update: {
+          from_email?: string
+          from_name?: string
+          id?: number
+          inquiry_notify_subject_template?: string
+          notification_recipients?: string[]
+          quote_subject_template?: string
+          reply_to_email?: string | null
+          survey_filled_subject_template?: string
+          survey_link_subject_template?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       furniture_categories: {
         Row: {
           code: string

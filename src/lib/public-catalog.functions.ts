@@ -227,5 +227,53 @@ export const submitPublicInquiry = createServerFn({ method: "POST" })
     });
     if (iErr) throw new Error(iErr.message);
 
+    // Best-effort: interná notifikácia firme o novom dopyte.
+    try {
+      const { data: cfg } = await supabaseAdmin.from("email_settings").select("*").eq("id", 1).maybeSingle();
+      const recipients: string[] = (cfg?.notification_recipients as any) ?? [];
+      if (cfg && recipients.length > 0) {
+        const { sendResendEmail, formatSender, renderTemplate, escapeHtml } = await import("./email.server");
+        const subject = renderTemplate(cfg.inquiry_notify_subject_template || "Nový dopyt z katalógu — {{name}}", {
+          name: data.name,
+          company: data.company ?? "",
+        });
+        const itemsHtml = items.map((i) => {
+          const found = (validItems ?? []).find((v: any) => v.id === i.furniture_item_id);
+          return `<li>${escapeHtml(found?.name ?? i.furniture_item_id)} — ${i.qty} ks</li>`;
+        }).join("");
+        const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.5;color:#111">
+          <p><strong>Nový dopyt z verejného katalógu.</strong></p>
+          <p><strong>Meno:</strong> ${escapeHtml(data.name)}<br/>
+          ${data.company ? `<strong>Firma:</strong> ${escapeHtml(data.company)}<br/>` : ""}
+          <strong>Email:</strong> ${escapeHtml(data.email)}<br/>
+          ${data.phone ? `<strong>Telefón:</strong> ${escapeHtml(data.phone)}<br/>` : ""}
+          ${data.venue ? `<strong>Miesto:</strong> ${escapeHtml(data.venue)}<br/>` : ""}
+          ${data.event_start_at ? `<strong>Termín:</strong> ${escapeHtml(new Date(data.event_start_at).toLocaleString("sk-SK"))}<br/>` : ""}
+          </p>
+          ${data.message ? `<p><strong>Správa:</strong><br/>${escapeHtml(data.message)}</p>` : ""}
+          <p><strong>Položky:</strong></p><ul>${itemsHtml}</ul>
+        </div>`;
+        const result = await sendResendEmail({
+          from: formatSender(cfg.from_name, cfg.from_email),
+          to: recipients,
+          reply_to: data.email,
+          subject,
+          html,
+          tags: [{ name: "kind", value: "inquiry_notify" }],
+        });
+        await supabaseAdmin.from("email_send_log").insert({
+          kind: "inquiry_notify",
+          recipient: recipients.join(","),
+          subject,
+          status: result.ok ? "sent" : "failed",
+          error_message: result.error ?? null,
+          provider_id: result.id ?? null,
+          metadata: { reservation_id: reservation.id },
+        });
+      }
+    } catch (e) {
+      console.warn("[public-catalog] inquiry notify failed", e);
+    }
+
     return { ok: true, reservationId: reservation.id };
   });
