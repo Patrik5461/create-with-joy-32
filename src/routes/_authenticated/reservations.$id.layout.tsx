@@ -238,6 +238,59 @@ function LayoutEditor() {
   const [savedSnapshot, setSavedSnapshot] = useState<string>("");
   const [invalidLoaded, setInvalidLoaded] = useState(false);
 
+  // ---- Undo/Redo history ----
+  const historyRef = useRef<{ stack: LayoutData[]; idx: number }>({ stack: [], idx: -1 });
+  const [historyTick, setHistoryTick] = useState(0);
+  const canUndo = historyRef.current.idx > 0;
+  const canRedo = historyRef.current.idx < historyRef.current.stack.length - 1;
+  void historyTick;
+
+  function seedHistory(l: LayoutData) {
+    historyRef.current = { stack: [l], idx: 0 };
+    setHistoryTick((t) => t + 1);
+  }
+  function commit(next: LayoutData) {
+    const h = historyRef.current;
+    const trimmed = h.stack.slice(0, h.idx + 1);
+    trimmed.push(next);
+    const capped = trimmed.slice(-50);
+    historyRef.current = { stack: capped, idx: capped.length - 1 };
+    setLayout(next);
+    setHistoryTick((t) => t + 1);
+  }
+  function undo() {
+    const h = historyRef.current;
+    if (h.idx <= 0) return;
+    const idx = h.idx - 1;
+    historyRef.current = { stack: h.stack, idx };
+    setLayout(h.stack[idx]);
+    setHistoryTick((t) => t + 1);
+  }
+  function redo() {
+    const h = historyRef.current;
+    if (h.idx >= h.stack.length - 1) return;
+    const idx = h.idx + 1;
+    historyRef.current = { stack: h.stack, idx };
+    setLayout(h.stack[idx]);
+    setHistoryTick((t) => t + 1);
+  }
+
+  // ---- Zoom / viewport ----
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  function clampZoom(z: number) { return Math.max(0.25, Math.min(2, Math.round(z * 100) / 100)); }
+  function zoomIn() { setZoom((z) => clampZoom(z * 1.15)); }
+  function zoomOut() { setZoom((z) => clampZoom(z / 1.15)); }
+  function zoomFit() {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const zx = vp.clientWidth / (layout.width + 40);
+    const zy = vp.clientHeight / (layout.height + 40);
+    setZoom(clampZoom(Math.min(zx, zy)));
+    requestAnimationFrame(() => { if (vp) { vp.scrollLeft = 0; vp.scrollTop = 0; } });
+  }
+  function zoomReset() { setZoom(1); }
+
   useEffect(() => {
     if (!reservation.data || loaded) return;
     const raw = reservation.data.layout as unknown;
@@ -249,6 +302,7 @@ function LayoutEditor() {
         const empty: LayoutData = { width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 };
         setLayout(empty);
         setSavedSnapshot("");
+        seedHistory(empty);
       } else if (parsed) {
         const next: LayoutData = {
           width: parsed.width || CANVAS_W,
@@ -258,11 +312,16 @@ function LayoutEditor() {
         };
         setLayout(next);
         setSavedSnapshot(JSON.stringify(next));
+        seedHistory(next);
       } else {
-        setSavedSnapshot(JSON.stringify({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 }));
+        const empty: LayoutData = { width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 };
+        setSavedSnapshot(JSON.stringify(empty));
+        seedHistory(empty);
       }
     } else {
-      setSavedSnapshot(JSON.stringify({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 }));
+      const empty: LayoutData = { width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 };
+      setSavedSnapshot(JSON.stringify(empty));
+      seedHistory(empty);
     }
     setLoaded(true);
   }, [reservation.data, loaded]);
