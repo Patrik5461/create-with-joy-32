@@ -961,7 +961,7 @@ function ElementNode({
 
 // ---------------- Canvas viewport (zoom + pan) ----------------
 function CanvasViewport({
-  viewportRef, canvasRef, zoom, setZoom, layout, readOnly, onDrop, onBackgroundClick, children,
+  viewportRef, canvasRef, zoom, setZoom, layout, readOnly, onDrop, onBackgroundClick, children, bgUrl, bgOpacity,
 }: {
   viewportRef: React.RefObject<HTMLDivElement | null>;
   canvasRef: React.RefObject<HTMLDivElement | null>;
@@ -972,6 +972,8 @@ function CanvasViewport({
   onDrop: (e: React.DragEvent) => void;
   onBackgroundClick: () => void;
   children: React.ReactNode;
+  bgUrl?: string | null;
+  bgOpacity?: number;
 }) {
   // Ctrl/Cmd + wheel zoom
   useEffect(() => {
