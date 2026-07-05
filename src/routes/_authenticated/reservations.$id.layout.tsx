@@ -360,21 +360,19 @@ function LayoutEditor() {
 
   const selected = useMemo(() => layout.elements.find((e) => e.id === selectedId) ?? null, [layout, selectedId]);
 
-  function updateEl(id: string, patch: Partial<LayoutElement>) {
-    setLayout((l) => ({ ...l, elements: l.elements.map((e) => e.id === id ? { ...e, ...patch } : e) }));
+  function updateEl(elId: string, patch: Partial<LayoutElement>) {
+    commit({ ...layout, elements: layout.elements.map((e) => e.id === elId ? { ...e, ...patch } : e) });
   }
-  function removeEl(id: string) {
-    setLayout((l) => ({ ...l, elements: l.elements.filter((e) => e.id !== id) }));
+  function removeEl(elId: string) {
+    commit({ ...layout, elements: layout.elements.filter((e) => e.id !== elId) });
     setSelectedId(null);
   }
-  function duplicateEl(id: string) {
-    setLayout((l) => {
-      const src = l.elements.find((e) => e.id === id);
-      if (!src) return l;
-      const copy: LayoutElement = { ...src, id: uid(), x: snap(src.x + 30), y: snap(src.y + 30) };
-      setSelectedId(copy.id);
-      return { ...l, elements: [...l.elements, copy] };
-    });
+  function duplicateEl(elId: string) {
+    const src = layout.elements.find((e) => e.id === elId);
+    if (!src) return;
+    const copy: LayoutElement = { ...src, id: uid(), x: snap(src.x + 30), y: snap(src.y + 30) };
+    commit({ ...layout, elements: [...layout.elements, copy] });
+    setSelectedId(copy.id);
   }
   function addEl(type: ElType, x = 100, y = 100) {
     const def = PALETTE.find((p) => p.type === type)!;
@@ -384,19 +382,26 @@ function LayoutEditor() {
       rotation: 0, label: def.defaults.label, chairCount: def.defaults.chairCount,
       color: isZone(type) ? ZONE_COLORS[type] : undefined,
     };
-    setLayout((l) => ({ ...l, elements: [...l.elements, el] }));
+    commit({ ...layout, elements: [...layout.elements, el] });
     setSelectedId(el.id);
+  }
+  function addAtViewportCenter(type: ElType) {
+    const vp = viewportRef.current;
+    const def = PALETTE.find((p) => p.type === type)!;
+    const w = def.defaults.w ?? 100, h = def.defaults.h ?? 100;
+    if (!vp) { addEl(type, layout.width / 2 - w / 2, layout.height / 2 - h / 2); return; }
+    const cxLayout = (vp.scrollLeft + vp.clientWidth / 2) / zoom;
+    const cyLayout = (vp.scrollTop + vp.clientHeight / 2) / zoom;
+    addEl(type, cxLayout - w / 2, cyLayout - h / 2);
   }
 
   // ---- Alignment helpers (operate on tables) ----
   function withTables(fn: (tables: LayoutElement[]) => LayoutElement[]) {
-    setLayout((l) => {
-      const tables = l.elements.filter((e) => isTable(e.type));
-      if (tables.length === 0) { toast.info("Žiadne stoly na zarovnanie."); return l; }
-      const updated = fn(tables);
-      const map = new Map(updated.map((e) => [e.id, e]));
-      return { ...l, elements: l.elements.map((e) => map.get(e.id) ?? e) };
-    });
+    const tables = layout.elements.filter((e) => isTable(e.type));
+    if (tables.length === 0) { toast.info("Žiadne stoly na zarovnanie."); return; }
+    const updated = fn(tables);
+    const map = new Map(updated.map((e) => [e.id, e]));
+    commit({ ...layout, elements: layout.elements.map((e) => map.get(e.id) ?? e) });
   }
   function alignTables(mode: "left" | "right" | "top" | "bottom" | "hcenter" | "vcenter" | "distH" | "distV") {
     withTables((tables) => {
