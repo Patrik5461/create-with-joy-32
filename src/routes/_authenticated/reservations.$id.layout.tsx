@@ -52,6 +52,38 @@ interface LayoutData {
   width: number;
   height: number;
   elements: LayoutElement[];
+  schemaVersion?: number;
+}
+
+// ---------------- Zod validation ----------------
+const ElTypeSchema = z.enum([
+  "rect_table", "chair", "round_table", "round_table_chairs", "stage",
+  "zone_podium", "zone_entry", "zone_vip", "zone_custom",
+]);
+const LayoutElementSchema = z.object({
+  id: z.string(),
+  type: ElTypeSchema,
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+  rotation: z.number(),
+  label: z.string().optional(),
+  color: z.string().optional(),
+  chairCount: z.number().optional(),
+});
+const LayoutDataSchema = z.object({
+  width: z.number().positive(),
+  height: z.number().positive(),
+  elements: z.array(LayoutElementSchema),
+  schemaVersion: z.number().optional().default(1),
+});
+
+function parseLayout(raw: unknown): { layout: LayoutData | null; invalid: boolean } {
+  if (raw === null || raw === undefined) return { layout: null, invalid: false };
+  const res = LayoutDataSchema.safeParse(raw);
+  if (!res.success) return { layout: null, invalid: true };
+  return { layout: { ...res.data, schemaVersion: res.data.schemaVersion ?? 1 }, invalid: false };
 }
 
 interface ExportLayoutOptions {
@@ -199,27 +231,72 @@ function LayoutEditor() {
     },
   });
 
-  const [layout, setLayout] = useState<LayoutData>({ width: CANVAS_W, height: CANVAS_H, elements: [] });
+  const [layout, setLayout] = useState<LayoutData>({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState<string>("");
+  const [invalidLoaded, setInvalidLoaded] = useState(false);
 
   useEffect(() => {
     if (!reservation.data || loaded) return;
-    const existing = reservation.data.layout as LayoutData | null;
-    if (existing && Array.isArray(existing.elements)) {
-      setLayout({ width: existing.width || CANVAS_W, height: existing.height || CANVAS_H, elements: existing.elements });
+    const raw = reservation.data.layout as unknown;
+    if (raw !== null && raw !== undefined) {
+      const { layout: parsed, invalid } = parseLayout(raw);
+      if (invalid) {
+        setInvalidLoaded(true);
+        toast.error("Uložený plán má neplatný formát. Začnite odznova.");
+        const empty: LayoutData = { width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 };
+        setLayout(empty);
+        setSavedSnapshot("");
+      } else if (parsed) {
+        const next: LayoutData = {
+          width: parsed.width || CANVAS_W,
+          height: parsed.height || CANVAS_H,
+          elements: parsed.elements,
+          schemaVersion: parsed.schemaVersion ?? 1,
+        };
+        setLayout(next);
+        setSavedSnapshot(JSON.stringify(next));
+      } else {
+        setSavedSnapshot(JSON.stringify({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 }));
+      }
+    } else {
+      setSavedSnapshot(JSON.stringify({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 }));
     }
     setLoaded(true);
   }, [reservation.data, loaded]);
 
+  const currentSnapshot = useMemo(() => JSON.stringify(layout), [layout]);
+  const isDirty = loaded && !readOnly && savedSnapshot !== "" && currentSnapshot !== savedSnapshot;
+
+  // beforeunload guard
+  useEffect(() => {
+    if (!isDirty) return;
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
+
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("reservations").update({ layout: layout as any }).eq("id", id);
+      const toSave: LayoutData = { ...layout, schemaVersion: 1 };
+      const { error } = await supabase.from("reservations").update({ layout: toSave as any }).eq("id", id);
       if (error) throw error;
+      return toSave;
     },
-    onSuccess: () => { toast.success("Plán uložený"); qc.invalidateQueries({ queryKey: ["reservation-layout", id] }); },
+    onSuccess: (saved) => {
+      toast.success("Plán uložený");
+      if (saved) setSavedSnapshot(JSON.stringify(saved));
+      qc.invalidateQueries({ queryKey: ["reservation-layout", id] });
+      qc.invalidateQueries({ queryKey: ["reservations-for-layouts"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
+  void invalidLoaded;
 
   const selected = useMemo(() => layout.elements.find((e) => e.id === selectedId) ?? null, [layout, selectedId]);
 
@@ -378,7 +455,11 @@ function LayoutEditor() {
               <Button variant="outline" size="sm" onClick={exportPng}><FileImage className="size-4 mr-1" />PNG</Button>
               <Button variant="outline" size="sm" onClick={exportPdf}><FileText className="size-4 mr-1" />PDF</Button>
               <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
-                <Save className="size-4 mr-1" />{save.isPending ? "Ukladám…" : "Uložiť plán"}
+                <Save className="size-4 mr-1" />
+                {save.isPending ? "Ukladám…" : isDirty ? "Uložiť plán •" : "Uložiť plán"}
+                {isDirty && !save.isPending && (
+                  <span className="ml-2 text-[10px] font-normal opacity-80">Neuložené zmeny</span>
+                )}
               </Button>
             </div>
           </div>
@@ -549,6 +630,8 @@ function ElementNode({
   onSelect: () => void; onChange: (patch: Partial<LayoutElement>) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const dragRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
 
   function startDrag(e: React.PointerEvent, mode: "move" | "resize") {
     if (readOnly) return;
@@ -556,27 +639,48 @@ function ElementNode({
     onSelect();
     const startX = e.clientX, startY = e.clientY;
     const orig = { x: el.x, y: el.y, w: el.w, h: el.h };
+    const rotated = (((el.rotation % 360) + 360) % 360) !== 0;
+    const rad = (el.rotation * Math.PI) / 180;
+    const cos = Math.cos(-rad), sin = Math.sin(-rad);
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     function onMove(ev: PointerEvent) {
       const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      let next: { x: number; y: number; w: number; h: number };
       if (mode === "move") {
-        onChange({ x: snap(orig.x + dx), y: snap(orig.y + dy) });
+        const nx = rotated ? orig.x + dx : snap(orig.x + dx);
+        const ny = rotated ? orig.y + dy : snap(orig.y + dy);
+        next = { x: nx, y: ny, w: orig.w, h: orig.h };
       } else {
-        onChange({ w: Math.max(20, snap(orig.w + dx)), h: Math.max(20, snap(orig.h + dy)) });
+        // Rotate screen delta to element-local frame, then resize around center
+        const ldx = dx * cos - dy * sin;
+        const ldy = dx * sin + dy * cos;
+        let nw = Math.max(20, orig.w + ldx);
+        let nh = Math.max(20, orig.h + ldy);
+        if (!rotated) { nw = Math.max(20, snap(nw)); nh = Math.max(20, snap(nh)); }
+        const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
+        next = { x: cx - nw / 2, y: cy - nh / 2, w: nw, h: nh };
       }
+      dragRef.current = next;
+      setDrag(next);
     }
     function onUp() {
-      target.releasePointerCapture(e.pointerId);
+      const final = dragRef.current;
+      dragRef.current = null;
+      setDrag(null);
+      try { target.releasePointerCapture(e.pointerId); } catch {}
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      if (final) onChange(final);
     }
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   }
 
+  const display = drag ?? { x: el.x, y: el.y, w: el.w, h: el.h };
+  const displayEl: LayoutElement = { ...el, ...display };
   const baseStyle: React.CSSProperties = {
-    position: "absolute", left: el.x, top: el.y, width: el.w, height: el.h,
+    position: "absolute", left: display.x, top: display.y, width: display.w, height: display.h,
     transform: `rotate(${el.rotation}deg)`, transformOrigin: "center",
     touchAction: "none",
   };
@@ -588,7 +692,7 @@ function ElementNode({
       onPointerDown={(e) => startDrag(e, "move")}
       className={`${selected ? "outline outline-2 outline-primary" : ""} ${readOnly ? "" : "cursor-move"}`}
     >
-      <ElementVisual el={el} />
+      <ElementVisual el={displayEl} />
       {selected && isResizable(el.type) && (
         <div
           onPointerDown={(e) => startDrag(e, "resize")}
