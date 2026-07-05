@@ -630,6 +630,8 @@ function ElementNode({
   onSelect: () => void; onChange: (patch: Partial<LayoutElement>) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const dragRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
 
   function startDrag(e: React.PointerEvent, mode: "move" | "resize") {
     if (readOnly) return;
@@ -637,27 +639,48 @@ function ElementNode({
     onSelect();
     const startX = e.clientX, startY = e.clientY;
     const orig = { x: el.x, y: el.y, w: el.w, h: el.h };
+    const rotated = (((el.rotation % 360) + 360) % 360) !== 0;
+    const rad = (el.rotation * Math.PI) / 180;
+    const cos = Math.cos(-rad), sin = Math.sin(-rad);
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     function onMove(ev: PointerEvent) {
       const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      let next: { x: number; y: number; w: number; h: number };
       if (mode === "move") {
-        onChange({ x: snap(orig.x + dx), y: snap(orig.y + dy) });
+        const nx = rotated ? orig.x + dx : snap(orig.x + dx);
+        const ny = rotated ? orig.y + dy : snap(orig.y + dy);
+        next = { x: nx, y: ny, w: orig.w, h: orig.h };
       } else {
-        onChange({ w: Math.max(20, snap(orig.w + dx)), h: Math.max(20, snap(orig.h + dy)) });
+        // Rotate screen delta to element-local frame, then resize around center
+        const ldx = dx * cos - dy * sin;
+        const ldy = dx * sin + dy * cos;
+        let nw = Math.max(20, orig.w + ldx);
+        let nh = Math.max(20, orig.h + ldy);
+        if (!rotated) { nw = Math.max(20, snap(nw)); nh = Math.max(20, snap(nh)); }
+        const cx = orig.x + orig.w / 2, cy = orig.y + orig.h / 2;
+        next = { x: cx - nw / 2, y: cy - nh / 2, w: nw, h: nh };
       }
+      dragRef.current = next;
+      setDrag(next);
     }
     function onUp() {
-      target.releasePointerCapture(e.pointerId);
+      const final = dragRef.current;
+      dragRef.current = null;
+      setDrag(null);
+      try { target.releasePointerCapture(e.pointerId); } catch {}
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      if (final) onChange(final);
     }
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   }
 
+  const display = drag ?? { x: el.x, y: el.y, w: el.w, h: el.h };
+  const displayEl: LayoutElement = { ...el, ...display };
   const baseStyle: React.CSSProperties = {
-    position: "absolute", left: el.x, top: el.y, width: el.w, height: el.h,
+    position: "absolute", left: display.x, top: display.y, width: display.w, height: display.h,
     transform: `rotate(${el.rotation}deg)`, transformOrigin: "center",
     touchAction: "none",
   };
@@ -669,7 +692,7 @@ function ElementNode({
       onPointerDown={(e) => startDrag(e, "move")}
       className={`${selected ? "outline outline-2 outline-primary" : ""} ${readOnly ? "" : "cursor-move"}`}
     >
-      <ElementVisual el={el} />
+      <ElementVisual el={displayEl} />
       {selected && isResizable(el.type) && (
         <div
           onPointerDown={(e) => startDrag(e, "resize")}
