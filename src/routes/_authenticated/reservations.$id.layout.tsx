@@ -777,6 +777,8 @@ function LayoutEditor() {
             onDrop={onCanvasDrop}
             onBackgroundClick={() => setSelectedId(null)}
             canvasRef={canvasRef}
+            bgUrl={bgUrl}
+            bgOpacity={layout.backgroundImage?.opacity ?? 0.5}
           >
             {layout.elements.map((el) => (
               <ElementNode
