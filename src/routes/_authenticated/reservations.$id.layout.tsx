@@ -11,6 +11,7 @@ import {
   ArrowLeft, Save, Printer, FileImage, FileText, Trash2, RotateCw,
   Square, Circle, Armchair, Users, DoorOpen, Music, Crown, Plus, Minus,
   AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater, Copy,
+  Undo2, Redo2, ZoomIn, ZoomOut, Maximize2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
