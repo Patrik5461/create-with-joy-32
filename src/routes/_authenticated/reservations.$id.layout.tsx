@@ -1048,6 +1048,28 @@ function CanvasViewport({
             backgroundSize: `${GRID}px ${GRID}px`,
           }}
         >
+          {bgUrl && (
+            <img
+              src={bgUrl}
+              alt=""
+              draggable={false}
+              style={{
+                position: "absolute", inset: 0, width: "100%", height: "100%",
+                objectFit: "cover", opacity: bgOpacity ?? 0.5, pointerEvents: "none",
+                userSelect: "none",
+              }}
+            />
+          )}
+          {layout.roomWidthM && layout.roomHeightM && (
+            <div
+              className="absolute pointer-events-none border-2 border-dashed border-slate-500/60 rounded"
+              style={{ left: 0, top: 0, width: layout.width, height: layout.height }}
+            >
+              <div className="absolute -top-6 left-0 text-[11px] font-medium text-slate-600 bg-white/80 px-1 rounded">
+                {layout.roomWidthM} × {layout.roomHeightM} m
+              </div>
+            </div>
+          )}
           {children}
         </div>
       </div>
