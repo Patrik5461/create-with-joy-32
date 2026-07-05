@@ -119,7 +119,7 @@ export function DocumentsSection({ reservation }: Props) {
           item_name: it.name,
           item_code: it.code,
           qty_expected: it.qty,
-          qty_actual: it.qty,
+          qty_actual: 0,
           condition: "ok" as const,
         }));
         const { error: e2 } = await supabase.from("protocol_items").insert(rows);
