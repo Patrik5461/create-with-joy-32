@@ -697,6 +697,33 @@ export type Database = {
           },
         ]
       }
+      layout_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data: Json
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data: Json
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       logistics: {
         Row: {
           assigned_to: string | null
