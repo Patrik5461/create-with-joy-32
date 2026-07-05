@@ -386,7 +386,7 @@ function LayoutEditor() {
 
   const save = useMutation({
     mutationFn: async () => {
-      const toSave: LayoutData = { ...layout, schemaVersion: 1 };
+      const toSave: LayoutData = { ...layout, schemaVersion: 2 };
       const { error } = await supabase.from("reservations").update({ layout: toSave as any }).eq("id", id);
       if (error) throw error;
       return toSave;
