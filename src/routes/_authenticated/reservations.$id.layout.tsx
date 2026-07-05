@@ -142,6 +142,23 @@ function escapeXml(value: string) {
   return value.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char] ?? char);
 }
 
+async function fetchBackgroundDataUrl(path: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from("layout-backgrounds")
+      .createSignedUrl(path, 60 * 60);
+    if (error || !data?.signedUrl) return null;
+    const res = await fetch(data.signedUrl);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = () => reject(new Error("read fail"));
+      r.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
 function layoutToSvg(layout: LayoutData) {
   const gridLines: string[] = [];
   for (let x = 0; x <= layout.width; x += GRID) gridLines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${layout.height}" stroke="#e5e7eb" stroke-width="1"/>`);
