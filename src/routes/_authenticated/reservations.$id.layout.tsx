@@ -189,9 +189,9 @@ function layoutToSvg(layout: LayoutData) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}"><rect width="100%" height="100%" fill="#ffffff"/>${bg}${gridLines.join("")}${elements}</svg>`;
 }
 
-async function exportLayoutAsPng({ layout, filename }: ExportLayoutOptions) {
+async function exportLayoutAsPng({ layout, filename, backgroundDataUrl }: ExportLayoutOptions) {
   if (typeof document === "undefined") return;
-  const svg = layoutToSvg(layout);
+  const svg = layoutToSvg({ ...(layout as any), __bgDataUrl: backgroundDataUrl } as LayoutData);
   const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const image = new Image();
@@ -224,9 +224,9 @@ async function exportLayoutAsPng({ layout, filename }: ExportLayoutOptions) {
   link.click();
 }
 
-async function exportLayoutAsPdf({ layout, filename }: ExportLayoutOptions) {
+async function exportLayoutAsPdf({ layout, filename, backgroundDataUrl }: ExportLayoutOptions) {
   if (typeof window === "undefined") return;
-  const svg = layoutToSvg(layout);
+  const svg = layoutToSvg({ ...(layout as any), __bgDataUrl: backgroundDataUrl } as LayoutData);
   const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1200,height=800");
   if (!printWindow) throw new Error("Prehliadač zablokoval otvorenie okna pre PDF export.");
   printWindow.document.write(`<!doctype html><html><head><title>${escapeXml(filename)}</title><style>@page{size:landscape;margin:10mm}body{margin:0;background:#fff;font-family:Arial,sans-serif}.wrap{width:100vw;height:100vh;display:grid;place-items:center}svg{max-width:100%;max-height:100%;width:auto;height:auto}</style></head><body><div class="wrap">${svg}</div><script>window.onload=()=>{window.focus();window.print();};</script></body></html>`);
