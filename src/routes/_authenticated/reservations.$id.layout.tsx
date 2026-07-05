@@ -11,6 +11,7 @@ import {
   ArrowLeft, Save, Printer, FileImage, FileText, Trash2, RotateCw,
   Square, Circle, Armchair, Users, DoorOpen, Music, Crown, Plus, Minus,
   AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater, Copy,
+  Undo2, Redo2, ZoomIn, ZoomOut, Maximize2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -237,6 +238,59 @@ function LayoutEditor() {
   const [savedSnapshot, setSavedSnapshot] = useState<string>("");
   const [invalidLoaded, setInvalidLoaded] = useState(false);
 
+  // ---- Undo/Redo history ----
+  const historyRef = useRef<{ stack: LayoutData[]; idx: number }>({ stack: [], idx: -1 });
+  const [historyTick, setHistoryTick] = useState(0);
+  const canUndo = historyRef.current.idx > 0;
+  const canRedo = historyRef.current.idx < historyRef.current.stack.length - 1;
+  void historyTick;
+
+  function seedHistory(l: LayoutData) {
+    historyRef.current = { stack: [l], idx: 0 };
+    setHistoryTick((t) => t + 1);
+  }
+  function commit(next: LayoutData) {
+    const h = historyRef.current;
+    const trimmed = h.stack.slice(0, h.idx + 1);
+    trimmed.push(next);
+    const capped = trimmed.slice(-50);
+    historyRef.current = { stack: capped, idx: capped.length - 1 };
+    setLayout(next);
+    setHistoryTick((t) => t + 1);
+  }
+  function undo() {
+    const h = historyRef.current;
+    if (h.idx <= 0) return;
+    const idx = h.idx - 1;
+    historyRef.current = { stack: h.stack, idx };
+    setLayout(h.stack[idx]);
+    setHistoryTick((t) => t + 1);
+  }
+  function redo() {
+    const h = historyRef.current;
+    if (h.idx >= h.stack.length - 1) return;
+    const idx = h.idx + 1;
+    historyRef.current = { stack: h.stack, idx };
+    setLayout(h.stack[idx]);
+    setHistoryTick((t) => t + 1);
+  }
+
+  // ---- Zoom / viewport ----
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  function clampZoom(z: number) { return Math.max(0.25, Math.min(2, Math.round(z * 100) / 100)); }
+  function zoomIn() { setZoom((z) => clampZoom(z * 1.15)); }
+  function zoomOut() { setZoom((z) => clampZoom(z / 1.15)); }
+  function zoomFit() {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const zx = vp.clientWidth / (layout.width + 40);
+    const zy = vp.clientHeight / (layout.height + 40);
+    setZoom(clampZoom(Math.min(zx, zy)));
+    requestAnimationFrame(() => { if (vp) { vp.scrollLeft = 0; vp.scrollTop = 0; } });
+  }
+  function zoomReset() { setZoom(1); }
+
   useEffect(() => {
     if (!reservation.data || loaded) return;
     const raw = reservation.data.layout as unknown;
@@ -248,6 +302,7 @@ function LayoutEditor() {
         const empty: LayoutData = { width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 };
         setLayout(empty);
         setSavedSnapshot("");
+        seedHistory(empty);
       } else if (parsed) {
         const next: LayoutData = {
           width: parsed.width || CANVAS_W,
@@ -257,11 +312,16 @@ function LayoutEditor() {
         };
         setLayout(next);
         setSavedSnapshot(JSON.stringify(next));
+        seedHistory(next);
       } else {
-        setSavedSnapshot(JSON.stringify({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 }));
+        const empty: LayoutData = { width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 };
+        setSavedSnapshot(JSON.stringify(empty));
+        seedHistory(empty);
       }
     } else {
-      setSavedSnapshot(JSON.stringify({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 }));
+      const empty: LayoutData = { width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 };
+      setSavedSnapshot(JSON.stringify(empty));
+      seedHistory(empty);
     }
     setLoaded(true);
   }, [reservation.data, loaded]);
@@ -300,21 +360,19 @@ function LayoutEditor() {
 
   const selected = useMemo(() => layout.elements.find((e) => e.id === selectedId) ?? null, [layout, selectedId]);
 
-  function updateEl(id: string, patch: Partial<LayoutElement>) {
-    setLayout((l) => ({ ...l, elements: l.elements.map((e) => e.id === id ? { ...e, ...patch } : e) }));
+  function updateEl(elId: string, patch: Partial<LayoutElement>) {
+    commit({ ...layout, elements: layout.elements.map((e) => e.id === elId ? { ...e, ...patch } : e) });
   }
-  function removeEl(id: string) {
-    setLayout((l) => ({ ...l, elements: l.elements.filter((e) => e.id !== id) }));
+  function removeEl(elId: string) {
+    commit({ ...layout, elements: layout.elements.filter((e) => e.id !== elId) });
     setSelectedId(null);
   }
-  function duplicateEl(id: string) {
-    setLayout((l) => {
-      const src = l.elements.find((e) => e.id === id);
-      if (!src) return l;
-      const copy: LayoutElement = { ...src, id: uid(), x: snap(src.x + 30), y: snap(src.y + 30) };
-      setSelectedId(copy.id);
-      return { ...l, elements: [...l.elements, copy] };
-    });
+  function duplicateEl(elId: string) {
+    const src = layout.elements.find((e) => e.id === elId);
+    if (!src) return;
+    const copy: LayoutElement = { ...src, id: uid(), x: snap(src.x + 30), y: snap(src.y + 30) };
+    commit({ ...layout, elements: [...layout.elements, copy] });
+    setSelectedId(copy.id);
   }
   function addEl(type: ElType, x = 100, y = 100) {
     const def = PALETTE.find((p) => p.type === type)!;
@@ -324,19 +382,26 @@ function LayoutEditor() {
       rotation: 0, label: def.defaults.label, chairCount: def.defaults.chairCount,
       color: isZone(type) ? ZONE_COLORS[type] : undefined,
     };
-    setLayout((l) => ({ ...l, elements: [...l.elements, el] }));
+    commit({ ...layout, elements: [...layout.elements, el] });
     setSelectedId(el.id);
+  }
+  function addAtViewportCenter(type: ElType) {
+    const vp = viewportRef.current;
+    const def = PALETTE.find((p) => p.type === type)!;
+    const w = def.defaults.w ?? 100, h = def.defaults.h ?? 100;
+    if (!vp) { addEl(type, layout.width / 2 - w / 2, layout.height / 2 - h / 2); return; }
+    const cxLayout = (vp.scrollLeft + vp.clientWidth / 2) / zoom;
+    const cyLayout = (vp.scrollTop + vp.clientHeight / 2) / zoom;
+    addEl(type, cxLayout - w / 2, cyLayout - h / 2);
   }
 
   // ---- Alignment helpers (operate on tables) ----
   function withTables(fn: (tables: LayoutElement[]) => LayoutElement[]) {
-    setLayout((l) => {
-      const tables = l.elements.filter((e) => isTable(e.type));
-      if (tables.length === 0) { toast.info("Žiadne stoly na zarovnanie."); return l; }
-      const updated = fn(tables);
-      const map = new Map(updated.map((e) => [e.id, e]));
-      return { ...l, elements: l.elements.map((e) => map.get(e.id) ?? e) };
-    });
+    const tables = layout.elements.filter((e) => isTable(e.type));
+    if (tables.length === 0) { toast.info("Žiadne stoly na zarovnanie."); return; }
+    const updated = fn(tables);
+    const map = new Map(updated.map((e) => [e.id, e]));
+    commit({ ...layout, elements: layout.elements.map((e) => map.get(e.id) ?? e) });
   }
   function alignTables(mode: "left" | "right" | "top" | "bottom" | "hcenter" | "vcenter" | "distH" | "distV") {
     withTables((tables) => {
@@ -407,15 +472,20 @@ function LayoutEditor() {
   useEffect(() => {
     if (readOnly) return;
     function onKey(e: KeyboardEvent) {
-      if (!selectedId) return;
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const inEditable = tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable;
+      const meta = e.ctrlKey || e.metaKey;
+      // Undo / redo work even in editable fields is annoying; skip in inputs
+      if (!inEditable && meta && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
+      if (!inEditable && meta && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
+      if (!selectedId) return;
+      if (inEditable) return;
       if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); removeEl(selectedId); }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateEl(selectedId); }
+      if (meta && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateEl(selectedId); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, readOnly]);
+  }, [selectedId, readOnly, layout]);
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -449,6 +519,20 @@ function LayoutEditor() {
               <Link to="/reservations/$id" params={{ id }}><ArrowLeft className="size-4 mr-1" />Späť na rezerváciu</Link>
             </Button>
             <div className="flex flex-wrap gap-2">
+              <div className="flex items-center gap-1 rounded-md border bg-background px-1">
+                <Button variant="ghost" size="icon" className="size-8" onClick={undo} disabled={!canUndo} title="Späť (Ctrl/Cmd+Z)">
+                  <Undo2 className="size-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="size-8" onClick={redo} disabled={!canRedo} title="Znova (Ctrl/Cmd+Shift+Z / Ctrl+Y)">
+                  <Redo2 className="size-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-1 rounded-md border bg-background px-1">
+                <Button variant="ghost" size="icon" className="size-8" onClick={zoomOut} title="Oddialiť"><ZoomOut className="size-4" /></Button>
+                <button type="button" onClick={zoomReset} className="text-xs tabular-nums px-1 min-w-[3ch] text-center hover:underline" title="100 %">{Math.round(zoom * 100)}%</button>
+                <Button variant="ghost" size="icon" className="size-8" onClick={zoomIn} title="Priblížiť"><ZoomIn className="size-4" /></Button>
+                <Button variant="ghost" size="icon" className="size-8" onClick={zoomFit} title="Prispôsobiť obrazovke"><Maximize2 className="size-4" /></Button>
+              </div>
               <Button variant="outline" size="sm" onClick={() => navigate({ to: "/reservations/$id/layout", params: { id }, search: { view: true } })}>
                 <Printer className="size-4 mr-1" />Náhľad / Tlač
               </Button>
@@ -504,45 +588,43 @@ function LayoutEditor() {
                     key={p.type}
                     draggable
                     onDragStart={(e) => onPaletteDragStart(e, p.type)}
-                    onDoubleClick={() => addEl(p.type, 200, 200)}
-                    className="flex items-center gap-2 p-2 rounded-md border cursor-grab hover:bg-muted/60 active:cursor-grabbing select-none"
-                    title="Pretiahnite na plátno alebo dvojklik"
+                    onClick={() => addAtViewportCenter(p.type)}
+                    onDoubleClick={() => addAtViewportCenter(p.type)}
+                    className="flex items-center gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/60 active:bg-muted select-none touch-manipulation"
+                    title="Klepnite pre pridanie na plátno (alebo pretiahnite)"
                   >
                     <p.icon className="size-4 shrink-0" />
                     <span className="text-xs">{p.label}</span>
+                    <Plus className="size-3 ml-auto text-muted-foreground" />
                   </div>
                 ))}
-                <p className="text-[10px] text-muted-foreground pt-1">Pretiahnite prvok na plátno. Klávesa Delete vymaže označený prvok.</p>
+                <p className="text-[10px] text-muted-foreground pt-1">Klepnite pre pridanie alebo pretiahnite. Delete vymaže označený prvok.</p>
               </CardContent>
             </Card>
           )}
 
-          <div className="overflow-auto rounded-lg border bg-white">
-            <div
-              ref={canvasRef}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={onCanvasDrop}
-              onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedId(null); }}
-              className="relative bg-white"
-              style={{
-                width: layout.width, height: layout.height,
-                backgroundImage: readOnly ? undefined :
-                  `linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)`,
-                backgroundSize: `${GRID}px ${GRID}px`,
-              }}
-            >
-              {layout.elements.map((el) => (
-                <ElementNode
-                  key={el.id}
-                  el={el}
-                  selected={!readOnly && selectedId === el.id}
-                  readOnly={readOnly}
-                  onSelect={() => setSelectedId(el.id)}
-                  onChange={(patch) => updateEl(el.id, patch)}
-                />
-              ))}
-            </div>
-          </div>
+          <CanvasViewport
+            viewportRef={viewportRef}
+            zoom={zoom}
+            setZoom={setZoom}
+            layout={layout}
+            readOnly={readOnly}
+            onDrop={onCanvasDrop}
+            onBackgroundClick={() => setSelectedId(null)}
+            canvasRef={canvasRef}
+          >
+            {layout.elements.map((el) => (
+              <ElementNode
+                key={el.id}
+                el={el}
+                zoom={zoom}
+                selected={!readOnly && selectedId === el.id}
+                readOnly={readOnly}
+                onSelect={() => setSelectedId(el.id)}
+                onChange={(patch) => updateEl(el.id, patch)}
+              />
+            ))}
+          </CanvasViewport>
 
           {!readOnly && (
             <Card className="print:hidden">
@@ -624,9 +706,9 @@ function LayoutEditor() {
 
 // ---------------- Element rendering + drag ----------------
 function ElementNode({
-  el, selected, readOnly, onSelect, onChange,
+  el, zoom, selected, readOnly, onSelect, onChange,
 }: {
-  el: LayoutElement; selected: boolean; readOnly: boolean;
+  el: LayoutElement; zoom: number; selected: boolean; readOnly: boolean;
   onSelect: () => void; onChange: (patch: Partial<LayoutElement>) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -638,6 +720,7 @@ function ElementNode({
     e.stopPropagation();
     onSelect();
     const startX = e.clientX, startY = e.clientY;
+    const zoomFactor = zoom || 1;
     const orig = { x: el.x, y: el.y, w: el.w, h: el.h };
     const rotated = (((el.rotation % 360) + 360) % 360) !== 0;
     const rad = (el.rotation * Math.PI) / 180;
@@ -645,7 +728,9 @@ function ElementNode({
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     function onMove(ev: PointerEvent) {
-      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      // Screen delta → layout delta (canvas is scaled by CSS transform)
+      const dx = (ev.clientX - startX) / zoomFactor;
+      const dy = (ev.clientY - startY) / zoomFactor;
       let next: { x: number; y: number; w: number; h: number };
       if (mode === "move") {
         const nx = rotated ? orig.x + dx : snap(orig.x + dx);
@@ -696,10 +781,107 @@ function ElementNode({
       {selected && isResizable(el.type) && (
         <div
           onPointerDown={(e) => startDrag(e, "resize")}
-          className="absolute -right-1 -bottom-1 size-3 bg-primary rounded-sm cursor-se-resize"
-          style={{ touchAction: "none" }}
-        />
+          className="absolute flex items-center justify-center cursor-se-resize"
+          style={{ right: -12, bottom: -12, width: 24, height: 24, touchAction: "none" }}
+          aria-label="Zmeniť veľkosť"
+        >
+          <div className="size-3 bg-primary rounded-sm shadow" />
+        </div>
       )}
+    </div>
+  );
+}
+
+// ---------------- Canvas viewport (zoom + pan) ----------------
+function CanvasViewport({
+  viewportRef, canvasRef, zoom, setZoom, layout, readOnly, onDrop, onBackgroundClick, children,
+}: {
+  viewportRef: React.RefObject<HTMLDivElement | null>;
+  canvasRef: React.RefObject<HTMLDivElement | null>;
+  zoom: number;
+  setZoom: React.Dispatch<React.SetStateAction<number>>;
+  layout: LayoutData;
+  readOnly: boolean;
+  onDrop: (e: React.DragEvent) => void;
+  onBackgroundClick: () => void;
+  children: React.ReactNode;
+}) {
+  // Ctrl/Cmd + wheel zoom
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    function onWheel(e: WheelEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 1 / 1.1 : 1.1;
+      setZoom((z) => Math.max(0.25, Math.min(2, Math.round(z * delta * 100) / 100)));
+    }
+    vp.addEventListener("wheel", onWheel, { passive: false });
+    return () => vp.removeEventListener("wheel", onWheel);
+  }, [viewportRef, setZoom]);
+
+  // Two-finger pinch zoom
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    let startDist = 0;
+    let startZoom = 1;
+    function dist(t: TouchList) {
+      const [a, b] = [t[0], t[1]];
+      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    }
+    function onStart(e: TouchEvent) {
+      if (e.touches.length !== 2) return;
+      startDist = dist(e.touches);
+      setZoom((z) => { startZoom = z; return z; });
+    }
+    function onMove(e: TouchEvent) {
+      if (e.touches.length !== 2 || startDist === 0) return;
+      e.preventDefault();
+      const d = dist(e.touches);
+      const ratio = d / startDist;
+      setZoom(() => Math.max(0.25, Math.min(2, Math.round(startZoom * ratio * 100) / 100)));
+    }
+    function onEnd() { startDist = 0; }
+    vp.addEventListener("touchstart", onStart, { passive: true });
+    vp.addEventListener("touchmove", onMove, { passive: false });
+    vp.addEventListener("touchend", onEnd);
+    vp.addEventListener("touchcancel", onEnd);
+    return () => {
+      vp.removeEventListener("touchstart", onStart);
+      vp.removeEventListener("touchmove", onMove);
+      vp.removeEventListener("touchend", onEnd);
+      vp.removeEventListener("touchcancel", onEnd);
+    };
+  }, [viewportRef, setZoom]);
+
+  const scaledW = layout.width * zoom;
+  const scaledH = layout.height * zoom;
+
+  return (
+    <div
+      ref={viewportRef}
+      className="overflow-auto rounded-lg border bg-white"
+      style={{ maxHeight: "calc(100vh - 220px)", minHeight: 320, touchAction: "pan-x pan-y" }}
+    >
+      <div style={{ width: scaledW, height: scaledH, position: "relative" }}>
+        <div
+          ref={canvasRef}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onDrop}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) onBackgroundClick(); }}
+          className="relative bg-white"
+          style={{
+            width: layout.width, height: layout.height,
+            transform: `scale(${zoom})`, transformOrigin: "0 0",
+            backgroundImage: readOnly ? undefined :
+              `linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)`,
+            backgroundSize: `${GRID}px ${GRID}px`,
+          }}
+        >
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
