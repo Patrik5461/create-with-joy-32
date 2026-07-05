@@ -519,6 +519,20 @@ function LayoutEditor() {
               <Link to="/reservations/$id" params={{ id }}><ArrowLeft className="size-4 mr-1" />Späť na rezerváciu</Link>
             </Button>
             <div className="flex flex-wrap gap-2">
+              <div className="flex items-center gap-1 rounded-md border bg-background px-1">
+                <Button variant="ghost" size="icon" className="size-8" onClick={undo} disabled={!canUndo} title="Späť (Ctrl/Cmd+Z)">
+                  <Undo2 className="size-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="size-8" onClick={redo} disabled={!canRedo} title="Znova (Ctrl/Cmd+Shift+Z / Ctrl+Y)">
+                  <Redo2 className="size-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-1 rounded-md border bg-background px-1">
+                <Button variant="ghost" size="icon" className="size-8" onClick={zoomOut} title="Oddialiť"><ZoomOut className="size-4" /></Button>
+                <button type="button" onClick={zoomReset} className="text-xs tabular-nums px-1 min-w-[3ch] text-center hover:underline" title="100 %">{Math.round(zoom * 100)}%</button>
+                <Button variant="ghost" size="icon" className="size-8" onClick={zoomIn} title="Priblížiť"><ZoomIn className="size-4" /></Button>
+                <Button variant="ghost" size="icon" className="size-8" onClick={zoomFit} title="Prispôsobiť obrazovke"><Maximize2 className="size-4" /></Button>
+              </div>
               <Button variant="outline" size="sm" onClick={() => navigate({ to: "/reservations/$id/layout", params: { id }, search: { view: true } })}>
                 <Printer className="size-4 mr-1" />Náhľad / Tlač
               </Button>
