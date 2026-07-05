@@ -275,6 +275,12 @@ function LayoutEditor() {
   const [loaded, setLoaded] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState<string>("");
   const [invalidLoaded, setInvalidLoaded] = useState(false);
+  const [bgUrl, setBgUrl] = useState<string | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   // ---- Undo/Redo history ----
   const historyRef = useRef<{ stack: LayoutData[]; idx: number }>({ stack: [], idx: -1 });
