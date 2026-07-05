@@ -8,10 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft, Save, Printer, FileImage, FileText, Trash2, RotateCw,
   Square, Circle, Armchair, Users, DoorOpen, Music, Crown, Plus, Minus,
   AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater, Copy,
-  Undo2, Redo2, ZoomIn, ZoomOut, Maximize2,
+  Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, Image as ImageIcon, BookOpen, BookmarkPlus, X, Ruler,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -54,6 +57,10 @@ interface LayoutData {
   height: number;
   elements: LayoutElement[];
   schemaVersion?: number;
+  roomWidthM?: number;
+  roomHeightM?: number;
+  pxPerMeter?: number;
+  backgroundImage?: { path: string; opacity?: number } | null;
 }
 
 // ---------------- Zod validation ----------------
@@ -73,11 +80,19 @@ const LayoutElementSchema = z.object({
   color: z.string().optional(),
   chairCount: z.number().optional(),
 });
+const BackgroundImageSchema = z.object({
+  path: z.string(),
+  opacity: z.number().min(0).max(1).optional(),
+}).nullable().optional();
 const LayoutDataSchema = z.object({
   width: z.number().positive(),
   height: z.number().positive(),
   elements: z.array(LayoutElementSchema),
   schemaVersion: z.number().optional().default(1),
+  roomWidthM: z.number().positive().optional(),
+  roomHeightM: z.number().positive().optional(),
+  pxPerMeter: z.number().positive().optional(),
+  backgroundImage: BackgroundImageSchema,
 });
 
 function parseLayout(raw: unknown): { layout: LayoutData | null; invalid: boolean } {
@@ -90,6 +105,7 @@ function parseLayout(raw: unknown): { layout: LayoutData | null; invalid: boolea
 interface ExportLayoutOptions {
   layout: LayoutData;
   filename: string;
+  backgroundDataUrl?: string;
 }
 
 const CANVAS_W = 1400;
@@ -126,10 +142,32 @@ function escapeXml(value: string) {
   return value.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char] ?? char);
 }
 
+async function fetchBackgroundDataUrl(path: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from("layout-backgrounds")
+      .createSignedUrl(path, 60 * 60);
+    if (error || !data?.signedUrl) return null;
+    const res = await fetch(data.signedUrl);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = () => reject(new Error("read fail"));
+      r.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
 function layoutToSvg(layout: LayoutData) {
   const gridLines: string[] = [];
   for (let x = 0; x <= layout.width; x += GRID) gridLines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${layout.height}" stroke="#e5e7eb" stroke-width="1"/>`);
   for (let y = 0; y <= layout.height; y += GRID) gridLines.push(`<line x1="0" y1="${y}" x2="${layout.width}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/>`);
+
+  const backgroundDataUrl = (layout as LayoutData & { __bgDataUrl?: string }).__bgDataUrl;
+  const bg = (backgroundDataUrl && layout.backgroundImage)
+    ? `<image href="${backgroundDataUrl}" x="0" y="0" width="${layout.width}" height="${layout.height}" opacity="${layout.backgroundImage.opacity ?? 0.5}" preserveAspectRatio="xMidYMid slice"/>`
+    : "";
 
   const elements = layout.elements.map((el) => {
     const label = escapeXml(el.label || (isZone(el.type) ? "Zóna" : el.type === "stage" ? "PÓDIUM" : el.type === "chair" ? "" : "Stôl"));
@@ -165,12 +203,12 @@ function layoutToSvg(layout: LayoutData) {
     return `<g transform="${transform}"><rect width="${el.w}" height="${el.h}" rx="8" fill="${color}33" stroke="${color}" stroke-width="2" stroke-dasharray="8 6"/><text x="${el.w / 2}" y="${el.h / 2 + 5}" text-anchor="middle" font-size="14" font-weight="700" fill="${color}">${label}</text></g>`;
   }).join("");
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}"><rect width="100%" height="100%" fill="#ffffff"/>${gridLines.join("")}${elements}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}"><rect width="100%" height="100%" fill="#ffffff"/>${bg}${gridLines.join("")}${elements}</svg>`;
 }
 
-async function exportLayoutAsPng({ layout, filename }: ExportLayoutOptions) {
+async function exportLayoutAsPng({ layout, filename, backgroundDataUrl }: ExportLayoutOptions) {
   if (typeof document === "undefined") return;
-  const svg = layoutToSvg(layout);
+  const svg = layoutToSvg({ ...(layout as any), __bgDataUrl: backgroundDataUrl } as LayoutData);
   const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const image = new Image();
@@ -203,9 +241,9 @@ async function exportLayoutAsPng({ layout, filename }: ExportLayoutOptions) {
   link.click();
 }
 
-async function exportLayoutAsPdf({ layout, filename }: ExportLayoutOptions) {
+async function exportLayoutAsPdf({ layout, filename, backgroundDataUrl }: ExportLayoutOptions) {
   if (typeof window === "undefined") return;
-  const svg = layoutToSvg(layout);
+  const svg = layoutToSvg({ ...(layout as any), __bgDataUrl: backgroundDataUrl } as LayoutData);
   const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1200,height=800");
   if (!printWindow) throw new Error("Prehliadač zablokoval otvorenie okna pre PDF export.");
   printWindow.document.write(`<!doctype html><html><head><title>${escapeXml(filename)}</title><style>@page{size:landscape;margin:10mm}body{margin:0;background:#fff;font-family:Arial,sans-serif}.wrap{width:100vw;height:100vh;display:grid;place-items:center}svg{max-width:100%;max-height:100%;width:auto;height:auto}</style></head><body><div class="wrap">${svg}</div><script>window.onload=()=>{window.focus();window.print();};</script></body></html>`);
@@ -237,6 +275,12 @@ function LayoutEditor() {
   const [loaded, setLoaded] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState<string>("");
   const [invalidLoaded, setInvalidLoaded] = useState(false);
+  const [bgUrl, setBgUrl] = useState<string | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   // ---- Undo/Redo history ----
   const historyRef = useRef<{ stack: LayoutData[]; idx: number }>({ stack: [], idx: -1 });
@@ -342,7 +386,7 @@ function LayoutEditor() {
 
   const save = useMutation({
     mutationFn: async () => {
-      const toSave: LayoutData = { ...layout, schemaVersion: 1 };
+      const toSave: LayoutData = { ...layout, schemaVersion: 2 };
       const { error } = await supabase.from("reservations").update({ layout: toSave as any }).eq("id", id);
       if (error) throw error;
       return toSave;
@@ -359,6 +403,119 @@ function LayoutEditor() {
   void invalidLoaded;
 
   const selected = useMemo(() => layout.elements.find((e) => e.id === selectedId) ?? null, [layout, selectedId]);
+
+  // ---- Capacity (chairs + tables) ----
+  const capacity = useMemo(() => {
+    let chairs = 0, tables = 0;
+    for (const el of layout.elements) {
+      if (el.type === "chair") chairs++;
+      else if (el.type === "round_table_chairs") { chairs += el.chairCount ?? 0; tables++; }
+      else if (el.type === "rect_table" || el.type === "round_table") tables++;
+    }
+    return { chairs, tables };
+  }, [layout.elements]);
+
+  // ---- Background image signed URL for display ----
+  useEffect(() => {
+    let cancelled = false;
+    const path = layout.backgroundImage?.path;
+    if (!path) { setBgUrl(null); return; }
+    supabase.storage.from("layout-backgrounds").createSignedUrl(path, 60 * 60).then(({ data }) => {
+      if (!cancelled) setBgUrl(data?.signedUrl ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [layout.backgroundImage?.path]);
+
+  async function onUploadBackground(file: File) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Nahrajte prosím obrázok."); return; }
+    const ext = file.name.split(".").pop() ?? "png";
+    const path = `${id}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("layout-backgrounds").upload(path, file, { upsert: true, contentType: file.type });
+    if (error) { toast.error(error.message); return; }
+    // Optionally clean up previous
+    const prev = layout.backgroundImage?.path;
+    if (prev && prev !== path) {
+      supabase.storage.from("layout-backgrounds").remove([prev]).catch(() => {});
+    }
+    commit({ ...layout, backgroundImage: { path, opacity: layout.backgroundImage?.opacity ?? 0.5 } });
+    toast.success("Pôdorys nahraný");
+  }
+  async function removeBackground() {
+    const prev = layout.backgroundImage?.path;
+    if (prev) supabase.storage.from("layout-backgrounds").remove([prev]).catch(() => {});
+    commit({ ...layout, backgroundImage: null });
+  }
+
+  // ---- Templates ----
+  const templates = useQuery({
+    queryKey: ["layout-templates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("layout_templates")
+        .select("id, name, data, created_by, created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const saveAsTemplate = useMutation({
+    mutationFn: async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Zadajte názov šablóny");
+      const payload: LayoutData = { ...layout, schemaVersion: 2 };
+      const { error } = await supabase.from("layout_templates").insert({ name: trimmed, data: payload as any });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Šablóna uložená");
+      setSaveTemplateOpen(false);
+      setNewTemplateName("");
+      qc.invalidateQueries({ queryKey: ["layout-templates"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const renameTemplate = useMutation({
+    mutationFn: async ({ tid, name }: { tid: string; name: string }) => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Zadajte názov");
+      const { error } = await supabase.from("layout_templates").update({ name: trimmed }).eq("id", tid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setRenamingId(null);
+      qc.invalidateQueries({ queryKey: ["layout-templates"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteTemplate = useMutation({
+    mutationFn: async (tid: string) => {
+      const { error } = await supabase.from("layout_templates").delete().eq("id", tid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Šablóna zmazaná");
+      qc.invalidateQueries({ queryKey: ["layout-templates"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  function loadTemplateInto(tid: string) {
+    const tpl = templates.data?.find((t: any) => t.id === tid);
+    if (!tpl) return;
+    const res = LayoutDataSchema.safeParse(tpl.data);
+    if (!res.success) { toast.error("Šablóna má neplatný formát"); return; }
+    const hasContent = layout.elements.length > 0 || !!layout.backgroundImage;
+    if (hasContent && !window.confirm("Prepísať súčasné rozloženie touto šablónou?")) return;
+    // Preserve current background — templates shouldn't drag storage refs across reservations
+    const next: LayoutData = {
+      ...res.data,
+      backgroundImage: layout.backgroundImage ?? null,
+      schemaVersion: 2,
+    };
+    commit(next);
+    setTemplatesOpen(false);
+    toast.success(`Šablóna „${tpl.name}“ načítaná`);
+  }
 
   function updateEl(elId: string, patch: Partial<LayoutElement>) {
     commit({ ...layout, elements: layout.elements.map((e) => e.id === elId ? { ...e, ...patch } : e) });
@@ -490,10 +647,12 @@ function LayoutEditor() {
   const canvasRef = useRef<HTMLDivElement>(null);
 
   async function exportPng() {
-    await exportLayoutAsPng({ layout, filename: `plan-${reservation.data?.event_name ?? id}` });
+    const bgDataUrl = layout.backgroundImage?.path ? (await fetchBackgroundDataUrl(layout.backgroundImage.path)) ?? undefined : undefined;
+    await exportLayoutAsPng({ layout, filename: `plan-${reservation.data?.event_name ?? id}`, backgroundDataUrl: bgDataUrl });
   }
   async function exportPdf() {
-    await exportLayoutAsPdf({ layout, filename: `plan-${reservation.data?.event_name ?? id}` });
+    const bgDataUrl = layout.backgroundImage?.path ? (await fetchBackgroundDataUrl(layout.backgroundImage.path)) ?? undefined : undefined;
+    await exportLayoutAsPdf({ layout, filename: `plan-${reservation.data?.event_name ?? id}`, backgroundDataUrl: bgDataUrl });
   }
 
   // Drag from palette
@@ -535,6 +694,12 @@ function LayoutEditor() {
               </div>
               <Button variant="outline" size="sm" onClick={() => navigate({ to: "/reservations/$id/layout", params: { id }, search: { view: true } })}>
                 <Printer className="size-4 mr-1" />Náhľad / Tlač
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setTemplatesOpen(true)}>
+                <BookOpen className="size-4 mr-1" />Šablóny
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setNewTemplateName(reservation.data?.event_name ?? ""); setSaveTemplateOpen(true); }}>
+                <BookmarkPlus className="size-4 mr-1" />Uložiť ako šablónu
               </Button>
               <Button variant="outline" size="sm" onClick={exportPng}><FileImage className="size-4 mr-1" />PNG</Button>
               <Button variant="outline" size="sm" onClick={exportPdf}><FileText className="size-4 mr-1" />PDF</Button>
@@ -580,6 +745,7 @@ function LayoutEditor() {
 
         <div className={readOnly ? "" : "grid gap-4 lg:grid-cols-[220px_1fr_280px]"}>
           {!readOnly && (
+            <div className="space-y-4 print:hidden">
             <Card className="print:hidden">
               <CardContent className="p-3 space-y-2">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Paleta</div>
@@ -601,6 +767,94 @@ function LayoutEditor() {
                 <p className="text-[10px] text-muted-foreground pt-1">Klepnite pre pridanie alebo pretiahnite. Delete vymaže označený prvok.</p>
               </CardContent>
             </Card>
+            <Card>
+              <CardContent className="p-3 space-y-3">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Ruler className="size-3" />Miestnosť
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px]">Šírka (m)</Label>
+                    <Input type="number" step="0.5" min={0}
+                      value={layout.roomWidthM ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value === "" ? undefined : Math.max(0, Number(e.target.value));
+                        commit({ ...layout, roomWidthM: v });
+                      }} />
+                  </div>
+                  <div>
+                    <Label className="text-[10px]">Dĺžka (m)</Label>
+                    <Input type="number" step="0.5" min={0}
+                      value={layout.roomHeightM ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value === "" ? undefined : Math.max(0, Number(e.target.value));
+                        commit({ ...layout, roomHeightM: v });
+                      }} />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-[10px]">Škála (px/m): {layout.pxPerMeter ?? Math.round((layout.roomWidthM ? layout.width / layout.roomWidthM : 0))}</Label>
+                  <Input type="number" step="1" min={0}
+                    value={layout.pxPerMeter ?? ""}
+                    placeholder="auto"
+                    onChange={(e) => {
+                      const v = e.target.value === "" ? undefined : Math.max(0, Number(e.target.value));
+                      commit({ ...layout, pxPerMeter: v });
+                    }} />
+                </div>
+                <div className="rounded-md bg-muted/40 p-2 text-xs">
+                  <div className="font-medium mb-0.5">Miesta na sedenie</div>
+                  <div className="tabular-nums">
+                    <span className="text-lg font-semibold">{capacity.chairs}</span> stoličiek · {capacity.tables} stolov
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3 space-y-3">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <ImageIcon className="size-3" />Podklad / pôdorys
+                </div>
+                {layout.backgroundImage?.path ? (
+                  <div className="space-y-2">
+                    {bgUrl && (
+                      <img src={bgUrl} alt="Podklad" className="w-full h-24 object-cover rounded border" />
+                    )}
+                    <div>
+                      <Label className="text-[10px]">Priehľadnosť: {Math.round((layout.backgroundImage.opacity ?? 0.5) * 100)}%</Label>
+                      <input type="range" min={0.05} max={1} step={0.05}
+                        value={layout.backgroundImage.opacity ?? 0.5}
+                        onChange={(e) => commit({
+                          ...layout,
+                          backgroundImage: { ...layout.backgroundImage!, opacity: Number(e.target.value) },
+                        })}
+                        className="w-full" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-xs">
+                        <Input type="file" accept="image/*" className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadBackground(f); e.target.value = ""; }} />
+                        <span className="flex items-center justify-center gap-1 h-8 rounded border cursor-pointer hover:bg-muted/60">
+                          <ImageIcon className="size-3" />Vymeniť
+                        </span>
+                      </label>
+                      <Button variant="destructive" size="sm" onClick={removeBackground}>
+                        <X className="size-3 mr-1" />Odstrániť
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="block text-xs">
+                    <Input type="file" accept="image/*" className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadBackground(f); e.target.value = ""; }} />
+                    <span className="flex items-center justify-center gap-1 h-9 rounded border cursor-pointer hover:bg-muted/60">
+                      <ImageIcon className="size-3" />Nahrať pôdorys
+                    </span>
+                  </label>
+                )}
+              </CardContent>
+            </Card>
+            </div>
           )}
 
           <CanvasViewport
@@ -612,6 +866,8 @@ function LayoutEditor() {
             onDrop={onCanvasDrop}
             onBackgroundClick={() => setSelectedId(null)}
             canvasRef={canvasRef}
+            bgUrl={bgUrl}
+            bgOpacity={layout.backgroundImage?.opacity ?? 0.5}
           >
             {layout.elements.map((el) => (
               <ElementNode
@@ -700,6 +956,70 @@ function LayoutEditor() {
           )}
         </div>
       </div>
+      <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Šablóny rozložení</DialogTitle>
+            <DialogDescription>Načítať existujúcu šablónu do tejto rezervácie.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto divide-y">
+            {templates.isLoading && <p className="text-sm text-muted-foreground p-2">Načítavam…</p>}
+            {!templates.isLoading && (templates.data?.length ?? 0) === 0 && (
+              <p className="text-sm text-muted-foreground p-2">Žiadne šablóny zatiaľ nie sú uložené.</p>
+            )}
+            {templates.data?.map((t: any) => {
+              const isRenaming = renamingId === t.id;
+              return (
+                <div key={t.id} className="flex items-center gap-2 py-2">
+                  {isRenaming ? (
+                    <>
+                      <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} className="h-8" />
+                      <Button size="sm" onClick={() => renameTemplate.mutate({ tid: t.id, name: renameValue })} disabled={renameTemplate.isPending}>OK</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setRenamingId(null)}>Zrušiť</Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{t.name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {new Date(t.created_at).toLocaleString("sk-SK")}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => loadTemplateInto(t.id)}>Načítať</Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setRenamingId(t.id); setRenameValue(t.name); }}>Premenovať</Button>
+                      <Button size="icon" variant="ghost" onClick={() => { if (window.confirm(`Zmazať šablónu „${t.name}“?`)) deleteTemplate.mutate(t.id); }}>
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTemplatesOpen(false)}>Zavrieť</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Uložiť ako šablónu</DialogTitle>
+            <DialogDescription>Súčasné rozloženie sa uloží ako opakovane použiteľná šablóna.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-xs">Názov šablóny</Label>
+            <Input value={newTemplateName} onChange={(e) => setNewTemplateName(e.target.value)} placeholder="napr. Svadba 80 hostí" />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSaveTemplateOpen(false)}>Zrušiť</Button>
+            <Button onClick={() => saveAsTemplate.mutate(newTemplateName)} disabled={saveAsTemplate.isPending || !newTemplateName.trim()}>
+              {saveAsTemplate.isPending ? "Ukladám…" : "Uložiť"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -794,7 +1114,7 @@ function ElementNode({
 
 // ---------------- Canvas viewport (zoom + pan) ----------------
 function CanvasViewport({
-  viewportRef, canvasRef, zoom, setZoom, layout, readOnly, onDrop, onBackgroundClick, children,
+  viewportRef, canvasRef, zoom, setZoom, layout, readOnly, onDrop, onBackgroundClick, children, bgUrl, bgOpacity,
 }: {
   viewportRef: React.RefObject<HTMLDivElement | null>;
   canvasRef: React.RefObject<HTMLDivElement | null>;
@@ -805,6 +1125,8 @@ function CanvasViewport({
   onDrop: (e: React.DragEvent) => void;
   onBackgroundClick: () => void;
   children: React.ReactNode;
+  bgUrl?: string | null;
+  bgOpacity?: number;
 }) {
   // Ctrl/Cmd + wheel zoom
   useEffect(() => {
@@ -879,6 +1201,28 @@ function CanvasViewport({
             backgroundSize: `${GRID}px ${GRID}px`,
           }}
         >
+          {bgUrl && (
+            <img
+              src={bgUrl}
+              alt=""
+              draggable={false}
+              style={{
+                position: "absolute", inset: 0, width: "100%", height: "100%",
+                objectFit: "cover", opacity: bgOpacity ?? 0.5, pointerEvents: "none",
+                userSelect: "none",
+              }}
+            />
+          )}
+          {layout.roomWidthM && layout.roomHeightM && (
+            <div
+              className="absolute pointer-events-none border-2 border-dashed border-slate-500/60 rounded"
+              style={{ left: 0, top: 0, width: layout.width, height: layout.height }}
+            >
+              <div className="absolute -top-6 left-0 text-[11px] font-medium text-slate-600 bg-white/80 px-1 rounded">
+                {layout.roomWidthM} × {layout.roomHeightM} m
+              </div>
+            </div>
+          )}
           {children}
         </div>
       </div>
