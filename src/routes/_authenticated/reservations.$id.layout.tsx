@@ -647,10 +647,12 @@ function LayoutEditor() {
   const canvasRef = useRef<HTMLDivElement>(null);
 
   async function exportPng() {
-    await exportLayoutAsPng({ layout, filename: `plan-${reservation.data?.event_name ?? id}` });
+    const bgDataUrl = layout.backgroundImage?.path ? (await fetchBackgroundDataUrl(layout.backgroundImage.path)) ?? undefined : undefined;
+    await exportLayoutAsPng({ layout, filename: `plan-${reservation.data?.event_name ?? id}`, backgroundDataUrl: bgDataUrl });
   }
   async function exportPdf() {
-    await exportLayoutAsPdf({ layout, filename: `plan-${reservation.data?.event_name ?? id}` });
+    const bgDataUrl = layout.backgroundImage?.path ? (await fetchBackgroundDataUrl(layout.backgroundImage.path)) ?? undefined : undefined;
+    await exportLayoutAsPdf({ layout, filename: `plan-${reservation.data?.event_name ?? id}`, backgroundDataUrl: bgDataUrl });
   }
 
   // Drag from palette
