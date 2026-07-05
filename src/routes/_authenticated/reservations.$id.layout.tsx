@@ -472,15 +472,20 @@ function LayoutEditor() {
   useEffect(() => {
     if (readOnly) return;
     function onKey(e: KeyboardEvent) {
-      if (!selectedId) return;
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const inEditable = tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable;
+      const meta = e.ctrlKey || e.metaKey;
+      // Undo / redo work even in editable fields is annoying; skip in inputs
+      if (!inEditable && meta && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
+      if (!inEditable && meta && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
+      if (!selectedId) return;
+      if (inEditable) return;
       if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); removeEl(selectedId); }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateEl(selectedId); }
+      if (meta && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateEl(selectedId); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, readOnly]);
+  }, [selectedId, readOnly, layout]);
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
