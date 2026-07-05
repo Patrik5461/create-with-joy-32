@@ -956,6 +956,70 @@ function LayoutEditor() {
           )}
         </div>
       </div>
+      <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Šablóny rozložení</DialogTitle>
+            <DialogDescription>Načítať existujúcu šablónu do tejto rezervácie.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto divide-y">
+            {templates.isLoading && <p className="text-sm text-muted-foreground p-2">Načítavam…</p>}
+            {!templates.isLoading && (templates.data?.length ?? 0) === 0 && (
+              <p className="text-sm text-muted-foreground p-2">Žiadne šablóny zatiaľ nie sú uložené.</p>
+            )}
+            {templates.data?.map((t: any) => {
+              const isRenaming = renamingId === t.id;
+              return (
+                <div key={t.id} className="flex items-center gap-2 py-2">
+                  {isRenaming ? (
+                    <>
+                      <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} className="h-8" />
+                      <Button size="sm" onClick={() => renameTemplate.mutate({ tid: t.id, name: renameValue })} disabled={renameTemplate.isPending}>OK</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setRenamingId(null)}>Zrušiť</Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{t.name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {new Date(t.created_at).toLocaleString("sk-SK")}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => loadTemplateInto(t.id)}>Načítať</Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setRenamingId(t.id); setRenameValue(t.name); }}>Premenovať</Button>
+                      <Button size="icon" variant="ghost" onClick={() => { if (window.confirm(`Zmazať šablónu „${t.name}“?`)) deleteTemplate.mutate(t.id); }}>
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTemplatesOpen(false)}>Zavrieť</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Uložiť ako šablónu</DialogTitle>
+            <DialogDescription>Súčasné rozloženie sa uloží ako opakovane použiteľná šablóna.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-xs">Názov šablóny</Label>
+            <Input value={newTemplateName} onChange={(e) => setNewTemplateName(e.target.value)} placeholder="napr. Svadba 80 hostí" />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSaveTemplateOpen(false)}>Zrušiť</Button>
+            <Button onClick={() => saveAsTemplate.mutate(newTemplateName)} disabled={saveAsTemplate.isPending || !newTemplateName.trim()}>
+              {saveAsTemplate.isPending ? "Ukladám…" : "Uložiť"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
