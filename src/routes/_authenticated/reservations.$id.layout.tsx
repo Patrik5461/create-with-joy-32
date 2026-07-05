@@ -8,10 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft, Save, Printer, FileImage, FileText, Trash2, RotateCw,
   Square, Circle, Armchair, Users, DoorOpen, Music, Crown, Plus, Minus,
   AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignStartVertical, AlignStartHorizontal, LayoutGrid, Theater, Copy,
-  Undo2, Redo2, ZoomIn, ZoomOut, Maximize2,
+  Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, Image as ImageIcon, BookOpen, BookmarkPlus, X, Ruler,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -54,6 +57,10 @@ interface LayoutData {
   height: number;
   elements: LayoutElement[];
   schemaVersion?: number;
+  roomWidthM?: number;
+  roomHeightM?: number;
+  pxPerMeter?: number;
+  backgroundImage?: { path: string; opacity?: number } | null;
 }
 
 // ---------------- Zod validation ----------------
@@ -73,11 +80,19 @@ const LayoutElementSchema = z.object({
   color: z.string().optional(),
   chairCount: z.number().optional(),
 });
+const BackgroundImageSchema = z.object({
+  path: z.string(),
+  opacity: z.number().min(0).max(1).optional(),
+}).nullable().optional();
 const LayoutDataSchema = z.object({
   width: z.number().positive(),
   height: z.number().positive(),
   elements: z.array(LayoutElementSchema),
   schemaVersion: z.number().optional().default(1),
+  roomWidthM: z.number().positive().optional(),
+  roomHeightM: z.number().positive().optional(),
+  pxPerMeter: z.number().positive().optional(),
+  backgroundImage: BackgroundImageSchema,
 });
 
 function parseLayout(raw: unknown): { layout: LayoutData | null; invalid: boolean } {
