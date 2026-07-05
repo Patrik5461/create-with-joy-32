@@ -693,6 +693,12 @@ function LayoutEditor() {
               <Button variant="outline" size="sm" onClick={() => navigate({ to: "/reservations/$id/layout", params: { id }, search: { view: true } })}>
                 <Printer className="size-4 mr-1" />Náhľad / Tlač
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setTemplatesOpen(true)}>
+                <BookOpen className="size-4 mr-1" />Šablóny
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setNewTemplateName(reservation.data?.event_name ?? ""); setSaveTemplateOpen(true); }}>
+                <BookmarkPlus className="size-4 mr-1" />Uložiť ako šablónu
+              </Button>
               <Button variant="outline" size="sm" onClick={exportPng}><FileImage className="size-4 mr-1" />PNG</Button>
               <Button variant="outline" size="sm" onClick={exportPdf}><FileText className="size-4 mr-1" />PDF</Button>
               <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
