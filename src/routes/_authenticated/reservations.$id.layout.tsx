@@ -105,6 +105,7 @@ function parseLayout(raw: unknown): { layout: LayoutData | null; invalid: boolea
 interface ExportLayoutOptions {
   layout: LayoutData;
   filename: string;
+  backgroundDataUrl?: string;
 }
 
 const CANVAS_W = 1400;
@@ -146,6 +147,11 @@ function layoutToSvg(layout: LayoutData) {
   for (let x = 0; x <= layout.width; x += GRID) gridLines.push(`<line x1="${x}" y1="0" x2="${x}" y2="${layout.height}" stroke="#e5e7eb" stroke-width="1"/>`);
   for (let y = 0; y <= layout.height; y += GRID) gridLines.push(`<line x1="0" y1="${y}" x2="${layout.width}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/>`);
 
+  const backgroundDataUrl = (layout as LayoutData & { __bgDataUrl?: string }).__bgDataUrl;
+  const bg = (backgroundDataUrl && layout.backgroundImage)
+    ? `<image href="${backgroundDataUrl}" x="0" y="0" width="${layout.width}" height="${layout.height}" opacity="${layout.backgroundImage.opacity ?? 0.5}" preserveAspectRatio="xMidYMid slice"/>`
+    : "";
+
   const elements = layout.elements.map((el) => {
     const label = escapeXml(el.label || (isZone(el.type) ? "Zóna" : el.type === "stage" ? "PÓDIUM" : el.type === "chair" ? "" : "Stôl"));
     const transform = `translate(${el.x} ${el.y}) rotate(${el.rotation} ${el.w / 2} ${el.h / 2})`;
@@ -180,7 +186,7 @@ function layoutToSvg(layout: LayoutData) {
     return `<g transform="${transform}"><rect width="${el.w}" height="${el.h}" rx="8" fill="${color}33" stroke="${color}" stroke-width="2" stroke-dasharray="8 6"/><text x="${el.w / 2}" y="${el.h / 2 + 5}" text-anchor="middle" font-size="14" font-weight="700" fill="${color}">${label}</text></g>`;
   }).join("");
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}"><rect width="100%" height="100%" fill="#ffffff"/>${gridLines.join("")}${elements}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}"><rect width="100%" height="100%" fill="#ffffff"/>${bg}${gridLines.join("")}${elements}</svg>`;
 }
 
 async function exportLayoutAsPng({ layout, filename }: ExportLayoutOptions) {
