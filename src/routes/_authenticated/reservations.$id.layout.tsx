@@ -588,45 +588,43 @@ function LayoutEditor() {
                     key={p.type}
                     draggable
                     onDragStart={(e) => onPaletteDragStart(e, p.type)}
-                    onDoubleClick={() => addEl(p.type, 200, 200)}
-                    className="flex items-center gap-2 p-2 rounded-md border cursor-grab hover:bg-muted/60 active:cursor-grabbing select-none"
-                    title="Pretiahnite na plátno alebo dvojklik"
+                    onClick={() => addAtViewportCenter(p.type)}
+                    onDoubleClick={() => addAtViewportCenter(p.type)}
+                    className="flex items-center gap-2 p-2 rounded-md border cursor-pointer hover:bg-muted/60 active:bg-muted select-none touch-manipulation"
+                    title="Klepnite pre pridanie na plátno (alebo pretiahnite)"
                   >
                     <p.icon className="size-4 shrink-0" />
                     <span className="text-xs">{p.label}</span>
+                    <Plus className="size-3 ml-auto text-muted-foreground" />
                   </div>
                 ))}
-                <p className="text-[10px] text-muted-foreground pt-1">Pretiahnite prvok na plátno. Klávesa Delete vymaže označený prvok.</p>
+                <p className="text-[10px] text-muted-foreground pt-1">Klepnite pre pridanie alebo pretiahnite. Delete vymaže označený prvok.</p>
               </CardContent>
             </Card>
           )}
 
-          <div className="overflow-auto rounded-lg border bg-white">
-            <div
-              ref={canvasRef}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={onCanvasDrop}
-              onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedId(null); }}
-              className="relative bg-white"
-              style={{
-                width: layout.width, height: layout.height,
-                backgroundImage: readOnly ? undefined :
-                  `linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)`,
-                backgroundSize: `${GRID}px ${GRID}px`,
-              }}
-            >
-              {layout.elements.map((el) => (
-                <ElementNode
-                  key={el.id}
-                  el={el}
-                  selected={!readOnly && selectedId === el.id}
-                  readOnly={readOnly}
-                  onSelect={() => setSelectedId(el.id)}
-                  onChange={(patch) => updateEl(el.id, patch)}
-                />
-              ))}
-            </div>
-          </div>
+          <CanvasViewport
+            viewportRef={viewportRef}
+            zoom={zoom}
+            setZoom={setZoom}
+            layout={layout}
+            readOnly={readOnly}
+            onDrop={onCanvasDrop}
+            onBackgroundClick={() => setSelectedId(null)}
+            canvasRef={canvasRef}
+          >
+            {layout.elements.map((el) => (
+              <ElementNode
+                key={el.id}
+                el={el}
+                zoom={zoom}
+                selected={!readOnly && selectedId === el.id}
+                readOnly={readOnly}
+                onSelect={() => setSelectedId(el.id)}
+                onChange={(patch) => updateEl(el.id, patch)}
+              />
+            ))}
+          </CanvasViewport>
 
           {!readOnly && (
             <Card className="print:hidden">
