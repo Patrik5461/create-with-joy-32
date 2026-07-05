@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Printer, Save, Trash2, CheckCircle2, Wrench, ScanLine } from "lucide-react";
+import { ArrowLeft, Printer, Save, Trash2, CheckCircle2, Wrench, ScanLine, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { SignaturePad } from "@/components/signature-pad";
 import { COMPANY_INFO, formatDate, formatDateTime } from "@/lib/document-utils";
@@ -101,6 +101,102 @@ function ProtocolDetail() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const syncItems = useMutation({
+    mutationFn: async () => {
+      const p = q.data!.p;
+      // Source of truth: for handover -> reservation_items; for return -> latest handover items if any, else reservation_items
+      type SrcItem = { furniture_item_id: string | null; name: string; code: string | null; qty: number };
+      let source: SrcItem[] = [];
+      if (p.type === "return" && p.related_handover_id) {
+        const { data: hoItems, error: eHo } = await supabase
+          .from("protocol_items")
+          .select("furniture_item_id, item_name, item_code, qty_actual, qty_expected")
+          .eq("protocol_id", p.related_handover_id);
+        if (eHo) throw eHo;
+        source = (hoItems ?? []).map((it: any) => ({
+          furniture_item_id: it.furniture_item_id,
+          name: it.item_name,
+          code: it.item_code,
+          qty: Number(it.qty_actual) || Number(it.qty_expected) || 0,
+        }));
+      } else {
+        const { data: ri, error: eRi } = await supabase
+          .from("reservation_items")
+          .select("qty, furniture_item_id, furniture_items(name, internal_code)")
+          .eq("reservation_id", p.reservation_id);
+        if (eRi) throw eRi;
+        source = (ri ?? []).map((r: any) => ({
+          furniture_item_id: r.furniture_item_id,
+          name: r.furniture_items?.name ?? "—",
+          code: r.furniture_items?.internal_code ?? null,
+          qty: Number(r.qty) || 0,
+        }));
+      }
+
+      const existing = rows!;
+      const byFid = new Map<string, any>();
+      for (const r of existing) if (r.furniture_item_id) byFid.set(r.furniture_item_id, r);
+
+      // 1. Update qty_expected for existing rows; collect new inserts
+      const toInsert: any[] = [];
+      const seen = new Set<string>();
+      for (const s of source) {
+        if (s.furniture_item_id && byFid.has(s.furniture_item_id)) {
+          seen.add(s.furniture_item_id);
+          const cur = byFid.get(s.furniture_item_id);
+          if (Number(cur.qty_expected) !== s.qty) {
+            const { error } = await supabase
+              .from("protocol_items")
+              .update({ qty_expected: s.qty })
+              .eq("id", cur.id);
+            if (error) throw error;
+          }
+        } else {
+          toInsert.push({
+            protocol_id: id,
+            furniture_item_id: s.furniture_item_id,
+            item_name: s.name,
+            item_code: s.code,
+            qty_expected: s.qty,
+            qty_actual: 0,
+            condition: "ok" as const,
+          });
+        }
+      }
+      if (toInsert.length) {
+        const { error } = await supabase.from("protocol_items").insert(toInsert);
+        if (error) throw error;
+      }
+
+      // 2. Delete rows no longer in source, but ONLY if untouched
+      let keptStale = 0;
+      for (const r of existing) {
+        if (!r.furniture_item_id) continue;
+        if (seen.has(r.furniture_item_id)) continue;
+        const untouched =
+          Number(r.qty_actual) === 0 &&
+          (!r.note || r.note === "") &&
+          r.condition === "ok" &&
+          !r.damage_report_id;
+        if (untouched) {
+          const { error } = await supabase.from("protocol_items").delete().eq("id", r.id);
+          if (error) throw error;
+        } else {
+          keptStale += 1;
+        }
+      }
+      return { inserted: toInsert.length, keptStale };
+    },
+    onSuccess: (res) => {
+      setRows(null); // force reload from query
+      qc.invalidateQueries({ queryKey: ["protocol", id] });
+      const parts = [`Pridané: ${res.inserted}`];
+      if (res.keptStale > 0) parts.push(`ponechané ručne upravené: ${res.keptStale}`);
+      toast.success(`Položky zosynchronizované (${parts.join(", ")})`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   // Create a damage report linked to a protocol row
   const createDamage = useMutation({
     mutationFn: async (row: any) => {
@@ -168,6 +264,15 @@ function ProtocolDetail() {
             {canEdit && !isSigned && (
               <Button variant="outline" size="sm" onClick={() => setScannerOpen(true)}>
                 <ScanLine className="size-4 mr-1" />Skenovať
+              </Button>
+            )}
+            {canEdit && !isSigned && (
+              <Button variant="outline" size="sm" onClick={() => {
+                if (confirm("Zosynchronizovať položky protokolu s aktuálnou rezerváciou? Ručne upravené položky (počty, poznámky, stavy) zostanú zachované.")) {
+                  syncItems.mutate();
+                }
+              }} disabled={syncItems.isPending}>
+                <RefreshCw className={`size-4 mr-1 ${syncItems.isPending ? "animate-spin" : ""}`} />Aktualizovať podľa rezervácie
               </Button>
             )}
             {canEdit && !isSigned && (
