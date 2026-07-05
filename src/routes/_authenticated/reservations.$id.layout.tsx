@@ -706,9 +706,9 @@ function LayoutEditor() {
 
 // ---------------- Element rendering + drag ----------------
 function ElementNode({
-  el, selected, readOnly, onSelect, onChange,
+  el, zoom, selected, readOnly, onSelect, onChange,
 }: {
-  el: LayoutElement; selected: boolean; readOnly: boolean;
+  el: LayoutElement; zoom: number; selected: boolean; readOnly: boolean;
   onSelect: () => void; onChange: (patch: Partial<LayoutElement>) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -720,6 +720,7 @@ function ElementNode({
     e.stopPropagation();
     onSelect();
     const startX = e.clientX, startY = e.clientY;
+    const zoomFactor = zoom || 1;
     const orig = { x: el.x, y: el.y, w: el.w, h: el.h };
     const rotated = (((el.rotation % 360) + 360) % 360) !== 0;
     const rad = (el.rotation * Math.PI) / 180;
@@ -727,7 +728,9 @@ function ElementNode({
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     function onMove(ev: PointerEvent) {
-      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      // Screen delta → layout delta (canvas is scaled by CSS transform)
+      const dx = (ev.clientX - startX) / zoomFactor;
+      const dy = (ev.clientY - startY) / zoomFactor;
       let next: { x: number; y: number; w: number; h: number };
       if (mode === "move") {
         const nx = rotated ? orig.x + dx : snap(orig.x + dx);
@@ -778,10 +781,107 @@ function ElementNode({
       {selected && isResizable(el.type) && (
         <div
           onPointerDown={(e) => startDrag(e, "resize")}
-          className="absolute -right-1 -bottom-1 size-3 bg-primary rounded-sm cursor-se-resize"
-          style={{ touchAction: "none" }}
-        />
+          className="absolute flex items-center justify-center cursor-se-resize"
+          style={{ right: -12, bottom: -12, width: 24, height: 24, touchAction: "none" }}
+          aria-label="Zmeniť veľkosť"
+        >
+          <div className="size-3 bg-primary rounded-sm shadow" />
+        </div>
       )}
+    </div>
+  );
+}
+
+// ---------------- Canvas viewport (zoom + pan) ----------------
+function CanvasViewport({
+  viewportRef, canvasRef, zoom, setZoom, layout, readOnly, onDrop, onBackgroundClick, children,
+}: {
+  viewportRef: React.RefObject<HTMLDivElement | null>;
+  canvasRef: React.RefObject<HTMLDivElement | null>;
+  zoom: number;
+  setZoom: React.Dispatch<React.SetStateAction<number>>;
+  layout: LayoutData;
+  readOnly: boolean;
+  onDrop: (e: React.DragEvent) => void;
+  onBackgroundClick: () => void;
+  children: React.ReactNode;
+}) {
+  // Ctrl/Cmd + wheel zoom
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    function onWheel(e: WheelEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 1 / 1.1 : 1.1;
+      setZoom((z) => Math.max(0.25, Math.min(2, Math.round(z * delta * 100) / 100)));
+    }
+    vp.addEventListener("wheel", onWheel, { passive: false });
+    return () => vp.removeEventListener("wheel", onWheel);
+  }, [viewportRef, setZoom]);
+
+  // Two-finger pinch zoom
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    let startDist = 0;
+    let startZoom = 1;
+    function dist(t: TouchList) {
+      const [a, b] = [t[0], t[1]];
+      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    }
+    function onStart(e: TouchEvent) {
+      if (e.touches.length !== 2) return;
+      startDist = dist(e.touches);
+      setZoom((z) => { startZoom = z; return z; });
+    }
+    function onMove(e: TouchEvent) {
+      if (e.touches.length !== 2 || startDist === 0) return;
+      e.preventDefault();
+      const d = dist(e.touches);
+      const ratio = d / startDist;
+      setZoom(() => Math.max(0.25, Math.min(2, Math.round(startZoom * ratio * 100) / 100)));
+    }
+    function onEnd() { startDist = 0; }
+    vp.addEventListener("touchstart", onStart, { passive: true });
+    vp.addEventListener("touchmove", onMove, { passive: false });
+    vp.addEventListener("touchend", onEnd);
+    vp.addEventListener("touchcancel", onEnd);
+    return () => {
+      vp.removeEventListener("touchstart", onStart);
+      vp.removeEventListener("touchmove", onMove);
+      vp.removeEventListener("touchend", onEnd);
+      vp.removeEventListener("touchcancel", onEnd);
+    };
+  }, [viewportRef, setZoom]);
+
+  const scaledW = layout.width * zoom;
+  const scaledH = layout.height * zoom;
+
+  return (
+    <div
+      ref={viewportRef}
+      className="overflow-auto rounded-lg border bg-white"
+      style={{ maxHeight: "calc(100vh - 220px)", minHeight: 320, touchAction: "pan-x pan-y" }}
+    >
+      <div style={{ width: scaledW, height: scaledH, position: "relative" }}>
+        <div
+          ref={canvasRef}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onDrop}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) onBackgroundClick(); }}
+          className="relative bg-white"
+          style={{
+            width: layout.width, height: layout.height,
+            transform: `scale(${zoom})`, transformOrigin: "0 0",
+            backgroundImage: readOnly ? undefined :
+              `linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)`,
+            backgroundSize: `${GRID}px ${GRID}px`,
+          }}
+        >
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
