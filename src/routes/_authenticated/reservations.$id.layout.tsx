@@ -52,6 +52,38 @@ interface LayoutData {
   width: number;
   height: number;
   elements: LayoutElement[];
+  schemaVersion?: number;
+}
+
+// ---------------- Zod validation ----------------
+const ElTypeSchema = z.enum([
+  "rect_table", "chair", "round_table", "round_table_chairs", "stage",
+  "zone_podium", "zone_entry", "zone_vip", "zone_custom",
+]);
+const LayoutElementSchema = z.object({
+  id: z.string(),
+  type: ElTypeSchema,
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+  rotation: z.number(),
+  label: z.string().optional(),
+  color: z.string().optional(),
+  chairCount: z.number().optional(),
+});
+const LayoutDataSchema = z.object({
+  width: z.number().positive(),
+  height: z.number().positive(),
+  elements: z.array(LayoutElementSchema),
+  schemaVersion: z.number().optional().default(1),
+});
+
+function parseLayout(raw: unknown): { layout: LayoutData | null; invalid: boolean } {
+  if (raw === null || raw === undefined) return { layout: null, invalid: false };
+  const res = LayoutDataSchema.safeParse(raw);
+  if (!res.success) return { layout: null, invalid: true };
+  return { layout: { ...res.data, schemaVersion: res.data.schemaVersion ?? 1 }, invalid: false };
 }
 
 interface ExportLayoutOptions {
@@ -199,27 +231,72 @@ function LayoutEditor() {
     },
   });
 
-  const [layout, setLayout] = useState<LayoutData>({ width: CANVAS_W, height: CANVAS_H, elements: [] });
+  const [layout, setLayout] = useState<LayoutData>({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState<string>("");
+  const [invalidLoaded, setInvalidLoaded] = useState(false);
 
   useEffect(() => {
     if (!reservation.data || loaded) return;
-    const existing = reservation.data.layout as LayoutData | null;
-    if (existing && Array.isArray(existing.elements)) {
-      setLayout({ width: existing.width || CANVAS_W, height: existing.height || CANVAS_H, elements: existing.elements });
+    const raw = reservation.data.layout as unknown;
+    if (raw !== null && raw !== undefined) {
+      const { layout: parsed, invalid } = parseLayout(raw);
+      if (invalid) {
+        setInvalidLoaded(true);
+        toast.error("Uložený plán má neplatný formát. Začnite odznova.");
+        const empty: LayoutData = { width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 };
+        setLayout(empty);
+        setSavedSnapshot("");
+      } else if (parsed) {
+        const next: LayoutData = {
+          width: parsed.width || CANVAS_W,
+          height: parsed.height || CANVAS_H,
+          elements: parsed.elements,
+          schemaVersion: parsed.schemaVersion ?? 1,
+        };
+        setLayout(next);
+        setSavedSnapshot(JSON.stringify(next));
+      } else {
+        setSavedSnapshot(JSON.stringify({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 }));
+      }
+    } else {
+      setSavedSnapshot(JSON.stringify({ width: CANVAS_W, height: CANVAS_H, elements: [], schemaVersion: 1 }));
     }
     setLoaded(true);
   }, [reservation.data, loaded]);
 
+  const currentSnapshot = useMemo(() => JSON.stringify(layout), [layout]);
+  const isDirty = loaded && !readOnly && savedSnapshot !== "" && currentSnapshot !== savedSnapshot;
+
+  // beforeunload guard
+  useEffect(() => {
+    if (!isDirty) return;
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
+
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("reservations").update({ layout: layout as any }).eq("id", id);
+      const toSave: LayoutData = { ...layout, schemaVersion: 1 };
+      const { error } = await supabase.from("reservations").update({ layout: toSave as any }).eq("id", id);
       if (error) throw error;
+      return toSave;
     },
-    onSuccess: () => { toast.success("Plán uložený"); qc.invalidateQueries({ queryKey: ["reservation-layout", id] }); },
+    onSuccess: (saved) => {
+      toast.success("Plán uložený");
+      if (saved) setSavedSnapshot(JSON.stringify(saved));
+      qc.invalidateQueries({ queryKey: ["reservation-layout", id] });
+      qc.invalidateQueries({ queryKey: ["reservations-for-layouts"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
+  void invalidLoaded;
 
   const selected = useMemo(() => layout.elements.find((e) => e.id === selectedId) ?? null, [layout, selectedId]);
 
@@ -378,7 +455,11 @@ function LayoutEditor() {
               <Button variant="outline" size="sm" onClick={exportPng}><FileImage className="size-4 mr-1" />PNG</Button>
               <Button variant="outline" size="sm" onClick={exportPdf}><FileText className="size-4 mr-1" />PDF</Button>
               <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
-                <Save className="size-4 mr-1" />{save.isPending ? "Ukladám…" : "Uložiť plán"}
+                <Save className="size-4 mr-1" />
+                {save.isPending ? "Ukladám…" : isDirty ? "Uložiť plán •" : "Uložiť plán"}
+                {isDirty && !save.isPending && (
+                  <span className="ml-2 text-[10px] font-normal opacity-80">Neuložené zmeny</span>
+                )}
               </Button>
             </div>
           </div>
