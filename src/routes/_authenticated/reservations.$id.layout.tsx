@@ -404,6 +404,119 @@ function LayoutEditor() {
 
   const selected = useMemo(() => layout.elements.find((e) => e.id === selectedId) ?? null, [layout, selectedId]);
 
+  // ---- Capacity (chairs + tables) ----
+  const capacity = useMemo(() => {
+    let chairs = 0, tables = 0;
+    for (const el of layout.elements) {
+      if (el.type === "chair") chairs++;
+      else if (el.type === "round_table_chairs") { chairs += el.chairCount ?? 0; tables++; }
+      else if (el.type === "rect_table" || el.type === "round_table") tables++;
+    }
+    return { chairs, tables };
+  }, [layout.elements]);
+
+  // ---- Background image signed URL for display ----
+  useEffect(() => {
+    let cancelled = false;
+    const path = layout.backgroundImage?.path;
+    if (!path) { setBgUrl(null); return; }
+    supabase.storage.from("layout-backgrounds").createSignedUrl(path, 60 * 60).then(({ data }) => {
+      if (!cancelled) setBgUrl(data?.signedUrl ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [layout.backgroundImage?.path]);
+
+  async function onUploadBackground(file: File) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Nahrajte prosím obrázok."); return; }
+    const ext = file.name.split(".").pop() ?? "png";
+    const path = `${id}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("layout-backgrounds").upload(path, file, { upsert: true, contentType: file.type });
+    if (error) { toast.error(error.message); return; }
+    // Optionally clean up previous
+    const prev = layout.backgroundImage?.path;
+    if (prev && prev !== path) {
+      supabase.storage.from("layout-backgrounds").remove([prev]).catch(() => {});
+    }
+    commit({ ...layout, backgroundImage: { path, opacity: layout.backgroundImage?.opacity ?? 0.5 } });
+    toast.success("Pôdorys nahraný");
+  }
+  async function removeBackground() {
+    const prev = layout.backgroundImage?.path;
+    if (prev) supabase.storage.from("layout-backgrounds").remove([prev]).catch(() => {});
+    commit({ ...layout, backgroundImage: null });
+  }
+
+  // ---- Templates ----
+  const templates = useQuery({
+    queryKey: ["layout-templates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("layout_templates")
+        .select("id, name, data, created_by, created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const saveAsTemplate = useMutation({
+    mutationFn: async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Zadajte názov šablóny");
+      const payload: LayoutData = { ...layout, schemaVersion: 2 };
+      const { error } = await supabase.from("layout_templates").insert({ name: trimmed, data: payload as any });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Šablóna uložená");
+      setSaveTemplateOpen(false);
+      setNewTemplateName("");
+      qc.invalidateQueries({ queryKey: ["layout-templates"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const renameTemplate = useMutation({
+    mutationFn: async ({ tid, name }: { tid: string; name: string }) => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Zadajte názov");
+      const { error } = await supabase.from("layout_templates").update({ name: trimmed }).eq("id", tid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setRenamingId(null);
+      qc.invalidateQueries({ queryKey: ["layout-templates"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteTemplate = useMutation({
+    mutationFn: async (tid: string) => {
+      const { error } = await supabase.from("layout_templates").delete().eq("id", tid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Šablóna zmazaná");
+      qc.invalidateQueries({ queryKey: ["layout-templates"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  function loadTemplateInto(tid: string) {
+    const tpl = templates.data?.find((t: any) => t.id === tid);
+    if (!tpl) return;
+    const res = LayoutDataSchema.safeParse(tpl.data);
+    if (!res.success) { toast.error("Šablóna má neplatný formát"); return; }
+    const hasContent = layout.elements.length > 0 || !!layout.backgroundImage;
+    if (hasContent && !window.confirm("Prepísať súčasné rozloženie touto šablónou?")) return;
+    // Preserve current background — templates shouldn't drag storage refs across reservations
+    const next: LayoutData = {
+      ...res.data,
+      backgroundImage: layout.backgroundImage ?? null,
+      schemaVersion: 2,
+    };
+    commit(next);
+    setTemplatesOpen(false);
+    toast.success(`Šablóna „${tpl.name}“ načítaná`);
+  }
+
   function updateEl(elId: string, patch: Partial<LayoutElement>) {
     commit({ ...layout, elements: layout.elements.map((e) => e.id === elId ? { ...e, ...patch } : e) });
   }
