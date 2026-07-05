@@ -745,6 +745,7 @@ function LayoutEditor() {
 
         <div className={readOnly ? "" : "grid gap-4 lg:grid-cols-[220px_1fr_280px]"}>
           {!readOnly && (
+            <div className="space-y-4 print:hidden">
             <Card className="print:hidden">
               <CardContent className="p-3 space-y-2">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Paleta</div>
@@ -766,6 +767,94 @@ function LayoutEditor() {
                 <p className="text-[10px] text-muted-foreground pt-1">Klepnite pre pridanie alebo pretiahnite. Delete vymaže označený prvok.</p>
               </CardContent>
             </Card>
+            <Card>
+              <CardContent className="p-3 space-y-3">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Ruler className="size-3" />Miestnosť
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px]">Šírka (m)</Label>
+                    <Input type="number" step="0.5" min={0}
+                      value={layout.roomWidthM ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value === "" ? undefined : Math.max(0, Number(e.target.value));
+                        commit({ ...layout, roomWidthM: v });
+                      }} />
+                  </div>
+                  <div>
+                    <Label className="text-[10px]">Dĺžka (m)</Label>
+                    <Input type="number" step="0.5" min={0}
+                      value={layout.roomHeightM ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value === "" ? undefined : Math.max(0, Number(e.target.value));
+                        commit({ ...layout, roomHeightM: v });
+                      }} />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-[10px]">Škála (px/m): {layout.pxPerMeter ?? Math.round((layout.roomWidthM ? layout.width / layout.roomWidthM : 0))}</Label>
+                  <Input type="number" step="1" min={0}
+                    value={layout.pxPerMeter ?? ""}
+                    placeholder="auto"
+                    onChange={(e) => {
+                      const v = e.target.value === "" ? undefined : Math.max(0, Number(e.target.value));
+                      commit({ ...layout, pxPerMeter: v });
+                    }} />
+                </div>
+                <div className="rounded-md bg-muted/40 p-2 text-xs">
+                  <div className="font-medium mb-0.5">Miesta na sedenie</div>
+                  <div className="tabular-nums">
+                    <span className="text-lg font-semibold">{capacity.chairs}</span> stoličiek · {capacity.tables} stolov
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3 space-y-3">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <ImageIcon className="size-3" />Podklad / pôdorys
+                </div>
+                {layout.backgroundImage?.path ? (
+                  <div className="space-y-2">
+                    {bgUrl && (
+                      <img src={bgUrl} alt="Podklad" className="w-full h-24 object-cover rounded border" />
+                    )}
+                    <div>
+                      <Label className="text-[10px]">Priehľadnosť: {Math.round((layout.backgroundImage.opacity ?? 0.5) * 100)}%</Label>
+                      <input type="range" min={0.05} max={1} step={0.05}
+                        value={layout.backgroundImage.opacity ?? 0.5}
+                        onChange={(e) => commit({
+                          ...layout,
+                          backgroundImage: { ...layout.backgroundImage!, opacity: Number(e.target.value) },
+                        })}
+                        className="w-full" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-xs">
+                        <Input type="file" accept="image/*" className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadBackground(f); e.target.value = ""; }} />
+                        <span className="flex items-center justify-center gap-1 h-8 rounded border cursor-pointer hover:bg-muted/60">
+                          <ImageIcon className="size-3" />Vymeniť
+                        </span>
+                      </label>
+                      <Button variant="destructive" size="sm" onClick={removeBackground}>
+                        <X className="size-3 mr-1" />Odstrániť
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="block text-xs">
+                    <Input type="file" accept="image/*" className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadBackground(f); e.target.value = ""; }} />
+                    <span className="flex items-center justify-center gap-1 h-9 rounded border cursor-pointer hover:bg-muted/60">
+                      <ImageIcon className="size-3" />Nahrať pôdorys
+                    </span>
+                  </label>
+                )}
+              </CardContent>
+            </Card>
+            </div>
           )}
 
           <CanvasViewport
