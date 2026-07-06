@@ -141,24 +141,22 @@ export function buildReservationDatesPatch(q: {
 export async function createReservationFromQuote(quoteId: string): Promise<string> {
   const { data: q, error } = await supabase
     .from("quotes")
-    .select("id, quote_number, quote_group_id, client_id, contact_id, issue_date, event_start_at, event_end_at, notes, valid_until, client_contacts(full_name, phone, email)")
+    .select("id, quote_number, quote_group_id, client_id, contact_id, issue_date, event_start_at, event_end_at, event_date, installation_date, dismantling_date, notes, valid_until, client_contacts(full_name, phone, email)")
     .eq("id", quoteId)
     .maybeSingle();
   if (error) throw error;
   if (!q) throw new Error("Kalkulácia sa nenašla.");
 
-  // Prefer explicit event window from the quote; fall back to a sane default around issue_date.
-  const anyQ = q as any;
-  let loadAt: string;
-  let availableFrom: string;
-  if (anyQ.event_start_at && anyQ.event_end_at) {
-    loadAt = new Date(anyQ.event_start_at).toISOString();
-    availableFrom = new Date(anyQ.event_end_at).toISOString();
-  } else {
-    const base = q.issue_date ? new Date(q.issue_date + "T08:00:00") : new Date();
-    loadAt = base.toISOString();
-    availableFrom = new Date(base.getTime() + 2 * 24 * 3600 * 1000).toISOString();
-  }
+  // Zjednotená mapa dátumov kalkulácia → rezervácia (rovnaká ako pri sync).
+  const datesPatch = buildReservationDatesPatch(q as any);
+  const now = new Date();
+  const fallbackBase = q.issue_date ? new Date(q.issue_date + "T08:00:00") : now;
+  const loadAt = datesPatch.load_at ?? fallbackBase.toISOString();
+  const availableFrom =
+    datesPatch.available_from_at ?? new Date(fallbackBase.getTime() + 2 * 24 * 3600 * 1000).toISOString();
+  const eventStartAt = datesPatch.event_start_at ?? loadAt;
+  const eventEndAt = datesPatch.event_end_at ?? availableFrom;
+  const returnAt = datesPatch.return_at ?? eventEndAt;
 
   const contact = (q as any).client_contacts;
   const insertPayload: any = {
@@ -172,6 +170,9 @@ export async function createReservationFromQuote(quoteId: string): Promise<strin
     status: "confirmed",
     load_at: loadAt,
     available_from_at: availableFrom,
+    event_start_at: eventStartAt,
+    event_end_at: eventEndAt,
+    return_at: returnAt,
     quote_group_id: q.quote_group_id,
   };
   const { data: ins, error: eIns } = await supabase
