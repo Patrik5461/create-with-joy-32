@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Printer, Save, Trash2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { SignaturePad } from "@/components/signature-pad";
-import { COMPANY_INFO, DEFAULT_CONTRACT_TERMS, formatDate, formatEur, type ContractTerms } from "@/lib/document-utils";
+import { COMPANY_INFO, DEFAULT_CONTRACT_TERMS, buildClientLines, formatDate, formatEur, type ContractTerms } from "@/lib/document-utils";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/documents/contract/$id")({
@@ -129,12 +129,10 @@ function ContractDetail() {
           <Card>
             <CardHeader><CardTitle className="text-base">Nájomca</CardTitle></CardHeader>
             <CardContent className="text-sm space-y-0.5">
-              <div className="font-semibold">{d.client?.company_name ?? "—"}</div>
-              {d.client?.ico && <div className="text-muted-foreground">IČO: {d.client.ico}</div>}
-              {d.client?.address && <div className="text-muted-foreground">{d.client.address}</div>}
-              {d.client?.contact_person && <div>Kontakt: {d.client.contact_person}</div>}
-              {d.client?.email && <div className="text-muted-foreground">{d.client.email}</div>}
-              {d.client?.phone && <div className="text-muted-foreground">{d.client.phone}</div>}
+              {buildClientLines(d.client, null, { email: d.client?.email, phone: d.client?.phone, contactName: d.client?.contact_person }).map((l, i) => (
+                <div key={i} className={l.bold ? "font-semibold" : "text-muted-foreground"}>{l.text}</div>
+              ))}
+              {!d.client?.company_name && <div className="font-semibold">—</div>}
             </CardContent>
           </Card>
         </div>
@@ -246,12 +244,10 @@ function PrintContract({ c, d, terms, sigCo, sigCl, signedByName }: any) {
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Nájomca</div>
-          <div className="font-semibold">{d.client?.company_name ?? "—"}</div>
-          {d.client?.ico && <div>IČO: {d.client.ico}</div>}
-          {d.client?.address && <div>{d.client.address}</div>}
-          {d.client?.contact_person && <div>Kontakt: {d.client.contact_person}</div>}
-          {d.client?.email && <div>{d.client.email}</div>}
-          {d.client?.phone && <div>{d.client.phone}</div>}
+          {buildClientLines(d.client, null, { email: d.client?.email, phone: d.client?.phone, contactName: d.client?.contact_person }).map((l, i) => (
+            <div key={i} className={l.bold ? "font-semibold" : undefined}>{l.text}</div>
+          ))}
+          {!d.client?.company_name && <div className="font-semibold">—</div>}
         </div>
       </div>
 
