@@ -152,6 +152,10 @@ function Reservations() {
 function ReservationCard({ r, overbooked }: { r: any; overbooked?: boolean }) {
   const cls = STATUS_COLOR[r.status as ReservationStatus] ?? "";
   const color = r.color as string | null;
+  const clientName = r.clients?.company_name as string | undefined;
+  const eventName = r.event_name as string | undefined;
+  const primary = clientName || eventName || "—";
+  const secondary = clientName && eventName && eventName !== clientName ? eventName : null;
   return (
     <Link to="/reservations/$id" params={{ id: r.id }} className="block">
       <Card
@@ -161,8 +165,9 @@ function ReservationCard({ r, overbooked }: { r: any; overbooked?: boolean }) {
         <CardContent className="p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <div className="font-medium truncate text-sm">{r.event_name}</div>
-              <div className="text-xs opacity-80 truncate">{r.clients?.company_name ?? "—"} · {r.venue ?? "—"}</div>
+              <div className="font-medium truncate text-sm">{primary}</div>
+              {secondary && <div className="text-xs opacity-90 truncate">{secondary}</div>}
+              <div className="text-[11px] opacity-70 truncate">{r.venue ?? "—"}</div>
               <div className="text-[11px] opacity-70 mt-1">
                 {format(new Date(r.event_start_at), "d.M. HH:mm")} → {format(new Date(r.event_end_at), "HH:mm")}
               </div>
@@ -264,7 +269,12 @@ function MonthGrid({ cursor, reservations, onSlot, canCreate, overbookedSet }: {
                 className={`block truncate rounded px-1 py-0.5 mb-0.5 border ${r.color ? "text-white border-transparent" : STATUS_COLOR[r.status as ReservationStatus] ?? ""}`}
                 style={r.color ? { backgroundColor: r.color } : undefined}
               >
-                {overbookedSet.has(r.id) && "⚠ "}{format(new Date(r.event_start_at), "HH:mm")} {r.event_name}
+                {overbookedSet.has(r.id) && "⚠ "}
+                {format(new Date(r.event_start_at), "HH:mm")}{" "}
+                {(r.clients?.company_name as string | undefined) || (r.event_name as string | undefined) || "—"}
+                {r.clients?.company_name && r.event_name && r.event_name !== r.clients.company_name
+                  ? ` — ${r.event_name}`
+                  : ""}
               </Link>
               ))}
               {list.length > 3 && <div className="text-muted-foreground">+{list.length - 3}</div>}
