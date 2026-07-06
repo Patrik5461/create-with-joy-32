@@ -190,6 +190,9 @@ function QuoteDetail() {
         valid_until: q.valid_until,
         event_start_at: q.event_start_at,
         event_end_at: q.event_end_at,
+        event_date: q.event_date,
+        installation_date: q.installation_date,
+        dismantling_date: q.dismantling_date,
         vat_rate: q.vat_rate,
         discount_type: q.discount_type,
         discount_value: q.discount_value,
@@ -478,6 +481,9 @@ function QuoteDetail() {
               {q.valid_until && <div><span className="text-muted-foreground">Platnosť do:</span> {new Date(q.valid_until).toLocaleDateString("sk-SK")}</div>}
               {q.event_start_at && <div><span className="text-muted-foreground">Začiatok eventu:</span> {new Date(q.event_start_at).toLocaleString("sk-SK")}</div>}
               {q.event_end_at && <div><span className="text-muted-foreground">Koniec eventu:</span> {new Date(q.event_end_at).toLocaleString("sk-SK")}</div>}
+              {q.installation_date && <div><span className="text-muted-foreground">Dátum inštalácie:</span> {new Date(q.installation_date).toLocaleDateString("sk-SK")}</div>}
+              {q.event_date && <div><span className="text-muted-foreground">Dátum eventu:</span> {new Date(q.event_date).toLocaleDateString("sk-SK")}</div>}
+              {q.dismantling_date && <div><span className="text-muted-foreground">Dátum demontáže:</span> {new Date(q.dismantling_date).toLocaleDateString("sk-SK")}</div>}
               {q.reservations && <div><span className="text-muted-foreground">Rezervácia:</span> {q.reservations.event_name}</div>}
               <div><span className="text-muted-foreground">DPH:</span> {q.vat_rate}%</div>
               <div><span className="text-muted-foreground">Verzia:</span> v{q.version_number} · vytvorená {new Date(q.created_at).toLocaleString("sk-SK")}{q.creator?.full_name ? ` · ${q.creator.full_name}` : ""}</div>
