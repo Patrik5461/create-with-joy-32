@@ -14,6 +14,7 @@ import { ArrowLeft, Printer, Save, Trash2, CheckCircle2, Wrench, ScanLine, Refre
 import { toast } from "sonner";
 import { SignaturePad } from "@/components/signature-pad";
 import { COMPANY_INFO, buildClientLines, formatDate, formatDateTime } from "@/lib/document-utils";
+import { buildCompanyLines } from "@/lib/document-utils";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { QrScannerDialog } from "@/components/qr-scanner-dialog";
 
@@ -40,6 +41,15 @@ function ProtocolDetail() {
       if (e1) throw e1;
       if (e2) throw e2;
       return { p, items: items ?? [] } as { p: any; items: any[] };
+    },
+  });
+
+  const companyQ = useQuery({
+    queryKey: ["company-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("company_settings").select("*").order("created_at", { ascending: true }).limit(1).maybeSingle();
+      if (error) throw error;
+      return data;
     },
   });
 
