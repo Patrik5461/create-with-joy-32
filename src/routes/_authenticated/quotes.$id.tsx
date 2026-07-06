@@ -671,7 +671,12 @@ function PrintView({ quote: q, company }: { quote: any; company?: any }) {
           </tr>
         </thead>
         <tbody>
-          {(q.quote_items ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order).map((it: any) => (
+          {(q.quote_items ?? []).slice().sort((a: any, b: any) => {
+            const ak = a.kind === "service" ? 1 : 0;
+            const bk = b.kind === "service" ? 1 : 0;
+            if (ak !== bk) return ak - bk;
+            return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+          }).map((it: any) => (
             <tr key={it.id} className="border-b border-gray-300">
               <td className="py-2">{it.name}</td>
               <td className="text-right">{Number(it.qty)}</td>
