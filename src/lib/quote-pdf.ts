@@ -40,19 +40,20 @@ export function buildQuotePdfBase64(quote: any, company?: any): { base64: string
   if (dismD) { doc.text(`Datum demontaze: ${dismD}`, marginX, y); y += 14; }
   y += 6;
 
-  // Supplier block
+  // Supplier block (right column, top)
   const companyLines = buildCompanyLines(company);
   if (companyLines.length) {
     doc.setFont("helvetica", "bold");
-    doc.text("Dodavatel:", marginX + 260, 130);
+    doc.text("Dodavatel:", marginX + 300, 72);
     doc.setFont("helvetica", "normal");
-    let cy = 144;
+    let cy = 86;
     for (const line of companyLines) {
       if (line.bold) doc.setFont("helvetica", "bold");
-      doc.text(line.text, marginX + 260, cy);
+      doc.text(line.text, marginX + 300, cy);
       if (line.bold) doc.setFont("helvetica", "normal");
       cy += 12;
     }
+    if (cy > y) y = cy + 6;
   }
 
   // Client block
