@@ -149,7 +149,7 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
 
     const { data: q, error } = await supabaseAdmin
       .from("quotes")
-      .select("id, quote_number, version_number, total_with_vat, currency, valid_until, clients(id,company_name,email,contact_person), client_contacts(id,email,full_name)")
+      .select("id, quote_number, version_number, total_with_vat, currency, valid_until, created_by, clients(id,company_name,email,contact_person), client_contacts(id,email,full_name)")
       .eq("id", data.quoteId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -160,6 +160,20 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
 
     const { data: cfg } = await supabaseAdmin.from("email_settings").select("*").eq("id", 1).maybeSingle();
     if (!cfg) throw new Error("Chýbajú email nastavenia");
+
+    // Fetch creator profile for signature + Reply-To
+    let creator: { full_name: string | null; email: string | null; work_email: string | null; phone: string | null; job_title: string | null } | null = null;
+    const createdBy = (q as any).created_by as string | null;
+    if (createdBy) {
+      const { data: p } = await supabaseAdmin
+        .from("profiles")
+        .select("full_name, email, work_email, phone, job_title")
+        .eq("id", createdBy)
+        .maybeSingle();
+      creator = (p as any) ?? null;
+    }
+    const creatorWorkEmail = cleanEmail(creator?.work_email) ?? null;
+    const replyTo = creatorWorkEmail ?? cfg.reply_to_email ?? undefined;
 
     const subjectTpl = cfg.quote_subject_template || "Cenová ponuka {{quote_number}}";
     const subject = renderTemplate(subjectTpl, {
@@ -173,17 +187,31 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
       ? `<p>Ponuku si môžete pozrieť online: <a href="${escapeHtml(data.publicUrl)}">${escapeHtml(data.publicUrl)}</a></p>`
       : "";
     const customMessage = (data.message ?? "").trim();
+    const signerName = creator?.full_name?.trim() || cfg.from_name;
     const bodyMessage = customMessage
       ? `<p style="white-space:pre-wrap">${escapeHtml(customMessage)}</p>`
       : `<p>Dobrý deň${clientName ? " " + escapeHtml(clientName) : ""},</p>
          <p>zasielame Vám cenovú ponuku č. <strong>${escapeHtml((q as any).quote_number)}</strong> (v${(q as any).version_number}) v celkovej sume <strong>${escapeHtml(total)}</strong> s DPH.</p>
          ${ (q as any).valid_until ? `<p>Platnosť ponuky: ${escapeHtml((q as any).valid_until)}</p>` : "" }
          <p>V prípade otázok nás neváhajte kontaktovať.</p>
-         <p>S pozdravom,<br/>${escapeHtml(cfg.from_name)}</p>`;
+         <p>S pozdravom,<br/>${escapeHtml(signerName)}</p>`;
+
+    // Signature footer with creator's contact info
+    const sigRows: string[] = [];
+    if (creator?.full_name) sigRows.push(`<div style="font-weight:600;color:#111">${escapeHtml(creator.full_name)}</div>`);
+    if (creator?.job_title) sigRows.push(`<div style="color:#555">${escapeHtml(creator.job_title)}</div>`);
+    const contactBits: string[] = [];
+    if (creatorWorkEmail) contactBits.push(`<a href="mailto:${escapeHtml(creatorWorkEmail)}" style="color:#555;text-decoration:none">${escapeHtml(creatorWorkEmail)}</a>`);
+    if (creator?.phone) contactBits.push(`<a href="tel:${escapeHtml(creator.phone)}" style="color:#555;text-decoration:none">${escapeHtml(creator.phone)}</a>`);
+    if (contactBits.length) sigRows.push(`<div style="color:#555">${contactBits.join(" · ")}</div>`);
+    const signatureHtml = sigRows.length
+      ? `<div style="margin-top:24px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:13px;line-height:1.5">${sigRows.join("")}</div>`
+      : "";
 
     const html = `<div style="font-family:system-ui,Arial,sans-serif;font-size:14px;line-height:1.5;color:#111;max-width:640px">
       ${bodyMessage}
       ${linkHtml}
+      ${signatureHtml}
     </div>`;
 
     const attachments = data.pdfBase64
@@ -197,7 +225,7 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
     const result = await sendResendEmail({
       from: formatSender(cfg.from_name, cfg.from_email),
       to,
-      reply_to: cfg.reply_to_email ?? undefined,
+      reply_to: replyTo,
       subject,
       html,
       attachments,
@@ -211,7 +239,7 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
       status: result.ok ? "sent" : "failed",
       error_message: result.error ?? null,
       provider_id: result.id ?? null,
-      metadata: { quote_id: (q as any).id, has_attachment: !!attachments },
+      metadata: { quote_id: (q as any).id, has_attachment: !!attachments, reply_to: replyTo ?? null, creator_id: createdBy },
     });
 
     if (result.ok) {
@@ -219,7 +247,7 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
     } else {
       throw new Error(result.error || "Odoslanie zlyhalo");
     }
-    return { ok: true, id: result.id };
+    return { ok: true, id: result.id, replyTo: replyTo ?? null, creatorMissingWorkEmail: !!createdBy && !creatorWorkEmail };
   });
 
 /** Send survey link to client. */
