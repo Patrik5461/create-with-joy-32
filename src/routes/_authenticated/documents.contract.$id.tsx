@@ -13,6 +13,7 @@ import { ArrowLeft, Printer, Save, Trash2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { SignaturePad } from "@/components/signature-pad";
 import { COMPANY_INFO, DEFAULT_CONTRACT_TERMS, buildClientLines, formatDate, formatEur, type ContractTerms } from "@/lib/document-utils";
+import { buildCompanyLines } from "@/lib/document-utils";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/documents/contract/$id")({
@@ -32,6 +33,15 @@ function ContractDetail() {
       const { data, error } = await supabase.from("contracts").select("*").eq("id", id).single();
       if (error) throw error;
       return data as any;
+    },
+  });
+
+  const companyQ = useQuery({
+    queryKey: ["company-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("company_settings").select("*").order("created_at", { ascending: true }).limit(1).maybeSingle();
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -121,9 +131,13 @@ function ContractDetail() {
           <Card>
             <CardHeader><CardTitle className="text-base">Prenajímateľ</CardTitle></CardHeader>
             <CardContent className="text-sm space-y-0.5">
-              <div className="font-semibold">{COMPANY_INFO.name}</div>
-              <div className="text-muted-foreground">{COMPANY_INFO.tagline}</div>
-              <div className="text-muted-foreground">{COMPANY_INFO.email}</div>
+              {(() => {
+                const lines = buildCompanyLines(companyQ.data);
+                if (!lines.length) return <><div className="font-semibold">{COMPANY_INFO.name}</div><div className="text-muted-foreground">{COMPANY_INFO.email}</div></>;
+                return lines.map((l, i) => (
+                  <div key={i} className={l.bold ? "font-semibold" : "text-muted-foreground"}>{l.text}</div>
+                ));
+              })()}
             </CardContent>
           </Card>
           <Card>
@@ -205,7 +219,7 @@ function ContractDetail() {
       </div>
 
       {/* Print-only */}
-      <PrintContract c={c} d={d} terms={terms} sigCo={sigCo} sigCl={sigCl} signedByName={signedByName} />
+      <PrintContract c={c} d={d} terms={terms} sigCo={sigCo} sigCl={sigCl} signedByName={signedByName} company={companyQ.data} />
     </>
   );
 }
@@ -218,7 +232,8 @@ const TERMS_LABEL: Record<keyof ContractTerms, string> = {
   return: "5. Podmienky vrátenia",
 };
 
-function PrintContract({ c, d, terms, sigCo, sigCl, signedByName }: any) {
+function PrintContract({ c, d, terms, sigCo, sigCl, signedByName, company }: any) {
+  const supplierLines = buildCompanyLines(company);
   return (
     <div className="hidden print:block p-10 text-sm text-black bg-white">
       <div className="flex items-start justify-between border-b pb-4 mb-6">
@@ -239,8 +254,9 @@ function PrintContract({ c, d, terms, sigCo, sigCl, signedByName }: any) {
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div>
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Prenajímateľ</div>
-          <div className="font-semibold">{COMPANY_INFO.name}</div>
-          <div>{COMPANY_INFO.email}</div>
+          {supplierLines.length ? supplierLines.map((l, i) => (
+            <div key={i} className={l.bold ? "font-semibold" : undefined}>{l.text}</div>
+          )) : <><div className="font-semibold">{COMPANY_INFO.name}</div><div>{COMPANY_INFO.email}</div></>}
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Nájomca</div>

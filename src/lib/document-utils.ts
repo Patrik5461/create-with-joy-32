@@ -65,3 +65,22 @@ export function buildClientLines(
   if (phone) lines.push({ text: String(phone) });
   return lines;
 }
+
+/**
+ * Zjednotené poradie údajov DODÁVATEĽA na dokumentoch:
+ * 1. Názov  2. Adresa  3. IČO / DIČ / IČ DPH  4. Kontaktná osoba  5. Telefón  6. Email  7. IBAN
+ */
+export function buildCompanyLines(company: any | null | undefined): ClientLine[] {
+  const c = company ?? {};
+  const lines: ClientLine[] = [];
+  if (c.company_name) lines.push({ text: String(c.company_name), bold: true });
+  if (c.address) lines.push({ text: String(c.address) });
+  if (c.ico) lines.push({ text: `IČO: ${c.ico}` });
+  if (c.dic) lines.push({ text: `DIČ: ${c.dic}` });
+  if (c.ic_dph) lines.push({ text: `IČ DPH: ${c.ic_dph}` });
+  if (c.contact_person) lines.push({ text: String(c.contact_person) });
+  if (c.phone) lines.push({ text: `Tel: ${c.phone}` });
+  if (c.email) lines.push({ text: String(c.email) });
+  if (c.iban) lines.push({ text: `IBAN: ${c.iban}` });
+  return lines;
+}

@@ -34,6 +34,7 @@ import { Route as AuthenticatedClientsIndexRouteImport } from './routes/_authent
 import { Route as AuthenticatedWarehouseQrPrintRouteImport } from './routes/_authenticated/warehouse.qr-print'
 import { Route as AuthenticatedSettingsHelpersRouteImport } from './routes/_authenticated/settings.helpers'
 import { Route as AuthenticatedSettingsEmailRouteImport } from './routes/_authenticated/settings.email'
+import { Route as AuthenticatedSettingsCompanyRouteImport } from './routes/_authenticated/settings.company'
 import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings.calendar'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings.account'
 import { Route as AuthenticatedReservationsNewRouteImport } from './routes/_authenticated/reservations.new'
@@ -182,6 +183,12 @@ const AuthenticatedSettingsEmailRoute =
     path: '/email',
     getParentRoute: () => AuthenticatedSettingsRoute,
   } as any)
+const AuthenticatedSettingsCompanyRoute =
+  AuthenticatedSettingsCompanyRouteImport.update({
+    id: '/company',
+    path: '/company',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedSettingsCalendarRoute =
   AuthenticatedSettingsCalendarRouteImport.update({
     id: '/calendar',
@@ -295,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/settings/company': typeof AuthenticatedSettingsCompanyRoute
   '/settings/email': typeof AuthenticatedSettingsEmailRoute
   '/settings/helpers': typeof AuthenticatedSettingsHelpersRoute
   '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
@@ -334,6 +342,7 @@ export interface FileRoutesByTo {
   '/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/settings/company': typeof AuthenticatedSettingsCompanyRoute
   '/settings/email': typeof AuthenticatedSettingsEmailRoute
   '/settings/helpers': typeof AuthenticatedSettingsHelpersRoute
   '/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
@@ -377,6 +386,7 @@ export interface FileRoutesById {
   '/_authenticated/reservations/new': typeof AuthenticatedReservationsNewRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
+  '/_authenticated/settings/company': typeof AuthenticatedSettingsCompanyRoute
   '/_authenticated/settings/email': typeof AuthenticatedSettingsEmailRoute
   '/_authenticated/settings/helpers': typeof AuthenticatedSettingsHelpersRoute
   '/_authenticated/warehouse/qr-print': typeof AuthenticatedWarehouseQrPrintRoute
@@ -420,6 +430,7 @@ export interface FileRouteTypes {
     | '/reservations/new'
     | '/settings/account'
     | '/settings/calendar'
+    | '/settings/company'
     | '/settings/email'
     | '/settings/helpers'
     | '/warehouse/qr-print'
@@ -459,6 +470,7 @@ export interface FileRouteTypes {
     | '/reservations/new'
     | '/settings/account'
     | '/settings/calendar'
+    | '/settings/company'
     | '/settings/email'
     | '/settings/helpers'
     | '/warehouse/qr-print'
@@ -501,6 +513,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reservations/new'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/calendar'
+    | '/_authenticated/settings/company'
     | '/_authenticated/settings/email'
     | '/_authenticated/settings/helpers'
     | '/_authenticated/warehouse/qr-print'
@@ -706,6 +719,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsEmailRouteImport
       parentRoute: typeof AuthenticatedSettingsRoute
     }
+    '/_authenticated/settings/company': {
+      id: '/_authenticated/settings/company'
+      path: '/company'
+      fullPath: '/settings/company'
+      preLoaderRoute: typeof AuthenticatedSettingsCompanyRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
     '/_authenticated/settings/calendar': {
       id: '/_authenticated/settings/calendar'
       path: '/calendar'
@@ -817,6 +837,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
   AuthenticatedSettingsCalendarRoute: typeof AuthenticatedSettingsCalendarRoute
+  AuthenticatedSettingsCompanyRoute: typeof AuthenticatedSettingsCompanyRoute
   AuthenticatedSettingsEmailRoute: typeof AuthenticatedSettingsEmailRoute
   AuthenticatedSettingsHelpersRoute: typeof AuthenticatedSettingsHelpersRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
@@ -825,6 +846,7 @@ interface AuthenticatedSettingsRouteChildren {
 const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
   AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
   AuthenticatedSettingsCalendarRoute: AuthenticatedSettingsCalendarRoute,
+  AuthenticatedSettingsCompanyRoute: AuthenticatedSettingsCompanyRoute,
   AuthenticatedSettingsEmailRoute: AuthenticatedSettingsEmailRoute,
   AuthenticatedSettingsHelpersRoute: AuthenticatedSettingsHelpersRoute,
   AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,

@@ -224,6 +224,51 @@ export type Database = {
         }
         Relationships: []
       }
+      company_settings: {
+        Row: {
+          address: string | null
+          company_name: string
+          contact_person: string | null
+          created_at: string
+          dic: string | null
+          email: string | null
+          iban: string | null
+          ic_dph: string | null
+          ico: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          company_name?: string
+          contact_person?: string | null
+          created_at?: string
+          dic?: string | null
+          email?: string | null
+          iban?: string | null
+          ic_dph?: string | null
+          ico?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          company_name?: string
+          contact_person?: string | null
+          created_at?: string
+          dic?: string | null
+          email?: string | null
+          iban?: string | null
+          ic_dph?: string | null
+          ico?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contracts: {
         Row: {
           contract_number: string | null
