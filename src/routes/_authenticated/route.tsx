@@ -22,7 +22,7 @@ function AuthenticatedLayout() {
           <div className="flex-1">
             <Outlet />
           </div>
-          <footer className="py-3 px-6 text-center text-xs text-muted-foreground border-t">
+          <footer className="py-3 px-6 text-center text-xs text-muted-foreground border-t print:hidden">
             © 2026 mima production s.r.o. Všetky práva vyhradené.
           </footer>
         </SidebarInset>
