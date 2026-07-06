@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link, useRouterState } from "@tanstack/react-router";
-import { Calendar, KeyRound, Mail, HardHat } from "lucide-react";
+import { Building2, Calendar, KeyRound, Mail, HardHat } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -7,6 +7,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 });
 
 const items = [
+  { to: "/settings/company", label: "Firemné údaje", icon: Building2 },
   { to: "/settings/calendar", label: "Kalendár (Google / Apple)", icon: Calendar },
   { to: "/settings/email", label: "Email (Resend)", icon: Mail },
   { to: "/settings/helpers", label: "Helperi (PIN)", icon: HardHat },
