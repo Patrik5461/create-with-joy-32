@@ -17,7 +17,7 @@ import { buildCompanyLines } from "@/lib/document-utils";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/documents/contract/$id")({
-  head: () => ({ meta: [{ title: "Zmluva o prenájme · Mima Production CRM" }] }),
+  head: () => ({ meta: [{ title: "Zmluva o prenájme · mima production CRM" }] }),
   component: ContractDetail,
 });
 
