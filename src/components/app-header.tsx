@@ -42,7 +42,7 @@ export function AppHeader({ title }: { title: string }) {
   };
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur">
+    <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur print:hidden">
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-5" />
       <div className="flex-1 min-w-0">
