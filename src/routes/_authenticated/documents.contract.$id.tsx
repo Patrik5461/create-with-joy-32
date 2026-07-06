@@ -237,11 +237,8 @@ function PrintContract({ c, d, terms, sigCo, sigCl, signedByName, company }: any
   return (
     <div className="hidden print:block p-10 text-sm text-black bg-white">
       <div className="flex items-start justify-between border-b pb-4 mb-6">
-        <div className="flex items-center gap-3">
-          <img src="/mima-logo.png" alt="Mima Production" className="h-14 w-auto" />
-          <div>
-            <div className="text-xl font-bold">{COMPANY_INFO.name}</div>
-          </div>
+        <div>
+          <img src="/mima-logo.png" alt="mima production" className="h-16 w-auto" />
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold">Zmluva o prenájme</div>
