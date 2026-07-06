@@ -50,7 +50,7 @@ function AuthPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--color-primary)/10,_transparent_60%),_radial-gradient(ellipse_at_bottom_right,_var(--color-accent)/15,_transparent_50%)] bg-background">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <img src={mimaLogo} alt="mima production" className="w-64 h-auto mb-4" />
+          <img src={mimaLogo} alt="mima production" className="w-80 h-auto mb-4" />
           <h1 className="text-xl font-semibold tracking-tight">mima production CRM</h1>
           <p className="text-sm text-muted-foreground">Interný systém</p>
         </div>
