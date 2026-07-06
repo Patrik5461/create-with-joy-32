@@ -488,7 +488,7 @@ function _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl
     <div className="hidden print:block p-10 text-sm text-black bg-white">
       <div className="flex items-start justify-between border-b pb-4 mb-6">
         <div>
-          <img src="/mima-logo.png" alt="mima production" className="h-16 w-auto" />
+          <img src="/mima-logo.png" alt="mima production" className="h-24 w-auto" />
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold">{title}</div>
