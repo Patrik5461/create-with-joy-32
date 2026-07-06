@@ -70,8 +70,13 @@ export function buildQuotePdfBase64(quote: any, company?: any): { base64: string
   }
   y += 6;
 
-  // Items table header
-  const items = (quote.quote_items ?? []).slice().sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  // Items table header — pre klienta: najprv nábytok, potom služby/doprava.
+  const items = (quote.quote_items ?? []).slice().sort((a: any, b: any) => {
+    const ak = a.kind === "service" ? 1 : 0;
+    const bk = b.kind === "service" ? 1 : 0;
+    if (ak !== bk) return ak - bk;
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  });
   doc.setFont("helvetica", "bold");
   doc.text("Polozka", marginX, y);
   doc.text("Ks", marginX + 260, y, { align: "right" });
