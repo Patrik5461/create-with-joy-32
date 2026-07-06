@@ -25,6 +25,9 @@ interface QuoteRecord {
   valid_until: string | null;
   event_start_at: string | null;
   event_end_at: string | null;
+  event_date: string | null;
+  installation_date: string | null;
+  dismantling_date: string | null;
   vat_rate: number;
   discount_type: AdjustType;
   discount_value: number;
@@ -52,6 +55,16 @@ interface Props {
 
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
+function isoToLocalDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function QuoteForm({ initial, quoteId, versionParent }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -65,6 +78,9 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
     valid_until: null,
     event_start_at: null,
     event_end_at: null,
+    event_date: null,
+    installation_date: null,
+    dismantling_date: null,
     vat_rate: 23,
     discount_type: "none",
     discount_value: 0,
@@ -206,8 +222,20 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
   }), [lines, form.discount_type, form.discount_value, form.surcharge_type, form.surcharge_value, form.vat_rate]);
 
   const prefillFromReservation = async (reservationId: string) => {
-    const { data: r } = await supabase.from("reservations").select("client_id").eq("id", reservationId).maybeSingle();
-    if (r?.client_id) setForm((f) => ({ ...f, client_id: r.client_id }));
+    const { data: r } = await supabase
+      .from("reservations")
+      .select("client_id, load_at, event_start_at, return_at")
+      .eq("id", reservationId)
+      .maybeSingle();
+    if (r) {
+      setForm((f) => ({
+        ...f,
+        client_id: r.client_id ?? f.client_id,
+        installation_date: f.installation_date ?? isoToLocalDate((r as any).load_at),
+        event_date: f.event_date ?? isoToLocalDate((r as any).event_start_at),
+        dismantling_date: f.dismantling_date ?? isoToLocalDate((r as any).return_at),
+      }));
+    }
     const { data: ri } = await supabase
       .from("reservation_items")
       .select("qty, furniture_item_id, furniture_items(name, price_per_day, price_fixed)")
@@ -298,6 +326,9 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         valid_until: form.valid_until,
         event_start_at: form.event_start_at,
         event_end_at: form.event_end_at,
+        event_date: form.event_date,
+        installation_date: form.installation_date,
+        dismantling_date: form.dismantling_date,
         vat_rate: form.vat_rate,
         discount_type: form.discount_type,
         discount_value: form.discount_value,
