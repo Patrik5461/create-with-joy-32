@@ -27,7 +27,7 @@ import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote,
 import { useServerFn } from "@tanstack/react-start";
 import { sendQuoteEmail } from "@/lib/email.functions";
 import { buildQuotePdfBase64 } from "@/lib/quote-pdf";
-import { buildClientLines } from "@/lib/document-utils";
+import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
   head: () => ({ meta: [{ title: "Kalkulácia · Mima Production CRM" }] }),
@@ -99,6 +99,20 @@ function QuoteDetail() {
         .maybeSingle();
       if (error) throw error;
       return data as any;
+    },
+  });
+
+  const companyQ = useQuery({
+    queryKey: ["company-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_settings")
+        .select("*")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -239,7 +253,7 @@ function QuoteDetail() {
     if (!to) return toast.error("Klient nemá email");
     setSendingEmail(true);
     try {
-      const { base64, filename } = buildQuotePdfBase64(q);
+      const { base64, filename } = buildQuotePdfBase64(q, companyQ.data);
       await sendQuoteFn({
         data: {
           quoteId: q.id,
