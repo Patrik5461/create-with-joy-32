@@ -392,7 +392,7 @@ function ProtocolDetail() {
         <Card>
           <CardHeader><CardTitle className="text-base">Podpisy</CardTitle></CardHeader>
           <CardContent className="grid md:grid-cols-2 gap-4">
-            <SignaturePad label="Za Mima Production" value={sigCo} onChange={setSigCo} disabled={!canEdit || isSigned} />
+            <SignaturePad label="Za mima production" value={sigCo} onChange={setSigCo} disabled={!canEdit || isSigned} />
             <SignaturePad label={isReturn ? "Za klienta (odovzdal)" : "Za klienta (prevzal)"} value={sigCl} onChange={setSigCl} disabled={!canEdit || isSigned} />
           </CardContent>
         </Card>
@@ -553,7 +553,7 @@ function _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl
 
       <div className="grid grid-cols-2 gap-12 mt-12">
         <div>
-          <div className="border-b border-black h-20 flex items-end justify-center">{sigCo && <img src={sigCo} alt="Podpis za Mima Production" className="max-h-20" />}</div>
+          <div className="border-b border-black h-20 flex items-end justify-center">{sigCo && <img src={sigCo} alt="Podpis za mima production" className="max-h-20" />}</div>
           <div className="text-xs text-center mt-1">Za {COMPANY_INFO.name}{p.issued_by_name ? ` · ${p.issued_by_name}` : ""}</div>
         </div>
         <div>

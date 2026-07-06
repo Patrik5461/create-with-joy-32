@@ -646,7 +646,7 @@ function PrintView({ quote: q, company }: { quote: any; company?: any }) {
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Dodávateľ</div>
           {supplierLines.length ? supplierLines.map((l, i) => (
             <div key={i} className={l.bold ? "font-semibold" : undefined}>{l.text}</div>
-          )) : <div className="font-semibold">Mima Production</div>}
+          )) : <div className="font-semibold">mima production</div>}
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Odberateľ</div>
@@ -704,7 +704,7 @@ function PrintView({ quote: q, company }: { quote: any; company?: any }) {
       )}
 
       <div className="mt-12 text-xs text-gray-500 text-center">
-        Cenová ponuka {q.quote_number} · Mima Production
+        Cenová ponuka {q.quote_number} · mima production
       </div>
     </div>
   );
