@@ -398,7 +398,7 @@ function ProtocolDetail() {
         </Card>
       </div>
 
-      <PrintProtocol p={p} rows={rows} notes={notes} receivedBy={receivedBy} issuedAt={issuedAt} sigCo={sigCo} sigCl={sigCl} title={title} />
+      <PrintProtocol p={p} rows={rows} notes={notes} receivedBy={receivedBy} issuedAt={issuedAt} sigCo={sigCo} sigCl={sigCl} title={title} company={companyQ.data} />
 
       <QrScannerDialog
         open={scannerOpen}
@@ -416,10 +416,10 @@ function ProtocolDetail() {
   );
 }
 
-function PrintProtocol({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl, title }: any) {
+function PrintProtocol({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl, title, company }: any) {
   const d = p.data ?? {};
   void d;
-  return _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl, title });
+  return _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl, title, company });
 }
 
 function ScanProgress({ actual, expected }: { actual: number; expected: number }) {
@@ -481,8 +481,9 @@ function ScanSummary({ rows, isReturn }: { rows: any[]; isReturn: boolean }) {
   );
 }
 
-function _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl, title }: any) {
+function _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl, title, company }: any) {
   const d = p.data ?? {};
+  const supplierLines = buildCompanyLines(company);
   return (
     <div className="hidden print:block p-10 text-sm text-black bg-white">
       <div className="flex items-start justify-between border-b pb-4 mb-6">
@@ -502,12 +503,10 @@ function _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl
 
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div>
-          <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Klient</div>
-          {buildClientLines(d.client, null, { email: d.client?.email, phone: d.client?.phone, contactName: d.client?.contact_person }).map((l, i) => (
+          <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Dodávateľ</div>
+          {supplierLines.length ? supplierLines.map((l: any, i: number) => (
             <div key={i} className={l.bold ? "font-semibold" : undefined}>{l.text}</div>
-          ))}
-          {!d.client?.company_name && <div className="font-semibold">—</div>}
-          {receivedBy && <div>Prevzal/Vrátil: {receivedBy}</div>}
+          )) : <div className="font-semibold">{COMPANY_INFO.name}</div>}
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Event</div>
@@ -515,6 +514,17 @@ function _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl
           <div>{d.event?.venue}{d.event?.address ? `, ${d.event.address}` : ""}</div>
           <div>Nakládka: {formatDate(d.event?.load_at)} · Návrat: {formatDate(d.event?.return_at)}</div>
           <div>Vydal: {p.issued_by_name ?? "—"}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Klient</div>
+          {buildClientLines(d.client, null, { email: d.client?.email, phone: d.client?.phone, contactName: d.client?.contact_person }).map((l, i) => (
+            <div key={i} className={l.bold ? "font-semibold" : undefined}>{l.text}</div>
+          ))}
+          {!d.client?.company_name && <div className="font-semibold">—</div>}
+          {receivedBy && <div>Prevzal/Vrátil: {receivedBy}</div>}
         </div>
       </div>
 
