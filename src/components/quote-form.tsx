@@ -494,6 +494,30 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
             />
           </div>
           <div className="space-y-1.5">
+            <Label>Dátum inštalácie</Label>
+            <Input
+              type="date"
+              value={form.installation_date ?? ""}
+              onChange={(e) => setForm({ ...form, installation_date: e.target.value || null })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Dátum eventu</Label>
+            <Input
+              type="date"
+              value={form.event_date ?? ""}
+              onChange={(e) => setForm({ ...form, event_date: e.target.value || null })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Dátum demontáže</Label>
+            <Input
+              type="date"
+              value={form.dismantling_date ?? ""}
+              onChange={(e) => setForm({ ...form, dismantling_date: e.target.value || null })}
+            />
+          </div>
+          <div className="space-y-1.5">
             <Label>Stav</Label>
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as any })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
