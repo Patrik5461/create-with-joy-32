@@ -15,6 +15,8 @@ import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMon
 import { sk } from "date-fns/locale";
 
 type RangeView = "day" | "week" | "month";
+type SortKey = "issue_date" | "event_date";
+type DateField = "issue_date" | "event_date";
 
 function getRange(view: RangeView, anchor: Date): { start: Date; end: Date; label: string } {
   if (view === "day") {
@@ -45,6 +47,10 @@ function QuotesList() {
   const [view, setView] = useState<RangeView>("month");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [dateFilterOn, setDateFilterOn] = useState(false);
+  const [dateField, setDateField] = useState<DateField>("issue_date");
+  const [eventFrom, setEventFrom] = useState<string>("");
+  const [eventTo, setEventTo] = useState<string>("");
+  const [sortBy, setSortBy] = useState<SortKey>("issue_date");
 
   const range = useMemo(() => getRange(view, anchor), [view, anchor]);
   const shift = (dir: 1 | -1) => {
@@ -66,7 +72,7 @@ function QuotesList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("id, quote_number, status, issue_date, total_with_vat, client_id, version_number, is_current, clients(company_name), reservations(event_name)")
+        .select("id, quote_number, status, issue_date, event_date, installation_date, dismantling_date, total_with_vat, client_id, version_number, is_current, clients(company_name), reservations(event_name)")
       .eq("is_current", true)
       .is("deleted_at", null)
         .order("issue_date", { ascending: false });
@@ -76,12 +82,20 @@ function QuotesList() {
   });
 
   const filtered = useMemo(() => {
-    return (quotes.data ?? []).filter((q: any) => {
+    const rows = (quotes.data ?? []).filter((q: any) => {
       if (status !== "all" && q.status !== status) return false;
       if (clientId !== "all" && q.client_id !== clientId) return false;
       if (dateFilterOn) {
-        const d = new Date(q.issue_date);
+        const src = dateField === "event_date" ? q.event_date : q.issue_date;
+        if (!src) return false;
+        const d = new Date(src);
         if (d < range.start || d > range.end) return false;
+      }
+      if (eventFrom) {
+        if (!q.event_date || q.event_date < eventFrom) return false;
+      }
+      if (eventTo) {
+        if (!q.event_date || q.event_date > eventTo) return false;
       }
       if (search) {
         const s = search.toLowerCase();
@@ -91,7 +105,33 @@ function QuotesList() {
       }
       return true;
     });
-  }, [quotes.data, status, clientId, search, dateFilterOn, range]);
+    const sorted = [...rows].sort((a: any, b: any) => {
+      if (sortBy === "event_date") {
+        const av = a.event_date ?? "";
+        const bv = b.event_date ?? "";
+        if (!av && !bv) return 0;
+        if (!av) return 1;
+        if (!bv) return -1;
+        return bv.localeCompare(av);
+      }
+      return (b.issue_date ?? "").localeCompare(a.issue_date ?? "");
+    });
+    return sorted;
+  }, [quotes.data, status, clientId, search, dateFilterOn, range, dateField, eventFrom, eventTo, sortBy]);
+
+  const quickThisMonth = () => {
+    const now = new Date();
+    const s = startOfMonth(now);
+    const e = endOfMonth(now);
+    setEventFrom(s.toISOString().slice(0, 10));
+    setEventTo(e.toISOString().slice(0, 10));
+  };
+  const quickUpcoming = () => {
+    const now = new Date();
+    setEventFrom(now.toISOString().slice(0, 10));
+    setEventTo("");
+  };
+  const clearEventRange = () => { setEventFrom(""); setEventTo(""); };
 
   return (
     <>
@@ -142,6 +182,13 @@ function QuotesList() {
             <Button variant="outline" size="icon" aria-label="Nasledujúce obdobie" onClick={() => shift(1)}><ChevronRight className="size-4" /></Button>
             <Button variant="outline" size="sm" onClick={() => { setAnchor(new Date()); setDateFilterOn(true); }}>Dnes</Button>
             <div className="ml-2 text-sm font-medium capitalize">{range.label}</div>
+            <Select value={dateField} onValueChange={(v) => setDateField(v as DateField)}>
+              <SelectTrigger className="h-8 w-40 ml-2"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="issue_date">Dátum vystavenia</SelectItem>
+                <SelectItem value="event_date">Dátum eventu</SelectItem>
+              </SelectContent>
+            </Select>
             {dateFilterOn && (
               <Button variant="ghost" size="sm" className="ml-2" onClick={() => setDateFilterOn(false)}>Zrušiť filter dátumu</Button>
             )}
@@ -159,6 +206,32 @@ function QuotesList() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-end gap-2 rounded-md border p-3 bg-muted/30">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Dátum eventu od</label>
+            <Input type="date" className="h-9 w-40" value={eventFrom} onChange={(e) => setEventFrom(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">do</label>
+            <Input type="date" className="h-9 w-40" value={eventTo} onChange={(e) => setEventTo(e.target.value)} />
+          </div>
+          <Button variant="outline" size="sm" onClick={quickThisMonth}>Tento mesiac</Button>
+          <Button variant="outline" size="sm" onClick={quickUpcoming}>Nadchádzajúce eventy</Button>
+          {(eventFrom || eventTo) && (
+            <Button variant="ghost" size="sm" onClick={clearEventRange}>Vymazať</Button>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Zoradiť</span>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+              <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="issue_date">Dátum vystavenia</SelectItem>
+                <SelectItem value="event_date">Dátum eventu</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -168,14 +241,17 @@ function QuotesList() {
                   <TableHead className="w-16">Verzia</TableHead>
                   <TableHead>Klient</TableHead>
                   <TableHead>Event</TableHead>
-                  <TableHead>Dátum</TableHead>
+                  <TableHead>Vystavené</TableHead>
+                  <TableHead>Dátum eventu</TableHead>
+                  <TableHead>Inštalácia</TableHead>
+                  <TableHead>Demontáž</TableHead>
                   <TableHead>Stav</TableHead>
                   <TableHead className="text-right">Suma s DPH</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quotes.isLoading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Načítavam…</TableCell></TableRow>}
-                {!quotes.isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Žiadne kalkulácie.</TableCell></TableRow>}
+                {quotes.isLoading && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">Načítavam…</TableCell></TableRow>}
+                {!quotes.isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">Žiadne kalkulácie.</TableCell></TableRow>}
                 {filtered.map((q: any) => (
                   <TableRow key={q.id} className="cursor-pointer" onClick={() => navigate({ to: "/quotes/$id", params: { id: q.id } })}>
                     <TableCell className="font-mono font-medium">{q.quote_number}</TableCell>
@@ -183,6 +259,9 @@ function QuotesList() {
                     <TableCell>{q.clients?.company_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{q.reservations?.event_name ?? "—"}</TableCell>
                     <TableCell>{new Date(q.issue_date).toLocaleDateString("sk-SK")}</TableCell>
+                    <TableCell>{q.event_date ? new Date(q.event_date).toLocaleDateString("sk-SK") : "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{q.installation_date ? new Date(q.installation_date).toLocaleDateString("sk-SK") : "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{q.dismantling_date ? new Date(q.dismantling_date).toLocaleDateString("sk-SK") : "—"}</TableCell>
                     <TableCell><Badge variant={QUOTE_STATUS_VARIANT[q.status as keyof typeof QUOTE_STATUS_VARIANT]}>{QUOTE_STATUS_LABEL[q.status as keyof typeof QUOTE_STATUS_LABEL]}</Badge></TableCell>
                     <TableCell className="text-right font-semibold">{formatEur(Number(q.total_with_vat))}</TableCell>
                   </TableRow>
