@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Printer, Save, Trash2, CheckCircle2, Wrench, ScanLine, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { SignaturePad } from "@/components/signature-pad";
-import { COMPANY_INFO, formatDate, formatDateTime } from "@/lib/document-utils";
+import { COMPANY_INFO, buildClientLines, formatDate, formatDateTime } from "@/lib/document-utils";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { QrScannerDialog } from "@/components/qr-scanner-dialog";
 
@@ -493,8 +493,10 @@ function _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div>
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Klient</div>
-          <div className="font-semibold">{d.client?.company_name ?? "—"}</div>
-          {d.client?.address && <div>{d.client.address}</div>}
+          {buildClientLines(d.client, null, { email: d.client?.email, phone: d.client?.phone, contactName: d.client?.contact_person }).map((l, i) => (
+            <div key={i} className={l.bold ? "font-semibold" : undefined}>{l.text}</div>
+          ))}
+          {!d.client?.company_name && <div className="font-semibold">—</div>}
           {receivedBy && <div>Prevzal/Vrátil: {receivedBy}</div>}
         </div>
         <div>

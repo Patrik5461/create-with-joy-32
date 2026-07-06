@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { formatEur, lineTotal } from "./quote-utils";
+import { buildClientLines } from "./document-utils";
 
 /**
  * Vygeneruje jednoduché PDF cenovej ponuky a vráti base64 (bez data: prefixu).
@@ -44,9 +45,13 @@ export function buildQuotePdfBase64(quote: any): { base64: string; filename: str
   doc.text("Odberatel:", marginX, y);
   doc.setFont("helvetica", "normal");
   y += 14;
-  if (client.company_name) { doc.text(String(client.company_name), marginX, y); y += 12; }
-  if (contact.full_name || client.contact_person) { doc.text(String(contact.full_name ?? client.contact_person), marginX, y); y += 12; }
-  if (contact.email || client.email) { doc.text(String(contact.email ?? client.email), marginX, y); y += 12; }
+  const clientLines = buildClientLines(client, contact);
+  for (const line of clientLines) {
+    if (line.bold) doc.setFont("helvetica", "bold");
+    doc.text(line.text, marginX, y);
+    if (line.bold) doc.setFont("helvetica", "normal");
+    y += 12;
+  }
   y += 6;
 
   // Items table header

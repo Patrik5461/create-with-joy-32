@@ -33,6 +33,8 @@ export function DocumentsSection({ reservation }: Props) {
     client: {
       company_name: reservation.clients?.company_name ?? "",
       ico: reservation.clients?.ico ?? null,
+      dic: reservation.clients?.dic ?? null,
+      ic_dph: reservation.clients?.ic_dph ?? null,
       address: reservation.clients?.address ?? null,
       contact_person: reservation.contact_person ?? reservation.clients?.contact_person ?? null,
       phone: reservation.phone ?? null,

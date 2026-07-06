@@ -27,6 +27,7 @@ import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote,
 import { useServerFn } from "@tanstack/react-start";
 import { sendQuoteEmail } from "@/lib/email.functions";
 import { buildQuotePdfBase64 } from "@/lib/quote-pdf";
+import { buildClientLines } from "@/lib/document-utils";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
   head: () => ({ meta: [{ title: "Kalkulácia · Mima Production CRM" }] }),
@@ -456,22 +457,10 @@ function QuoteDetail() {
           <Card>
             <CardHeader><CardTitle className="text-base">Klient</CardTitle></CardHeader>
             <CardContent className="text-sm space-y-1">
-              <div className="font-semibold">{q.clients?.company_name ?? "—"}</div>
-              {q.clients?.ico && <div className="text-muted-foreground">IČO: {q.clients.ico}</div>}
-              {q.client_contacts ? (
-                <div className="pt-1">
-                  <div>{q.client_contacts.full_name}{q.client_contacts.role ? ` · ${q.client_contacts.role}` : ""}</div>
-                  {q.client_contacts.email && <div className="text-muted-foreground">{q.client_contacts.email}</div>}
-                  {q.client_contacts.phone && <div className="text-muted-foreground">{q.client_contacts.phone}</div>}
-                </div>
-              ) : (
-                <>
-                  {q.clients?.contact_person && <div>{q.clients.contact_person}</div>}
-                  {q.clients?.email && <div className="text-muted-foreground">{q.clients.email}</div>}
-                  {q.clients?.phone && <div className="text-muted-foreground">{q.clients.phone}</div>}
-                </>
-              )}
-              {q.clients?.address && <div className="text-muted-foreground">{q.clients.address}</div>}
+              {buildClientLines(q.clients, q.client_contacts).map((l, i) => (
+                <div key={i} className={l.bold ? "font-semibold" : "text-muted-foreground"}>{l.text}</div>
+              ))}
+              {!q.clients?.company_name && <div className="font-semibold">—</div>}
             </CardContent>
           </Card>
           <Card>
@@ -648,14 +637,10 @@ function PrintView({ quote: q }: { quote: any }) {
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Odberateľ</div>
-          <div className="font-semibold">{q.clients?.company_name ?? "—"}</div>
-          {q.clients?.ico && <div>IČO: {q.clients.ico}</div>}
-          {q.client_contacts
-            ? <div>{q.client_contacts.full_name}{q.client_contacts.role ? ` · ${q.client_contacts.role}` : ""}</div>
-            : (q.clients?.contact_person && <div>{q.clients.contact_person}</div>)}
-          {q.clients?.address && <div>{q.clients.address}</div>}
-          {(q.client_contacts?.email ?? q.clients?.email) && <div>{q.client_contacts?.email ?? q.clients?.email}</div>}
-          {(q.client_contacts?.phone ?? q.clients?.phone) && <div>{q.client_contacts?.phone ?? q.clients?.phone}</div>}
+          {buildClientLines(q.clients, q.client_contacts).map((l, i) => (
+            <div key={i} className={l.bold ? "font-semibold" : undefined}>{l.text}</div>
+          ))}
+          {!q.clients?.company_name && <div className="font-semibold">—</div>}
         </div>
       </div>
 
