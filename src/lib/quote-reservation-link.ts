@@ -55,6 +55,7 @@ export function computeItemsDiff(
 
 /** Rebuild reservation_items from a quote's items. */
 export async function syncReservationFromQuote(reservationId: string, quoteId: string) {
+  // 1) Rebuild reservation_items from quote_items
   const { data: items, error: e1 } = await supabase
     .from("quote_items")
     .select("kind, furniture_item_id, qty")
@@ -76,6 +77,64 @@ export async function syncReservationFromQuote(reservationId: string, quoteId: s
     const { error: eIns } = await supabase.from("reservation_items").insert(rows);
     if (eIns) throw eIns;
   }
+
+  // 2) Propagate date/time fields from the quote to the reservation so that
+  //    the CRM calendar and the ICS feed reflect edits made on the quote.
+  const { data: q, error: eQ } = await supabase
+    .from("quotes")
+    .select("event_start_at, event_end_at, event_date, installation_date, dismantling_date")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (eQ) throw eQ;
+  if (q) {
+    const patch = buildReservationDatesPatch(q as any);
+    if (Object.keys(patch).length > 0) {
+      const { error: eUpd } = await supabase
+        .from("reservations")
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", reservationId);
+      if (eUpd) throw eUpd;
+    }
+  }
+}
+
+function dateAt(date: string, hh: number, mm = 0): string {
+  // Interpret YYYY-MM-DD as local time, then serialize to ISO (UTC).
+  const [y, m, d] = date.split("-").map((n) => Number(n));
+  return new Date(y, (m ?? 1) - 1, d ?? 1, hh, mm, 0, 0).toISOString();
+}
+
+/** Compute reservation date fields from a quote row. Only fields the quote
+ *  actually specifies are returned so we never blank out manual overrides. */
+export function buildReservationDatesPatch(q: {
+  event_start_at: string | null;
+  event_end_at: string | null;
+  event_date: string | null;
+  installation_date: string | null;
+  dismantling_date: string | null;
+}): Record<string, string> {
+  const patch: Record<string, string> = {};
+
+  // event window
+  const eventStart = q.event_start_at ?? (q.event_date ? dateAt(q.event_date, 10) : null);
+  const eventEnd = q.event_end_at ?? (q.event_date ? dateAt(q.event_date, 23) : null);
+  if (eventStart) patch.event_start_at = new Date(eventStart).toISOString();
+  if (eventEnd) patch.event_end_at = new Date(eventEnd).toISOString();
+
+  // load_at ← installation_date (08:00) alebo začiatok eventu
+  const loadAt = q.installation_date ? dateAt(q.installation_date, 8) : eventStart;
+  if (loadAt) patch.load_at = new Date(loadAt).toISOString();
+
+  // return_at ← dismantling_date (22:00) alebo koniec eventu;
+  // available_from_at ← nasledujúci deň 08:00 alebo return_at
+  const returnAt = q.dismantling_date ? dateAt(q.dismantling_date, 22) : eventEnd;
+  if (returnAt) {
+    patch.return_at = new Date(returnAt).toISOString();
+    const nextDay = new Date(new Date(returnAt).getTime() + 10 * 3600 * 1000);
+    patch.available_from_at = nextDay.toISOString();
+  }
+
+  return patch;
 }
 
 /** Create a reservation from a quote (and link both sides). Returns new reservation id. */
