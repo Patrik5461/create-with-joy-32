@@ -47,6 +47,11 @@ function NativeLauncher() {
           />
         </div>
       </main>
+      <footer className="py-4 text-center border-t border-border/50">
+        <p className="text-xs text-muted-foreground">
+          © 2026 mima production s.r.o. Všetky práva vyhradené.
+        </p>
+      </footer>
     </div>
   );
 }
