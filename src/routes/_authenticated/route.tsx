@@ -18,8 +18,13 @@ function AuthenticatedLayout() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
-        <SidebarInset className="flex-1 min-w-0">
-          <Outlet />
+        <SidebarInset className="flex-1 min-w-0 flex flex-col">
+          <div className="flex-1">
+            <Outlet />
+          </div>
+          <footer className="py-3 px-6 text-center text-xs text-muted-foreground border-t">
+            © 2026 mima production s.r.o. Všetky práva vyhradené.
+          </footer>
         </SidebarInset>
       </div>
     </SidebarProvider>
