@@ -1,12 +1,12 @@
 import jsPDF from "jspdf";
 import { formatEur, lineTotal } from "./quote-utils";
-import { buildClientLines } from "./document-utils";
+import { buildClientLines, buildCompanyLines } from "./document-utils";
 
 /**
  * Vygeneruje jednoduché PDF cenovej ponuky a vráti base64 (bez data: prefixu).
  * Beží čisto v prehliadači (jsPDF), aby to fungovalo aj bez server PDF renderu.
  */
-export function buildQuotePdfBase64(quote: any): { base64: string; filename: string } {
+export function buildQuotePdfBase64(quote: any, company?: any): { base64: string; filename: string } {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const marginX = 40;
   let y = 50;
@@ -39,6 +39,21 @@ export function buildQuotePdfBase64(quote: any): { base64: string; filename: str
   if (eventD) { doc.text(`Datum eventu: ${eventD}`, marginX, y); y += 14; }
   if (dismD) { doc.text(`Datum demontaze: ${dismD}`, marginX, y); y += 14; }
   y += 6;
+
+  // Supplier block
+  const companyLines = buildCompanyLines(company);
+  if (companyLines.length) {
+    doc.setFont("helvetica", "bold");
+    doc.text("Dodavatel:", marginX + 260, 130);
+    doc.setFont("helvetica", "normal");
+    let cy = 144;
+    for (const line of companyLines) {
+      if (line.bold) doc.setFont("helvetica", "bold");
+      doc.text(line.text, marginX + 260, cy);
+      if (line.bold) doc.setFont("helvetica", "normal");
+      cy += 12;
+    }
+  }
 
   // Client block
   doc.setFont("helvetica", "bold");
