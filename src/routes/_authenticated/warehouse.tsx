@@ -354,6 +354,7 @@ function Warehouse() {
                 key={editing?.id ?? "new"}
                 item={editing}
                 categories={categories.data ?? []}
+                defaultCategoryId={category !== "all" ? category : undefined}
                 onClose={() => { setOpen(false); setEditing(null); }}
               />
               </Dialog>
@@ -627,13 +628,13 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: "em
   );
 }
 
-function FurnitureDialog({ item, categories, onClose }: { item: FurnitureRow | null; categories: any[]; onClose: () => void }) {
+function FurnitureDialog({ item, categories, onClose, defaultCategoryId }: { item: FurnitureRow | null; categories: any[]; onClose: () => void; defaultCategoryId?: string }) {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({
     name: item?.name ?? "",
-    category_id: item?.category_id ?? categories[0]?.id ?? "",
+    category_id: item?.category_id ?? defaultCategoryId ?? categories[0]?.id ?? "",
     internal_code: item?.internal_code ?? "",
     dimensions: item?.dimensions ?? "",
     color: item?.color ?? "",
