@@ -30,6 +30,13 @@ export function buildQuotePdfBase64(quote: any): { base64: string; filename: str
     doc.text(`Platnost do: ${quote.valid_until}`, marginX, y);
     y += 14;
   }
+  const fmtDate = (d: any) => (d ? new Date(d).toLocaleDateString("sk-SK") : null);
+  const installD = fmtDate(quote.installation_date);
+  const eventD = fmtDate(quote.event_date);
+  const dismD = fmtDate(quote.dismantling_date);
+  if (installD) { doc.text(`Datum instalacie: ${installD}`, marginX, y); y += 14; }
+  if (eventD) { doc.text(`Datum eventu: ${eventD}`, marginX, y); y += 14; }
+  if (dismD) { doc.text(`Datum demontaze: ${dismD}`, marginX, y); y += 14; }
   y += 6;
 
   // Client block
