@@ -172,4 +172,15 @@
   html {
     background: white !important;
   }
+
+  /* Zabrániť prázdnym sivým blokom pod dokumentom – layout kontajnery
+     sa nesmú roztiahnuť na celú stranu ani mať farebné pozadie. */
+  .min-h-screen,
+  .min-h-svh {
+    min-height: auto !important;
+  }
+  .bg-background,
+  .bg-sidebar {
+    background-color: white !important;
+  }
 }
