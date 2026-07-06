@@ -19,7 +19,7 @@ import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { QrScannerDialog } from "@/components/qr-scanner-dialog";
 
 export const Route = createFileRoute("/_authenticated/documents/protocol/$id")({
-  head: () => ({ meta: [{ title: "Protokol · Mima Production CRM" }] }),
+  head: () => ({ meta: [{ title: "Protokol · mima production CRM" }] }),
   component: ProtocolDetail,
 });
 

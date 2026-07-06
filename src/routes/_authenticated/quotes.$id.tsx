@@ -30,7 +30,7 @@ import { buildQuotePdfBase64 } from "@/lib/quote-pdf";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
-  head: () => ({ meta: [{ title: "Kalkulácia · Mima Production CRM" }] }),
+  head: () => ({ meta: [{ title: "Kalkulácia · mima production CRM" }] }),
   component: QuoteDetail,
 });
 
