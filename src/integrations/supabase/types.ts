@@ -940,8 +940,11 @@ export type Database = {
           full_name: string | null
           ics_token: string
           id: string
+          job_title: string | null
+          phone: string | null
           updated_at: string
           username: string | null
+          work_email: string | null
         }
         Insert: {
           active?: boolean
@@ -950,8 +953,11 @@ export type Database = {
           full_name?: string | null
           ics_token?: string
           id: string
+          job_title?: string | null
+          phone?: string | null
           updated_at?: string
           username?: string | null
+          work_email?: string | null
         }
         Update: {
           active?: boolean
@@ -960,8 +966,11 @@ export type Database = {
           full_name?: string | null
           ics_token?: string
           id?: string
+          job_title?: string | null
+          phone?: string | null
           updated_at?: string
           username?: string | null
+          work_email?: string | null
         }
         Relationships: []
       }
