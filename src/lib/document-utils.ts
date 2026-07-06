@@ -1,5 +1,5 @@
 export const COMPANY_INFO = {
-  name: "Mima Production",
+  name: "mima production",
   tagline: "Eventový nábytok a logistika",
   address: "Mima Production s.r.o.",
   email: "info@mimaproduction.sk",
