@@ -537,7 +537,7 @@ function QuoteDetail() {
       </div>
 
       {/* Print-only view */}
-      <PrintView quote={q} />
+      <PrintView quote={q} company={companyQ.data} />
 
       <AlertDialog open={syncOpen} onOpenChange={setSyncOpen}>
         <AlertDialogContent>
@@ -625,7 +625,8 @@ function renderPrintBreakdown(q: any) {
   );
 }
 
-function PrintView({ quote: q }: { quote: any }) {
+function PrintView({ quote: q, company }: { quote: any; company?: any }) {
+  const supplierLines = buildCompanyLines(company);
   return (
     <div className="hidden print:block p-10 text-sm text-black bg-white">
       <div className="flex items-start justify-between border-b pb-4 mb-6">
@@ -647,7 +648,9 @@ function PrintView({ quote: q }: { quote: any }) {
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div>
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Dodávateľ</div>
-          <div className="font-semibold">Mima Production</div>
+          {supplierLines.length ? supplierLines.map((l, i) => (
+            <div key={i} className={l.bold ? "font-semibold" : undefined}>{l.text}</div>
+          )) : <div className="font-semibold">Mima Production</div>}
         </div>
         <div>
           <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Odberateľ</div>
