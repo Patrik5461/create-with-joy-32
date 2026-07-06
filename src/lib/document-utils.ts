@@ -34,3 +34,34 @@ export function formatDate(v: string | null | undefined): string {
 export function formatEur(n: number | null | undefined): string {
   return new Intl.NumberFormat("sk-SK", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
 }
+
+/**
+ * Zjednotené poradie údajov odberateľa (klienta) pre všetky generované dokumenty.
+ * 1. Názov firmy  2. Adresa  3. IČO / DIČ / IČ DPH  4. Kontaktná osoba (+pozícia)  5. Email  6. Telefón
+ * Chýbajúce údaje sa vynechávajú.
+ */
+export type ClientLine = { text: string; bold?: boolean };
+
+export function buildClientLines(
+  client: any,
+  contact?: any,
+  overrides?: { email?: string | null; phone?: string | null; contactName?: string | null },
+): ClientLine[] {
+  const c = client ?? {};
+  const lines: ClientLine[] = [];
+  if (c.company_name) lines.push({ text: String(c.company_name), bold: true });
+  if (c.address) lines.push({ text: String(c.address) });
+  if (c.ico) lines.push({ text: `IČO: ${c.ico}` });
+  if (c.dic) lines.push({ text: `DIČ: ${c.dic}` });
+  if (c.ic_dph) lines.push({ text: `IČ DPH: ${c.ic_dph}` });
+  const contactName = overrides?.contactName ?? contact?.full_name ?? c.contact_person ?? null;
+  const contactRole = contact?.role ?? null;
+  if (contactName) {
+    lines.push({ text: contactRole ? `${contactName} · ${contactRole}` : String(contactName) });
+  }
+  const email = overrides?.email ?? contact?.email ?? c.email ?? null;
+  if (email) lines.push({ text: String(email) });
+  const phone = overrides?.phone ?? contact?.phone ?? c.phone ?? null;
+  if (phone) lines.push({ text: String(phone) });
+  return lines;
+}
