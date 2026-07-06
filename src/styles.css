@@ -157,3 +157,19 @@
     color: var(--color-foreground);
   }
 }
+
+@media print {
+  /* Skryť aplikačné rozhranie (sidebar, header, footer) pri tlači/PDF. */
+  [data-slot="sidebar"],
+  [data-sidebar="sidebar"],
+  [data-slot="sidebar-container"],
+  [data-slot="sidebar-gap"],
+  [data-slot="sidebar-rail"],
+  [data-slot="sidebar-trigger"] {
+    display: none !important;
+  }
+  body,
+  html {
+    background: white !important;
+  }
+}
