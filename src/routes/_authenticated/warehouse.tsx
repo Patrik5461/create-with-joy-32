@@ -351,7 +351,7 @@ function Warehouse() {
                 <Button><Plus className="size-4 mr-1" />Pridať položku</Button>
               </DialogTrigger>
               <FurnitureDialog
-                key={editing?.id ?? "new"}
+                key={editing?.id ?? `new:${category}`}
                 item={editing}
                 categories={categories.data ?? []}
                 defaultCategoryId={category !== "all" ? category : undefined}
