@@ -634,7 +634,6 @@ function PrintView({ quote: q, company }: { quote: any; company?: any }) {
           <img src="/mima-logo.png" alt="Mima Production" className="h-14 w-auto" />
           <div>
             <div className="text-xl font-bold">Mima Production</div>
-            <div className="text-xs text-gray-600">Eventový nábytok a logistika</div>
           </div>
         </div>
         <div className="text-right">

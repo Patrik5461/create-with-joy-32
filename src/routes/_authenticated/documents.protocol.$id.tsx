@@ -491,7 +491,6 @@ function _PrintProtocolImpl({ p, rows, notes, receivedBy, issuedAt, sigCo, sigCl
           <img src="/mima-logo.png" alt="Mima Production" className="h-14 w-auto" />
           <div>
             <div className="text-xl font-bold">{COMPANY_INFO.name}</div>
-            <div className="text-xs text-gray-600">{COMPANY_INFO.tagline}</div>
           </div>
         </div>
         <div className="text-right">
