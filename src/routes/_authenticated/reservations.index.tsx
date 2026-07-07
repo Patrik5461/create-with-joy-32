@@ -42,11 +42,18 @@ function Reservations() {
   const reservations = useQuery({
     queryKey: ["reservations", range.from.toISOString(), range.to.toISOString(), statusFilter],
     queryFn: async () => {
+      const fromIso = range.from.toISOString();
+      const toIso = range.to.toISOString();
       let q = supabase
         .from("reservations")
         .select("id, event_name, venue, status, color, load_at, event_start_at, event_end_at, return_at, clients(company_name)")
-        .gte("event_start_at", range.from.toISOString())
-        .lte("event_start_at", range.to.toISOString())
+        .or(
+          [
+            `and(event_start_at.gte.${fromIso},event_start_at.lte.${toIso})`,
+            `and(load_at.gte.${fromIso},load_at.lte.${toIso})`,
+            `and(return_at.gte.${fromIso},return_at.lte.${toIso})`,
+          ].join(",")
+        )
         .order("event_start_at");
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       const { data, error } = await q;
@@ -66,6 +73,8 @@ function Reservations() {
     },
   });
   const overbookedSet: Set<string> = overbooked.data ?? new Set();
+
+  const occurrences = useMemo(() => expandOccurrences(reservations.data ?? []), [reservations.data]);
 
   const openNewAt = (day: Date, hour = 9) => {
     if (!canCreate) return;
@@ -138,23 +147,67 @@ function Reservations() {
         </div>
 
         {view === "month" ? (
-          <MonthGrid cursor={cursor} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
+          <MonthGrid cursor={cursor} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
         ) : view === "week" ? (
-          <WeekList from={range.from} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
+          <WeekList from={range.from} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
         ) : (
-          <DayList day={cursor} reservations={reservations.data ?? []} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
+          <DayList day={cursor} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
         )}
       </div>
     </>
   );
 }
 
-function ReservationCard({ r, overbooked }: { r: any; overbooked?: boolean }) {
+type OccurrenceKind = "setup" | "event" | "teardown";
+type Occurrence = { key: string; date: Date; kind: OccurrenceKind; kinds: OccurrenceKind[]; r: any };
+
+const KIND_LABEL: Record<OccurrenceKind, string> = {
+  setup: "Montáž",
+  event: "Event",
+  teardown: "Demontáž",
+};
+
+function expandOccurrences(reservations: any[]): Occurrence[] {
+  const out: Occurrence[] = [];
+  for (const r of reservations) {
+    const entries: { kind: OccurrenceKind; date: Date }[] = [];
+    if (r.load_at) entries.push({ kind: "setup", date: new Date(r.load_at) });
+    if (r.event_start_at) entries.push({ kind: "event", date: new Date(r.event_start_at) });
+    if (r.return_at) entries.push({ kind: "teardown", date: new Date(r.return_at) });
+    // Merge same-day entries
+    const byDay = new Map<string, { date: Date; kinds: OccurrenceKind[] }>();
+    for (const e of entries) {
+      const k = `${e.date.getFullYear()}-${e.date.getMonth()}-${e.date.getDate()}`;
+      const existing = byDay.get(k);
+      if (existing) {
+        if (!existing.kinds.includes(e.kind)) existing.kinds.push(e.kind);
+        // keep earliest time
+        if (e.date < existing.date) existing.date = e.date;
+      } else {
+        byDay.set(k, { date: e.date, kinds: [e.kind] });
+      }
+    }
+    const order: OccurrenceKind[] = ["setup", "event", "teardown"];
+    for (const [k, v] of byDay) {
+      v.kinds.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+      out.push({ key: `${r.id}:${k}`, date: v.date, kind: v.kinds[0], kinds: v.kinds, r });
+    }
+  }
+  return out.sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+function occurrenceLabel(o: Occurrence): string {
+  return o.kinds.map((k) => KIND_LABEL[k]).join(" + ");
+}
+
+function ReservationCard({ o, overbooked }: { o: Occurrence; overbooked?: boolean }) {
+  const r = o.r;
   const cls = STATUS_COLOR[r.status as ReservationStatus] ?? "";
   const color = r.color as string | null;
   const clientName = r.clients?.company_name as string | undefined;
   const eventName = r.event_name as string | undefined;
-  const primary = clientName || eventName || "—";
+  const base = clientName || eventName || "—";
+  const primary = `${occurrenceLabel(o)} — ${base}`;
   const secondary = clientName && eventName && eventName !== clientName ? eventName : null;
   return (
     <Link to="/reservations/$id" params={{ id: r.id }} className="block">
@@ -169,7 +222,7 @@ function ReservationCard({ r, overbooked }: { r: any; overbooked?: boolean }) {
               {secondary && <div className="text-xs opacity-90 truncate">{secondary}</div>}
               <div className="text-[11px] opacity-70 truncate">{r.venue ?? "—"}</div>
               <div className="text-[11px] opacity-70 mt-1">
-                {format(new Date(r.event_start_at), "d.M. HH:mm")} → {format(new Date(r.event_end_at), "HH:mm")}
+                {format(o.date, "d.M. HH:mm")}
               </div>
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
@@ -187,13 +240,13 @@ function ReservationCard({ r, overbooked }: { r: any; overbooked?: boolean }) {
   );
 }
 
-function DayList({ day, reservations, onSlot, canCreate, overbookedSet }: { day: Date; reservations: any[]; onSlot: (d: Date, h?: number) => void; canCreate: boolean; overbookedSet: Set<string> }) {
-  const list = reservations.filter((r) => isSameDay(new Date(r.event_start_at), day));
+function DayList({ day, occurrences, onSlot, canCreate, overbookedSet }: { day: Date; occurrences: Occurrence[]; onSlot: (d: Date, h?: number) => void; canCreate: boolean; overbookedSet: Set<string> }) {
+  const list = occurrences.filter((o) => isSameDay(o.date, day));
   const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 7..20
   return (
     <div className="rounded-lg border bg-card divide-y">
       {hours.map((h) => {
-        const slotItems = list.filter((r) => new Date(r.event_start_at).getHours() === h);
+        const slotItems = list.filter((o) => o.date.getHours() === h);
         return (
           <div key={h} className="grid grid-cols-[60px_1fr] min-h-14">
             <div className="text-xs text-muted-foreground p-2 border-r">{String(h).padStart(2, "0")}:00</div>
@@ -204,7 +257,7 @@ function DayList({ day, reservations, onSlot, canCreate, overbookedSet }: { day:
             >
               {slotItems.length === 0 ? (
                 canCreate && <span className="text-[11px] text-muted-foreground/50">+ Nová rezervácia</span>
-              ) : slotItems.map((r) => <ReservationCard key={r.id} r={r} overbooked={overbookedSet.has(r.id)} />)}
+              ) : slotItems.map((o) => <ReservationCard key={o.key} o={o} overbooked={overbookedSet.has(o.r.id)} />)}
             </button>
           </div>
         );
@@ -213,12 +266,12 @@ function DayList({ day, reservations, onSlot, canCreate, overbookedSet }: { day:
   );
 }
 
-function WeekList({ from, reservations, onSlot, canCreate, overbookedSet }: { from: Date; reservations: any[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string> }) {
+function WeekList({ from, occurrences, onSlot, canCreate, overbookedSet }: { from: Date; occurrences: Occurrence[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string> }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(from, i));
   return (
     <div className="grid gap-3 md:grid-cols-7">
       {days.map((d) => {
-        const list = reservations.filter((r) => isSameDay(new Date(r.event_start_at), d));
+        const list = occurrences.filter((o) => isSameDay(o.date, d));
         return (
           <div key={d.toISOString()} className="space-y-2">
             <div className="text-xs font-medium text-muted-foreground uppercase">{format(d, "EEE d.M.", { locale: sk })}</div>
@@ -226,7 +279,7 @@ function WeekList({ from, reservations, onSlot, canCreate, overbookedSet }: { fr
               <button type="button" onClick={() => canCreate && onSlot(d)} className={`w-full text-xs text-muted-foreground/60 border border-dashed rounded-md p-3 text-center ${canCreate ? "hover:bg-muted/40 hover:text-foreground" : ""}`}>
                 {canCreate ? "+ Pridať" : "—"}
               </button>
-            ) : list.map((r) => <ReservationCard key={r.id} r={r} overbooked={overbookedSet.has(r.id)} />)}
+            ) : list.map((o) => <ReservationCard key={o.key} o={o} overbooked={overbookedSet.has(o.r.id)} />)}
           </div>
         );
       })}
@@ -234,7 +287,7 @@ function WeekList({ from, reservations, onSlot, canCreate, overbookedSet }: { fr
   );
 }
 
-function MonthGrid({ cursor, reservations, onSlot, canCreate, overbookedSet }: { cursor: Date; reservations: any[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string> }) {
+function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet }: { cursor: Date; occurrences: Occurrence[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string> }) {
   const monthStart = startOfMonth(cursor);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 });
@@ -248,7 +301,7 @@ function MonthGrid({ cursor, reservations, onSlot, canCreate, overbookedSet }: {
       </div>
       <div className="grid grid-cols-7">
         {days.map((day) => {
-          const list = reservations.filter((r) => isSameDay(new Date(r.event_start_at), day));
+          const list = occurrences.filter((o) => isSameDay(o.date, day));
           const isOtherMonth = !isSameMonth(day, cursor);
           return (
             <div
@@ -261,20 +314,18 @@ function MonthGrid({ cursor, reservations, onSlot, canCreate, overbookedSet }: {
               className={`min-h-24 p-1.5 border-b border-r text-[11px] ${isOtherMonth ? "bg-muted/30 text-muted-foreground" : ""} ${canCreate ? "cursor-pointer hover:bg-muted/40" : ""}`}
             >
               <div className="font-semibold mb-1">{format(day, "d")}</div>
-              {list.slice(0, 3).map((r) => (
+              {list.slice(0, 3).map((o) => (
               <Link
-                key={r.id}
+                key={o.key}
                 to="/reservations/$id"
-                params={{ id: r.id }}
-                className={`block truncate rounded px-1 py-0.5 mb-0.5 border ${r.color ? "text-white border-transparent" : STATUS_COLOR[r.status as ReservationStatus] ?? ""}`}
-                style={r.color ? { backgroundColor: r.color } : undefined}
+                params={{ id: o.r.id }}
+                className={`block truncate rounded px-1 py-0.5 mb-0.5 border ${o.r.color ? "text-white border-transparent" : STATUS_COLOR[o.r.status as ReservationStatus] ?? ""}`}
+                style={o.r.color ? { backgroundColor: o.r.color } : undefined}
               >
-                {overbookedSet.has(r.id) && "⚠ "}
-                {format(new Date(r.event_start_at), "HH:mm")}{" "}
-                {(r.clients?.company_name as string | undefined) || (r.event_name as string | undefined) || "—"}
-                {r.clients?.company_name && r.event_name && r.event_name !== r.clients.company_name
-                  ? ` — ${r.event_name}`
-                  : ""}
+                {overbookedSet.has(o.r.id) && "⚠ "}
+                {occurrenceLabel(o)}{": "}
+                {format(o.date, "HH:mm")}{" "}
+                {(o.r.clients?.company_name as string | undefined) || (o.r.event_name as string | undefined) || "—"}
               </Link>
               ))}
               {list.length > 3 && <div className="text-muted-foreground">+{list.length - 3}</div>}
