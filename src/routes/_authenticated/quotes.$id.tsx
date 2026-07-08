@@ -41,6 +41,7 @@ function QuoteDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [confirmSendOpen, setConfirmSendOpen] = useState(false);
   const sendQuoteFn = useServerFn(sendQuoteEmail);
   const printRef = useRef<HTMLDivElement | null>(null);
 
@@ -376,7 +377,11 @@ function QuoteDetail() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => window.print()}><Printer className="size-4 mr-1" />Tlačiť / PDF</Button>
-            <Button variant="outline" onClick={sendEmail} disabled={sendingEmail}>
+            <Button variant="outline" onClick={() => {
+              const to = (q.client_contacts?.email ?? q.clients?.email ?? "").toString();
+              if (!to) { toast.error("Klient nemá email"); return; }
+              setConfirmSendOpen(true);
+            }} disabled={sendingEmail}>
               {sendingEmail ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Mail className="size-4 mr-1" />}
               Odoslať emailom
             </Button>
