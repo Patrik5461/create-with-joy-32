@@ -255,7 +255,7 @@ function QuoteDetail() {
     try {
       const el = printRef.current;
       if (!el) throw new Error("Tlačová verzia nie je pripravená");
-      const { renderElementToPdfBase64 } = await import("@/lib/quote-pdf.client");
+      const { renderElementToPdfBase64 } = await import("@/lib/quote-pdf-render");
       const { base64, filename } = await renderElementToPdfBase64(el, {
         filename: `ponuka-${q.quote_number}.pdf`,
       });
