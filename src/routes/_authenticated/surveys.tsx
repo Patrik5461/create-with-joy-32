@@ -15,6 +15,16 @@ import { SurveyCard } from "@/components/survey-card";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
 import { publicUrl as buildPublicUrl } from "@/lib/public-url";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/surveys")({
   head: () => ({ meta: [{ title: "Logistické dotazníky · Mima Production CRM" }] }),
@@ -26,6 +36,13 @@ export const Route = createFileRoute("/_authenticated/surveys")({
 function SurveysPage() {
   const [previewId, setPreviewId] = useState<{ id: string; email?: string | null } | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [confirmSend, setConfirmSend] = useState<null | {
+    reservationId: string;
+    email: string;
+    eventName: string | null;
+    company: string | null;
+    token: string | null | undefined;
+  }>(null);
   const ensureFn = useServerFn(ensureSurveyForReservation);
   const sendFn = useServerFn(sendSurveyLinkEmail);
 
@@ -40,7 +57,7 @@ function SurveysPage() {
       }
       const url = buildPublicUrl(`/dotaznik/${token}`);
       await sendFn({ data: { reservationId, to: email, publicUrl: url } });
-      toast.success(`Odkaz odoslaný na ${email}`);
+      toast.success(`Email odoslaný na ${email}`);
     } catch (err: any) {
       toast.error(err.message ?? "Odoslanie zlyhalo");
     } finally {
@@ -105,7 +122,16 @@ function SurveysPage() {
                     )}
                     <Button
                       size="sm"
-                      onClick={() => sendSurveyLink(r.id, r.email, s?.token)}
+                      onClick={() => {
+                        if (!r.email) return toast.error("Rezervácia nemá klientský email");
+                        setConfirmSend({
+                          reservationId: r.id,
+                          email: r.email,
+                          eventName: r.event_name ?? null,
+                          company: r.clients?.company_name ?? null,
+                          token: s?.token,
+                        });
+                      }}
                       disabled={sendingId === r.id || !r.email}
                       title={!r.email ? "Rezervácia nemá email klienta" : undefined}
                     >
@@ -129,6 +155,38 @@ function SurveysPage() {
           {previewId && <SurveyCard reservationId={previewId.id} email={previewId.email} canGenerate />}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmSend} onOpenChange={(o) => { if (!o && !sendingId) setConfirmSend(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Odoslať logistický dotazník klientovi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Skontrolujte údaje pred odoslaním. Email sa odošle až po potvrdení.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {confirmSend && (
+            <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1.5">
+              <div><span className="text-muted-foreground">Komu: </span><b>{confirmSend.company || "—"}</b> &lt;<span className="font-mono">{confirmSend.email}</span>&gt;</div>
+              <div><span className="text-muted-foreground">Predmet: </span>Logistický dotazník k akcii <b>{confirmSend.eventName || "—"}</b></div>
+              <div><span className="text-muted-foreground">Obsah: </span>odkaz na verejný formulár na vyplnenie logistiky</div>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!sendingId}>Zrušiť</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!!sendingId}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!confirmSend) return;
+                await sendSurveyLink(confirmSend.reservationId, confirmSend.email, confirmSend.token);
+                setConfirmSend(null);
+              }}
+            >
+              {sendingId ? <><Loader2 className="size-4 mr-1 animate-spin" />Odosielam…</> : "Áno, odoslať"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
