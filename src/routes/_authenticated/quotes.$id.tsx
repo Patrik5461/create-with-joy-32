@@ -542,7 +542,7 @@ function QuoteDetail() {
       </div>
 
       {/* Print-only view */}
-      <PrintView quote={q} company={companyQ.data} />
+      <PrintView quote={q} company={companyQ.data} innerRef={printRef} />
 
       <AlertDialog open={syncOpen} onOpenChange={setSyncOpen}>
         <AlertDialogContent>
@@ -630,10 +630,10 @@ function renderPrintBreakdown(q: any) {
   );
 }
 
-function PrintView({ quote: q, company }: { quote: any; company?: any }) {
+function PrintView({ quote: q, company, innerRef }: { quote: any; company?: any; innerRef?: React.Ref<HTMLDivElement> }) {
   const supplierLines = buildCompanyLines(company);
   return (
-    <div className="hidden print:block p-10 text-sm text-black bg-white">
+    <div ref={innerRef} className="hidden print:block p-10 text-sm text-black bg-white">
       <div className="flex items-start justify-between border-b pb-4 mb-6">
         <div>
           <img src="/mima-logo.png" alt="mima production" className="h-24 w-auto" />
