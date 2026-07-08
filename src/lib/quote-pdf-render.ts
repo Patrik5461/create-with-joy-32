@@ -31,8 +31,11 @@ export async function renderElementToPdfBase64(
     throw new Error("renderElementToPdfBase64 môže bežať iba v prehliadači");
   }
 
+  // Používame `html2canvas-pro` (fork, ktorý zvláda moderné CSS farby
+  // ako `oklch()` — pôvodný html2canvas hádže "unsupported color function"
+  // na Tailwind v4 tokenoch).
   const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-    import("html2canvas"),
+    import("html2canvas-pro"),
     import("jspdf"),
   ]);
 
