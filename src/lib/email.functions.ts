@@ -149,7 +149,7 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
 
     const { data: q, error } = await supabaseAdmin
       .from("quotes")
-      .select("id, quote_number, version_number, total_with_vat, currency, valid_until, created_by, clients(id,company_name,email,contact_person), client_contacts(id,email,full_name)")
+      .select("id, quote_number, version_number, total_with_vat, valid_until, created_by, clients(id,company_name,email,contact_person), client_contacts(id,email,full_name)")
       .eq("id", data.quoteId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -181,7 +181,7 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
       version: (q as any).version_number,
     });
 
-    const total = Number((q as any).total_with_vat ?? 0).toLocaleString("sk-SK", { style: "currency", currency: (q as any).currency || "EUR" });
+    const total = Number((q as any).total_with_vat ?? 0).toLocaleString("sk-SK", { style: "currency", currency: "EUR" });
     const clientName = (q as any).client_contacts?.full_name ?? (q as any).clients?.contact_person ?? (q as any).clients?.company_name ?? "";
     const linkHtml = data.publicUrl
       ? `<p>Ponuku si môžete pozrieť online: <a href="${escapeHtml(data.publicUrl)}">${escapeHtml(data.publicUrl)}</a></p>`
