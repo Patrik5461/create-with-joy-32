@@ -9,7 +9,7 @@ import { Printer, Copy, Trash2, Mail, Loader2, History } from "lucide-react";
 import { CalendarPlus, ExternalLink, RefreshCw, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useRef, useState } from "react";
+import { useRef, useState, type Ref } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -630,7 +630,7 @@ function renderPrintBreakdown(q: any) {
   );
 }
 
-function PrintView({ quote: q, company, innerRef }: { quote: any; company?: any; innerRef?: React.Ref<HTMLDivElement> }) {
+function PrintView({ quote: q, company, innerRef }: { quote: any; company?: any; innerRef?: Ref<HTMLDivElement> }) {
   const supplierLines = buildCompanyLines(company);
   return (
     <div ref={innerRef} className="hidden print:block p-10 text-sm text-black bg-white">
