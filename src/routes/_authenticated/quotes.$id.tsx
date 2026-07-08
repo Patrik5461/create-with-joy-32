@@ -9,7 +9,7 @@ import { Printer, Copy, Trash2, Mail, Loader2, History } from "lucide-react";
 import { CalendarPlus, ExternalLink, RefreshCw, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +26,6 @@ import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, type Qu
 import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow } from "@/lib/quote-reservation-link";
 import { useServerFn } from "@tanstack/react-start";
 import { sendQuoteEmail } from "@/lib/email.functions";
-import { buildQuotePdfBase64 } from "@/lib/quote-pdf";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
@@ -43,6 +42,7 @@ function QuoteDetail() {
   const [syncOpen, setSyncOpen] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const sendQuoteFn = useServerFn(sendQuoteEmail);
+  const printRef = useRef<HTMLDivElement | null>(null);
 
   const quote = useQuery({
     queryKey: ["quote", id],
@@ -253,7 +253,12 @@ function QuoteDetail() {
     if (!to) return toast.error("Klient nemá email");
     setSendingEmail(true);
     try {
-      const { base64, filename } = buildQuotePdfBase64(q, companyQ.data);
+      const el = printRef.current;
+      if (!el) throw new Error("Tlačová verzia nie je pripravená");
+      const { renderElementToPdfBase64 } = await import("@/lib/quote-pdf.client");
+      const { base64, filename } = await renderElementToPdfBase64(el, {
+        filename: `ponuka-${q.quote_number}.pdf`,
+      });
       await sendQuoteFn({
         data: {
           quoteId: q.id,
