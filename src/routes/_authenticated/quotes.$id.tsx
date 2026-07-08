@@ -41,6 +41,7 @@ function QuoteDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [confirmSendOpen, setConfirmSendOpen] = useState(false);
   const sendQuoteFn = useServerFn(sendQuoteEmail);
   const printRef = useRef<HTMLDivElement | null>(null);
 
@@ -255,7 +256,7 @@ function QuoteDetail() {
     try {
       const el = printRef.current;
       if (!el) throw new Error("Tlačová verzia nie je pripravená");
-      const { renderElementToPdfBase64 } = await import("@/lib/quote-pdf.client");
+      const { renderElementToPdfBase64 } = await import("@/lib/quote-pdf-render");
       const { base64, filename } = await renderElementToPdfBase64(el, {
         filename: `ponuka-${q.quote_number}.pdf`,
       });
@@ -376,7 +377,11 @@ function QuoteDetail() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => window.print()}><Printer className="size-4 mr-1" />Tlačiť / PDF</Button>
-            <Button variant="outline" onClick={sendEmail} disabled={sendingEmail}>
+            <Button variant="outline" onClick={() => {
+              const to = (q.client_contacts?.email ?? q.clients?.email ?? "").toString();
+              if (!to) { toast.error("Klient nemá email"); return; }
+              setConfirmSendOpen(true);
+            }} disabled={sendingEmail}>
               {sendingEmail ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Mail className="size-4 mr-1" />}
               Odoslať emailom
             </Button>
@@ -564,6 +569,45 @@ function QuoteDetail() {
             <AlertDialogCancel>Ponechať rezerváciu</AlertDialogCancel>
             <AlertDialogAction onClick={() => syncRes.mutate()} disabled={syncRes.isPending}>
               {syncRes.isPending ? "Aktualizujem…" : "Aktualizovať rezerváciu"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmSendOpen} onOpenChange={(o) => !sendingEmail && setConfirmSendOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Odoslať cenovú ponuku klientovi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Skontrolujte údaje pred odoslaním. Email sa odošle až po potvrdení.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1.5">
+            {(() => {
+              const recipientEmail = q.client_contacts?.email ?? q.clients?.email ?? "";
+              const recipientName = q.client_contacts?.full_name ?? q.clients?.contact_person ?? q.clients?.company_name ?? "";
+              return (
+                <>
+                  <div><span className="text-muted-foreground">Komu: </span><b>{recipientName || "—"}</b>{recipientEmail ? <> &lt;<span className="font-mono">{recipientEmail}</span>&gt;</> : null}</div>
+                  <div><span className="text-muted-foreground">Predmet: </span>Cenová ponuka <b>{q.quote_number}</b> (v{q.version_number})</div>
+                  <div><span className="text-muted-foreground">Suma: </span>{formatEur(Number(q.total_with_vat))} s DPH</div>
+                  <div><span className="text-muted-foreground">Príloha: </span>PDF <span className="font-mono">ponuka-{q.quote_number}.pdf</span></div>
+                  <div className="text-xs text-muted-foreground pt-1">Reply-to bude nastavené na pracovný email tvorcu ponuky (ak je vyplnený), inak na predvolené reply-to z nastavení.</div>
+                </>
+              );
+            })()}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sendingEmail}>Zrušiť</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={sendingEmail}
+              onClick={async (e) => {
+                e.preventDefault();
+                await sendEmail();
+                setConfirmSendOpen(false);
+              }}
+            >
+              {sendingEmail ? <><Loader2 className="size-4 mr-1 animate-spin" />Odosielam…</> : "Áno, odoslať"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
