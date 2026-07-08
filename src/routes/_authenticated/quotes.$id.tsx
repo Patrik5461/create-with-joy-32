@@ -9,7 +9,7 @@ import { Printer, Copy, Trash2, Mail, Loader2, History } from "lucide-react";
 import { CalendarPlus, ExternalLink, RefreshCw, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useRef, useState, type Ref } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +26,6 @@ import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, type Qu
 import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow } from "@/lib/quote-reservation-link";
 import { useServerFn } from "@tanstack/react-start";
 import { sendQuoteEmail } from "@/lib/email.functions";
-import { buildQuotePdfBase64 } from "@/lib/quote-pdf";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
@@ -43,6 +42,7 @@ function QuoteDetail() {
   const [syncOpen, setSyncOpen] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const sendQuoteFn = useServerFn(sendQuoteEmail);
+  const printRef = useRef<HTMLDivElement | null>(null);
 
   const quote = useQuery({
     queryKey: ["quote", id],
@@ -253,7 +253,12 @@ function QuoteDetail() {
     if (!to) return toast.error("Klient nemá email");
     setSendingEmail(true);
     try {
-      const { base64, filename } = buildQuotePdfBase64(q, companyQ.data);
+      const el = printRef.current;
+      if (!el) throw new Error("Tlačová verzia nie je pripravená");
+      const { renderElementToPdfBase64 } = await import("@/lib/quote-pdf.client");
+      const { base64, filename } = await renderElementToPdfBase64(el, {
+        filename: `ponuka-${q.quote_number}.pdf`,
+      });
       await sendQuoteFn({
         data: {
           quoteId: q.id,
@@ -537,7 +542,7 @@ function QuoteDetail() {
       </div>
 
       {/* Print-only view */}
-      <PrintView quote={q} company={companyQ.data} />
+      <PrintView quote={q} company={companyQ.data} innerRef={printRef} />
 
       <AlertDialog open={syncOpen} onOpenChange={setSyncOpen}>
         <AlertDialogContent>
@@ -625,10 +630,10 @@ function renderPrintBreakdown(q: any) {
   );
 }
 
-function PrintView({ quote: q, company }: { quote: any; company?: any }) {
+function PrintView({ quote: q, company, innerRef }: { quote: any; company?: any; innerRef?: Ref<HTMLDivElement> }) {
   const supplierLines = buildCompanyLines(company);
   return (
-    <div className="hidden print:block p-10 text-sm text-black bg-white">
+    <div ref={innerRef} className="hidden print:block p-10 text-sm text-black bg-white">
       <div className="flex items-start justify-between border-b pb-4 mb-6">
         <div>
           <img src="/mima-logo.png" alt="mima production" className="h-24 w-auto" />
