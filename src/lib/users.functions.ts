@@ -192,3 +192,35 @@ export const deleteUser = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/**
+ * Admin — replace explicit permission overrides for a user.
+ * The client sends the FULL desired set of overrides (grants + denies).
+ * We wipe existing overrides and insert the new ones atomically.
+ */
+export const setUserPermissions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string; overrides: { permission: string; granted: boolean }[] }) =>
+    z.object({
+      user_id: z.string().uuid(),
+      overrides: z.array(z.object({
+        permission: PermissionEnum,
+        granted: z.boolean(),
+      })),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await ensureAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("user_permissions").delete().eq("user_id", data.user_id);
+    if (data.overrides.length > 0) {
+      const rows = data.overrides.map((o) => ({
+        user_id: data.user_id,
+        permission: o.permission as any,
+        granted: o.granted,
+      }));
+      const { error } = await supabaseAdmin.from("user_permissions").insert(rows);
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
