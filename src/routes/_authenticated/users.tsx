@@ -11,10 +11,20 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Power, KeyRound, Trash2 } from "lucide-react";
+import { Plus, Power, KeyRound, Trash2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { listUsers, createUser, setUserRole, setUserActive, checkIsAdmin, adminSetUserPassword, deleteUser } from "@/lib/users.functions";
+import { listUsers, createUser, setUserRole, setUserActive, checkIsAdmin, adminSetUserPassword, deleteUser, setUserPermissions } from "@/lib/users.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  PERMISSION_GROUPS,
+  PERMISSION_TEMPLATES,
+  computeEffectivePermissions,
+  diffPermissions,
+  type Permission,
+  type PermissionOverride,
+} from "@/lib/permissions";
+import type { AppRole } from "@/hooks/use-current-user";
 
 const ROLE_LABEL: Record<string, string> = { admin: "Administrátor", manager: "Manažér", warehouse: "Skladník" };
 
@@ -36,10 +46,12 @@ function UsersPage() {
   const setActive = useServerFn(setUserActive);
   const setPwd = useServerFn(adminSetUserPassword);
   const del = useServerFn(deleteUser);
+  const setPerms = useServerFn(setUserPermissions);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [pwdFor, setPwdFor] = useState<{ id: string; name: string } | null>(null);
   const [delFor, setDelFor] = useState<{ id: string; name: string } | null>(null);
+  const [permFor, setPermFor] = useState<{ id: string; name: string; roles: AppRole[]; overrides: PermissionOverride[] } | null>(null);
 
   const users = useQuery({ queryKey: ["admin-users"], queryFn: () => list() });
 
@@ -66,6 +78,11 @@ function UsersPage() {
   const delMut = useMutation({
     mutationFn: (data: any) => del({ data }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); toast.success("Používateľ bol vymazaný"); setDelFor(null); },
+    onError: (e: any) => toast.error(e?.message ?? "Chyba"),
+  });
+  const permMut = useMutation({
+    mutationFn: (data: any) => setPerms({ data }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); toast.success("Oprávnenia uložené"); setPermFor(null); },
     onError: (e: any) => toast.error(e?.message ?? "Chyba"),
   });
 
@@ -114,6 +131,7 @@ function UsersPage() {
                   </TableCell>
                   <TableCell><Badge variant={u.active ? "default" : "destructive"}>{u.active ? "Aktívny" : "Deaktivovaný"}</Badge></TableCell>
                   <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" aria-label="Oprávnenia" onClick={() => setPermFor({ id: u.id, name: u.full_name ?? u.username ?? u.email, roles: (u.roles ?? []) as AppRole[], overrides: (u.permission_overrides ?? []) as PermissionOverride[] })}><ShieldCheck className="size-4" /></Button>
                     <Button size="sm" variant="ghost" aria-label="Reset hesla" onClick={() => setPwdFor({ id: u.id, name: u.full_name ?? u.username ?? u.email })}><KeyRound className="size-4" /></Button>
                     <Button size="sm" variant="ghost" aria-label={u.active ? "Deaktivovať" : "Aktivovať"} onClick={() => activeMut.mutate({ user_id: u.id, active: !u.active })}><Power className="size-4" /></Button>
                     <Button size="sm" variant="ghost" aria-label="Vymazať používateľa" className="text-destructive hover:text-destructive" onClick={() => setDelFor({ id: u.id, name: u.full_name ?? u.username ?? u.email })}><Trash2 className="size-4" /></Button>
@@ -145,7 +163,92 @@ function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={!!permFor} onOpenChange={(v) => !v && setPermFor(null)}>
+        {permFor && (
+          <PermissionsDialog
+            target={permFor}
+            loading={permMut.isPending}
+            onSubmit={(overrides) => permMut.mutate({ user_id: permFor.id, overrides })}
+          />
+        )}
+      </Dialog>
     </>
+  );
+}
+
+function PermissionsDialog({
+  target,
+  loading,
+  onSubmit,
+}: {
+  target: { id: string; name: string; roles: AppRole[]; overrides: PermissionOverride[] };
+  loading: boolean;
+  onSubmit: (overrides: PermissionOverride[]) => void;
+}) {
+  const initial = computeEffectivePermissions(target.roles, target.overrides);
+  const [selected, setSelected] = useState<Set<Permission>>(new Set(initial));
+
+  const toggle = (p: Permission) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      return next;
+    });
+  };
+
+  const applyTemplate = (perms: Permission[]) => setSelected(new Set(perms));
+
+  return (
+    <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Oprávnenia — {target.name}</DialogTitle>
+        <DialogDescription>
+          Zaškrtnite presne, čo môže tento používateľ vidieť a robiť. Šablóny nižšie
+          zaškrtnú typický balík — potom môžete jednotlivé oprávnenia ešte doladiť.
+          {target.roles.length > 0 && (
+            <span className="block mt-1 text-xs">Rola v DB: <strong>{target.roles.join(", ")}</strong> (predvolené oprávnenia).</span>
+          )}
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="flex flex-wrap gap-2 py-2">
+        {PERMISSION_TEMPLATES.map((t) => (
+          <Button key={t.key} type="button" variant="outline" size="sm" onClick={() => applyTemplate(t.permissions)} title={t.description}>
+            {t.label}
+          </Button>
+        ))}
+      </div>
+
+      <div className="space-y-4">
+        {PERMISSION_GROUPS.map((g) => (
+          <div key={g.label} className="rounded-md border p-3">
+            <div className="font-medium text-sm mb-2">{g.label}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {g.items.map((it) => (
+                <label key={it.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={selected.has(it.key)}
+                    onCheckedChange={() => toggle(it.key)}
+                  />
+                  <span>{it.label}</span>
+                  <span className="text-xs text-muted-foreground font-mono">{it.key}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <DialogFooter>
+        <Button
+          onClick={() => onSubmit(diffPermissions(target.roles, Array.from(selected)))}
+          disabled={loading}
+        >
+          Uložiť oprávnenia
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
