@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, AlertTriangle, Users, UserX } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ReservationStaffSection } from "@/components/reservation-staff-section";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
@@ -75,6 +78,63 @@ function Reservations() {
   const overbookedSet: Set<string> = overbooked.data ?? new Set();
 
   const occurrences = useMemo(() => expandOccurrences(reservations.data ?? []), [reservations.data]);
+
+  // Load staff for all visible reservations
+  const staffQ = useQuery({
+    queryKey: ["calendar-staff", ids.join(",")],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from as any)("reservation_staff")
+        .select("id, reservation_id, user_id, external_name, role, planned_start, planned_end")
+        .in("reservation_id", ids);
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{ id: string; reservation_id: string; user_id: string | null; external_name: string | null; role: string | null; planned_start: string | null; planned_end: string | null }>;
+      const uids = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean))) as string[];
+      const profileMap = new Map<string, { full_name: string | null; email: string | null }>();
+      if (uids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", uids);
+        for (const p of (profs ?? []) as any[]) profileMap.set(p.id, p);
+      }
+      return rows.map((r) => ({
+        ...r,
+        name: r.user_id ? (profileMap.get(r.user_id)?.full_name || profileMap.get(r.user_id)?.email || "—") : (r.external_name || "—"),
+      }));
+    },
+  });
+
+  const staffByRes = useMemo(() => {
+    const m = new Map<string, Array<{ id: string; name: string; role: string | null; user_id: string | null; planned_start: string | null; planned_end: string | null }>>();
+    for (const s of staffQ.data ?? []) {
+      const arr = m.get(s.reservation_id) ?? [];
+      arr.push(s);
+      m.set(s.reservation_id, arr);
+    }
+    return m;
+  }, [staffQ.data]);
+
+  // Detect conflicts: same CRM user assigned to two different reservations that overlap by day
+  const conflictResIds = useMemo(() => {
+    const byUserDay = new Map<string, Set<string>>();
+    for (const s of staffQ.data ?? []) {
+      if (!s.user_id || !s.planned_start) continue;
+      const d = new Date(s.planned_start);
+      const key = `${s.user_id}|${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const set = byUserDay.get(key) ?? new Set();
+      set.add(s.reservation_id);
+      byUserDay.set(key, set);
+    }
+    const bad = new Set<string>();
+    for (const [, set] of byUserDay) {
+      if (set.size > 1) for (const id of set) bad.add(id);
+    }
+    return bad;
+  }, [staffQ.data]);
+
+  const [staffDialogResId, setStaffDialogResId] = useState<string | null>(null);
+  const dialogRes = useMemo(
+    () => (reservations.data ?? []).find((r) => r.id === staffDialogResId) ?? null,
+    [reservations.data, staffDialogResId],
+  );
 
   const openNewAt = (day: Date, hour = 9) => {
     if (!canCreate) return;
@@ -147,13 +207,38 @@ function Reservations() {
         </div>
 
         {view === "month" ? (
-          <MonthGrid cursor={cursor} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
+          <MonthGrid cursor={cursor} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} staffByRes={staffByRes} conflictResIds={conflictResIds} onOpenStaff={setStaffDialogResId} />
         ) : view === "week" ? (
-          <WeekList from={range.from} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
+          <WeekList from={range.from} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} staffByRes={staffByRes} conflictResIds={conflictResIds} onOpenStaff={setStaffDialogResId} />
         ) : (
-          <DayList day={cursor} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} />
+          <DayList day={cursor} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} staffByRes={staffByRes} conflictResIds={conflictResIds} onOpenStaff={setStaffDialogResId} />
         )}
       </div>
+
+      <Dialog open={!!staffDialogResId} onOpenChange={(o) => !o && setStaffDialogResId(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Personál
+              {dialogRes && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  · {(dialogRes as any).clients?.company_name || (dialogRes as any).event_name || "—"}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {staffDialogResId && <ReservationStaffSection reservationId={staffDialogResId} />}
+          {staffDialogResId && (
+            <div className="pt-2">
+              <Button asChild variant="outline" size="sm">
+                <Link to="/reservations/$id" params={{ id: staffDialogResId }} onClick={() => setStaffDialogResId(null)}>
+                  Otvoriť detail rezervácie
+                </Link>
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -200,7 +285,43 @@ function occurrenceLabel(o: Occurrence): string {
   return o.kinds.map((k) => KIND_LABEL[k]).join(" + ");
 }
 
-function ReservationCard({ o, overbooked }: { o: Occurrence; overbooked?: boolean }) {
+type StaffLite = { id: string; name: string; role: string | null; user_id: string | null; planned_start: string | null; planned_end: string | null };
+
+function StaffPill({ list, conflict, onOpen }: { list: StaffLite[]; conflict: boolean; onOpen: () => void }) {
+  const count = list.length;
+  const tooltipContent = count === 0
+    ? "Nikto nie je priradený"
+    : list.slice(0, 12).map((s) => `${s.name}${s.role ? ` · ${s.role}` : ""}${s.planned_start ? ` · ${format(new Date(s.planned_start), "HH:mm")}${s.planned_end ? `–${format(new Date(s.planned_end), "HH:mm")}` : ""}` : ""}`).join("\n") + (list.length > 12 ? `\n… +${list.length - 12}` : "");
+  const cls = count === 0
+    ? "border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100"
+    : conflict
+      ? "border-red-400 bg-red-50 text-red-800 hover:bg-red-100"
+      : "border-slate-300 bg-background hover:bg-muted";
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen(); }}
+            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] leading-none ${cls}`}
+            title={count === 0 ? "Priradiť personál" : "Upraviť personál"}
+          >
+            {count === 0 ? <UserX className="size-3" /> : <Users className="size-3" />}
+            <span>{count === 0 ? "Bez ľudí" : `${count} ${count === 1 ? "človek" : count < 5 ? "ľudia" : "ľudí"}`}</span>
+            {conflict && <AlertTriangle className="size-3" />}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs whitespace-pre-line text-xs">
+          {tooltipContent}
+          {conflict && "\n⚠ Konflikt: osoba na inej akcii v ten deň"}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function ReservationCard({ o, overbooked, staff, conflict, onOpenStaff }: { o: Occurrence; overbooked?: boolean; staff: StaffLite[]; conflict: boolean; onOpenStaff: (id: string) => void }) {
   const r = o.r;
   const cls = STATUS_COLOR[r.status as ReservationStatus] ?? "";
   const color = r.color as string | null;
@@ -224,6 +345,9 @@ function ReservationCard({ o, overbooked }: { o: Occurrence; overbooked?: boolea
               <div className="text-[11px] opacity-70 mt-1">
                 {format(o.date, "d.M. HH:mm")}
               </div>
+              <div className="mt-1.5">
+                <StaffPill list={staff} conflict={conflict} onOpen={() => onOpenStaff(r.id)} />
+              </div>
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
               <Badge variant="outline" className="text-[10px] bg-background/60">{STATUS_LABEL[r.status as ReservationStatus]}</Badge>
@@ -240,7 +364,7 @@ function ReservationCard({ o, overbooked }: { o: Occurrence; overbooked?: boolea
   );
 }
 
-function DayList({ day, occurrences, onSlot, canCreate, overbookedSet }: { day: Date; occurrences: Occurrence[]; onSlot: (d: Date, h?: number) => void; canCreate: boolean; overbookedSet: Set<string> }) {
+function DayList({ day, occurrences, onSlot, canCreate, overbookedSet, staffByRes, conflictResIds, onOpenStaff }: { day: Date; occurrences: Occurrence[]; onSlot: (d: Date, h?: number) => void; canCreate: boolean; overbookedSet: Set<string>; staffByRes: Map<string, StaffLite[]>; conflictResIds: Set<string>; onOpenStaff: (id: string) => void }) {
   const list = occurrences.filter((o) => isSameDay(o.date, day));
   const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 7..20
   return (
@@ -257,7 +381,7 @@ function DayList({ day, occurrences, onSlot, canCreate, overbookedSet }: { day: 
             >
               {slotItems.length === 0 ? (
                 canCreate && <span className="text-[11px] text-muted-foreground/50">+ Nová rezervácia</span>
-              ) : slotItems.map((o) => <ReservationCard key={o.key} o={o} overbooked={overbookedSet.has(o.r.id)} />)}
+              ) : slotItems.map((o) => <ReservationCard key={o.key} o={o} overbooked={overbookedSet.has(o.r.id)} staff={staffByRes.get(o.r.id) ?? []} conflict={conflictResIds.has(o.r.id)} onOpenStaff={onOpenStaff} />)}
             </button>
           </div>
         );
@@ -266,7 +390,7 @@ function DayList({ day, occurrences, onSlot, canCreate, overbookedSet }: { day: 
   );
 }
 
-function WeekList({ from, occurrences, onSlot, canCreate, overbookedSet }: { from: Date; occurrences: Occurrence[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string> }) {
+function WeekList({ from, occurrences, onSlot, canCreate, overbookedSet, staffByRes, conflictResIds, onOpenStaff }: { from: Date; occurrences: Occurrence[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string>; staffByRes: Map<string, StaffLite[]>; conflictResIds: Set<string>; onOpenStaff: (id: string) => void }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(from, i));
   return (
     <div className="grid gap-3 md:grid-cols-7">
@@ -279,7 +403,7 @@ function WeekList({ from, occurrences, onSlot, canCreate, overbookedSet }: { fro
               <button type="button" onClick={() => canCreate && onSlot(d)} className={`w-full text-xs text-muted-foreground/60 border border-dashed rounded-md p-3 text-center ${canCreate ? "hover:bg-muted/40 hover:text-foreground" : ""}`}>
                 {canCreate ? "+ Pridať" : "—"}
               </button>
-            ) : list.map((o) => <ReservationCard key={o.key} o={o} overbooked={overbookedSet.has(o.r.id)} />)}
+            ) : list.map((o) => <ReservationCard key={o.key} o={o} overbooked={overbookedSet.has(o.r.id)} staff={staffByRes.get(o.r.id) ?? []} conflict={conflictResIds.has(o.r.id)} onOpenStaff={onOpenStaff} />)}
           </div>
         );
       })}
@@ -287,7 +411,7 @@ function WeekList({ from, occurrences, onSlot, canCreate, overbookedSet }: { fro
   );
 }
 
-function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet }: { cursor: Date; occurrences: Occurrence[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string> }) {
+function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet, staffByRes, conflictResIds, onOpenStaff }: { cursor: Date; occurrences: Occurrence[]; onSlot: (d: Date) => void; canCreate: boolean; overbookedSet: Set<string>; staffByRes: Map<string, StaffLite[]>; conflictResIds: Set<string>; onOpenStaff: (id: string) => void }) {
   const monthStart = startOfMonth(cursor);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 });
@@ -308,26 +432,41 @@ function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet }: { 
               key={day.toISOString()}
               onClick={(e) => {
                 if (!canCreate) return;
-                if ((e.target as HTMLElement).closest("a")) return;
+                if ((e.target as HTMLElement).closest("a,button")) return;
                 onSlot(day);
               }}
               className={`min-h-24 p-1.5 border-b border-r text-[11px] ${isOtherMonth ? "bg-muted/30 text-muted-foreground" : ""} ${canCreate ? "cursor-pointer hover:bg-muted/40" : ""}`}
             >
               <div className="font-semibold mb-1">{format(day, "d")}</div>
-              {list.slice(0, 3).map((o) => (
-              <Link
-                key={o.key}
-                to="/reservations/$id"
-                params={{ id: o.r.id }}
-                className={`block truncate rounded px-1 py-0.5 mb-0.5 border ${o.r.color ? "text-white border-transparent" : STATUS_COLOR[o.r.status as ReservationStatus] ?? ""}`}
-                style={o.r.color ? { backgroundColor: o.r.color } : undefined}
-              >
-                {overbookedSet.has(o.r.id) && "⚠ "}
-                {occurrenceLabel(o)}{": "}
-                {format(o.date, "HH:mm")}{" "}
-                {(o.r.clients?.company_name as string | undefined) || (o.r.event_name as string | undefined) || "—"}
-              </Link>
-              ))}
+              {list.slice(0, 3).map((o) => {
+                const staff = staffByRes.get(o.r.id) ?? [];
+                const hasConflict = conflictResIds.has(o.r.id);
+                return (
+                  <div key={o.key} className="flex items-center gap-1 mb-0.5">
+                    <Link
+                      to="/reservations/$id"
+                      params={{ id: o.r.id }}
+                      className={`flex-1 min-w-0 truncate rounded px-1 py-0.5 border ${o.r.color ? "text-white border-transparent" : STATUS_COLOR[o.r.status as ReservationStatus] ?? ""}`}
+                      style={o.r.color ? { backgroundColor: o.r.color } : undefined}
+                    >
+                      {overbookedSet.has(o.r.id) && "⚠ "}
+                      {occurrenceLabel(o)}{": "}
+                      {format(o.date, "HH:mm")}{" "}
+                      {(o.r.clients?.company_name as string | undefined) || (o.r.event_name as string | undefined) || "—"}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenStaff(o.r.id); }}
+                      title={staff.length === 0 ? "Priradiť personál" : `${staff.length} priradených`}
+                      className={`shrink-0 inline-flex items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] leading-none ${staff.length === 0 ? "border-amber-400 bg-amber-50 text-amber-800" : hasConflict ? "border-red-400 bg-red-50 text-red-800" : "border-slate-300 bg-background text-slate-700"}`}
+                    >
+                      {staff.length === 0 ? <UserX className="size-2.5" /> : <Users className="size-2.5" />}
+                      {staff.length > 0 && <span>{staff.length}</span>}
+                      {hasConflict && <AlertTriangle className="size-2.5" />}
+                    </button>
+                  </div>
+                );
+              })}
               {list.length > 3 && <div className="text-muted-foreground">+{list.length - 3}</div>}
             </div>
           );
