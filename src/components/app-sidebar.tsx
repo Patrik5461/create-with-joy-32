@@ -12,33 +12,43 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
-import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { usePermissions } from "@/hooks/use-permissions";
+import type { Permission } from "@/lib/permissions";
 import { useUnreadTotal } from "@/hooks/use-chat-conversations";
 import { ChatNotifications } from "@/components/chat/chat-notifications";
 
-const mainItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Rezervácie", url: "/reservations", icon: CalendarRange },
-  { title: "Sklad", url: "/warehouse", icon: Package },
-  { title: "Klienti", url: "/clients", icon: Users },
-  { title: "Logistika", url: "/logistics", icon: Truck },
-  { title: "Údržba nábytku", url: "/maintenance", icon: Wrench },
-  { title: "Plán rozloženia", url: "/layouts", icon: LayoutPanelTop },
-  { title: "Kalkulácie", url: "/quotes", icon: Calculator },
-  { title: "Logistické dotazníky", url: "/surveys", icon: ClipboardCheck },
-  { title: "Verejné dopyty", url: "/inquiries", icon: Inbox },
-  { title: "Interný Chat", url: "/chat", icon: MessageSquare },
-  { title: "Dochádzka", url: "/attendance", icon: Clock },
-] as const;
+type NavItem = { title: string; url: string; icon: any; permission: Permission | null };
+
+const mainItems: NavItem[] = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, permission: null },
+  { title: "Rezervácie", url: "/reservations", icon: CalendarRange, permission: "reservations.view" },
+  { title: "Sklad", url: "/warehouse", icon: Package, permission: "warehouse.view" },
+  { title: "Klienti", url: "/clients", icon: Users, permission: "clients.view" },
+  { title: "Logistika", url: "/logistics", icon: Truck, permission: "logistics.view" },
+  { title: "Údržba nábytku", url: "/maintenance", icon: Wrench, permission: "maintenance.view" },
+  { title: "Plán rozloženia", url: "/layouts", icon: LayoutPanelTop, permission: "layouts.view" },
+  { title: "Kalkulácie", url: "/quotes", icon: Calculator, permission: "quotes.view" },
+  { title: "Logistické dotazníky", url: "/surveys", icon: ClipboardCheck, permission: "logistics.view" },
+  { title: "Verejné dopyty", url: "/inquiries", icon: Inbox, permission: "reservations.view" },
+  { title: "Interný Chat", url: "/chat", icon: MessageSquare, permission: "chat.access" },
+  { title: "Dochádzka", url: "/attendance", icon: Clock, permission: null },
+];
 
 const itemClass =
   "h-10 rounded-xl px-3 font-medium text-sidebar-foreground/80 hover:text-sidebar-foreground data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:shadow-sm data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground [&>a>svg]:size-[18px] data-[active=true]:[&_svg]:text-sidebar-primary-foreground";
 
 export function AppSidebar() {
   const { data: user } = useCurrentUser();
+  const { can } = usePermissions();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (url: string) => pathname === url || pathname.startsWith(url + "/");
   const { total: unread } = useUnreadTotal(user?.id);
+  const visibleMain = mainItems.filter((it) => it.permission === null || can(it.permission));
+  const showUsers = can("users.manage");
+  const showEmail = can("settings.manage");
+  const showHelpers = can("settings.manage");
+  const showCompany = can("settings.manage");
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -58,7 +68,7 @@ export function AppSidebar() {
           <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/50">Hlavné menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
-              {mainItems.map((item) => (
+              {visibleMain.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title} className={itemClass}>
                     <Link to={item.url} className="flex items-center gap-3">
@@ -74,7 +84,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {hasRole(user, "admin") && (
+        {showUsers && (
           <SidebarGroup>
             <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/50">Administrácia</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -103,7 +113,7 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {hasRole(user, "admin") && (
+              {showEmail && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={isActive("/settings/email")} tooltip="Email (Resend)" className={itemClass}>
                     <Link to="/settings/email" className="flex items-center gap-3">
@@ -113,7 +123,7 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
-              {hasRole(user, "admin") && (
+              {showHelpers && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={isActive("/settings/helpers")} tooltip="Helperi (PIN)" className={itemClass}>
                     <Link to="/settings/helpers" className="flex items-center gap-3">
