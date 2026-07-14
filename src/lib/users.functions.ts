@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { PERMISSIONS as PERMISSION_VALUES } from "@/lib/permissions";
 
 const RoleEnum = z.enum(["admin", "manager", "warehouse"]);
+const PermissionEnum = z.enum(PERMISSION_VALUES as unknown as [string, ...string[]]);
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
 const SYNTHETIC_EMAIL_DOMAIN = "users.mimaproduction.local";
 
@@ -70,7 +72,20 @@ export const listUsers = createServerFn({ method: "GET" })
       arr.push(r.role);
       rolesByUser.set(r.user_id, arr);
     });
-    return (profiles ?? []).map((p: any) => ({ ...p, roles: rolesByUser.get(p.id) ?? [] }));
+    const { data: perms } = await context.supabase
+      .from("user_permissions")
+      .select("user_id, permission, granted");
+    const permsByUser = new Map<string, { permission: string; granted: boolean }[]>();
+    (perms ?? []).forEach((p: any) => {
+      const arr = permsByUser.get(p.user_id) ?? [];
+      arr.push({ permission: p.permission, granted: p.granted });
+      permsByUser.set(p.user_id, arr);
+    });
+    return (profiles ?? []).map((p: any) => ({
+      ...p,
+      roles: rolesByUser.get(p.id) ?? [],
+      permission_overrides: permsByUser.get(p.id) ?? [],
+    }));
   });
 
 export const createUser = createServerFn({ method: "POST" })
@@ -175,5 +190,37 @@ export const deleteUser = createServerFn({ method: "POST" })
     await supabaseAdmin.from("profiles").delete().eq("id", data.user_id);
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
     if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/**
+ * Admin — replace explicit permission overrides for a user.
+ * The client sends the FULL desired set of overrides (grants + denies).
+ * We wipe existing overrides and insert the new ones atomically.
+ */
+export const setUserPermissions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string; overrides: { permission: string; granted: boolean }[] }) =>
+    z.object({
+      user_id: z.string().uuid(),
+      overrides: z.array(z.object({
+        permission: PermissionEnum,
+        granted: z.boolean(),
+      })),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await ensureAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("user_permissions").delete().eq("user_id", data.user_id);
+    if (data.overrides.length > 0) {
+      const rows = data.overrides.map((o) => ({
+        user_id: data.user_id,
+        permission: o.permission as any,
+        granted: o.granted,
+      }));
+      const { error } = await supabaseAdmin.from("user_permissions").insert(rows);
+      if (error) throw new Error(error.message);
+    }
     return { ok: true };
   });

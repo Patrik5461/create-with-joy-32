@@ -1603,6 +1603,30 @@ export type Database = {
           },
         ]
       }
+      user_permissions: {
+        Row: {
+          created_at: string
+          granted: boolean
+          permission: Database["public"]["Enums"]["app_permission"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted?: boolean
+          permission: Database["public"]["Enums"]["app_permission"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted?: boolean
+          permission?: Database["public"]["Enums"]["app_permission"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1696,6 +1720,13 @@ export type Database = {
         Args: { _other: string }
         Returns: string
       }
+      has_permission: {
+        Args: {
+          _perm: Database["public"]["Enums"]["app_permission"]
+          _uid: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1728,6 +1759,27 @@ export type Database = {
       }
     }
     Enums: {
+      app_permission:
+        | "warehouse.view"
+        | "warehouse.edit"
+        | "reservations.view"
+        | "reservations.edit"
+        | "quotes.view"
+        | "quotes.edit"
+        | "clients.view"
+        | "clients.edit"
+        | "logistics.view"
+        | "logistics.edit"
+        | "contracts.view"
+        | "contracts.edit"
+        | "maintenance.view"
+        | "maintenance.edit"
+        | "attendance.view_all"
+        | "chat.access"
+        | "layouts.view"
+        | "layouts.edit"
+        | "settings.manage"
+        | "users.manage"
       app_role: "admin" | "manager" | "warehouse"
       document_status: "draft" | "signed"
       protocol_item_condition: "ok" | "damaged" | "missing"
@@ -1871,6 +1923,28 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_permission: [
+        "warehouse.view",
+        "warehouse.edit",
+        "reservations.view",
+        "reservations.edit",
+        "quotes.view",
+        "quotes.edit",
+        "clients.view",
+        "clients.edit",
+        "logistics.view",
+        "logistics.edit",
+        "contracts.view",
+        "contracts.edit",
+        "maintenance.view",
+        "maintenance.edit",
+        "attendance.view_all",
+        "chat.access",
+        "layouts.view",
+        "layouts.edit",
+        "settings.manage",
+        "users.manage",
+      ],
       app_role: ["admin", "manager", "warehouse"],
       document_status: ["draft", "signed"],
       protocol_item_condition: ["ok", "damaged", "missing"],
