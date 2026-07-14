@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { RouteGuard } from "@/components/route-guard";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -20,7 +21,9 @@ function AuthenticatedLayout() {
         <AppSidebar />
         <SidebarInset className="flex-1 min-w-0 flex flex-col">
           <div className="flex-1">
-            <Outlet />
+            <RouteGuard>
+              <Outlet />
+            </RouteGuard>
           </div>
           <footer className="py-3 px-6 text-center text-xs text-muted-foreground border-t print:hidden">
             © 2026 mima production s.r.o. Všetky práva vyhradené.
