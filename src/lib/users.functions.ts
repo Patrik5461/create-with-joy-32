@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { PERMISSIONS as PERMISSION_VALUES } from "@/lib/permissions";
 
 const RoleEnum = z.enum(["admin", "manager", "warehouse"]);
+const PermissionEnum = z.enum(PERMISSION_VALUES as unknown as [string, ...string[]]);
 const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
 const SYNTHETIC_EMAIL_DOMAIN = "users.mimaproduction.local";
 
@@ -70,7 +72,20 @@ export const listUsers = createServerFn({ method: "GET" })
       arr.push(r.role);
       rolesByUser.set(r.user_id, arr);
     });
-    return (profiles ?? []).map((p: any) => ({ ...p, roles: rolesByUser.get(p.id) ?? [] }));
+    const { data: perms } = await context.supabase
+      .from("user_permissions")
+      .select("user_id, permission, granted");
+    const permsByUser = new Map<string, { permission: string; granted: boolean }[]>();
+    (perms ?? []).forEach((p: any) => {
+      const arr = permsByUser.get(p.user_id) ?? [];
+      arr.push({ permission: p.permission, granted: p.granted });
+      permsByUser.set(p.user_id, arr);
+    });
+    return (profiles ?? []).map((p: any) => ({
+      ...p,
+      roles: rolesByUser.get(p.id) ?? [],
+      permission_overrides: permsByUser.get(p.id) ?? [],
+    }));
   });
 
 export const createUser = createServerFn({ method: "POST" })
