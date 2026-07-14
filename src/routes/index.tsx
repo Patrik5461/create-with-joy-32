@@ -1,13 +1,22 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { HardHat, LogIn, BookOpen } from "lucide-react";
-import { shouldShowNativeLauncher } from "@/lib/platform";
+import { shouldShowLauncher } from "@/lib/platform";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   ssr: false,
-  beforeLoad: () => {
-    // Web (crm.mimapro.sk, prehliadač): pôvodné správanie — rovno do CRM.
-    // V natívnej Capacitor appke sa rozhoduje v komponente (window API).
-    if (typeof window !== "undefined" && !shouldShowNativeLauncher()) {
+  beforeLoad: async () => {
+    if (typeof window === "undefined") return;
+    // Ak je používateľ prihlásený, rozcestník mu nezobrazujeme — rovno do CRM.
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) throw redirect({ to: "/dashboard" });
+    } catch (e) {
+      if (e && typeof e === "object" && "to" in (e as any)) throw e;
+    }
+    // Desktop web: pôvodné správanie — rovno na /dashboard (odtiaľ auth guard na /auth).
+    // Natívna appka alebo mobilný web: zobraz rozcestník.
+    if (!shouldShowLauncher()) {
       throw redirect({ to: "/dashboard" });
     }
   },
