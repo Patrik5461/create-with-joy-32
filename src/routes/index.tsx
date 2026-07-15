@@ -27,8 +27,7 @@ function NativeLauncher() {
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-background to-muted/40 flex flex-col">
       <header className="px-6 pt-10 pb-6 text-center">
-        <img src="/mima-logo.png" alt="Mima Production" className="h-14 mx-auto mb-4" />
-        <h1 className="text-2xl font-bold tracking-tight">Mima Production</h1>
+        <img src="/mima-logo.png" alt="mima production" className="h-14 mx-auto mb-4" />
         <p className="text-sm text-muted-foreground mt-1">Vyber, ako chceš pokračovať</p>
       </header>
       <main className="flex-1 px-6 pb-10 max-w-md mx-auto w-full">
@@ -37,7 +36,7 @@ function NativeLauncher() {
             to="/helper"
             icon={<HardHat className="size-8" />}
             title="Helper"
-            subtitle="Pichnutie dochádzky cez PIN"
+            subtitle="Zaznamenanie dochádzky cez PIN"
             tone="primary"
           />
           <LauncherTile
@@ -56,11 +55,6 @@ function NativeLauncher() {
           />
         </div>
       </main>
-      <footer className="py-4 text-center border-t border-border/50">
-        <p className="text-xs text-muted-foreground">
-          © 2026 mima production s.r.o. Všetky práva vyhradené.
-        </p>
-      </footer>
     </div>
   );
 }
