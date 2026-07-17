@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ type Attendance = {
 type StaffRow = {
   id: string;
   user_id: string | null;
+  helper_id?: string | null;
   reservation_id: string;
   actual_arrival: string | null;
   actual_departure: string | null;
@@ -579,8 +580,8 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                 }
                 const isOpen = expanded.has(r.userId);
                 return (
-                  <>
-                    <TableRow key={r.userId} className="cursor-pointer hover:bg-muted/40" onClick={() => toggleExpand(r.userId)}>
+                  <Fragment key={r.userId}>
+                    <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => toggleExpand(r.userId)}>
                       <TableCell>{isOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</TableCell>
                       <TableCell className="font-medium">{r.name}</TableCell>
                       <TableCell className="text-right">{r.days}</TableCell>
@@ -589,7 +590,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                       <TableCell className="text-right font-mono font-semibold">{fmtHM(r.totalMin)}</TableCell>
                     </TableRow>
                     {isOpen && (
-                      <TableRow key={`${r.userId}-detail`}>
+                      <TableRow>
                         <TableCell colSpan={6} className="bg-muted/20 p-3">
                           {userRows.length === 0 && (
                             <div className="text-xs text-muted-foreground">Žiadne pichnutia v tomto období.</div>
@@ -659,7 +660,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
               {summary.length === 0 && (
