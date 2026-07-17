@@ -518,9 +518,9 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           <div className="space-y-1.5">
             <Label>Dátum inštalácie</Label>
             <Input
-              type="date"
-              value={form.installation_date ?? ""}
-              onChange={(e) => setForm({ ...form, installation_date: e.target.value || null })}
+              type="datetime-local"
+              value={isoToLocalDateTime(form.installation_date)}
+              onChange={(e) => setForm({ ...form, installation_date: localDateTimeToIso(e.target.value) })}
             />
           </div>
           <div className="space-y-1.5">
@@ -534,9 +534,9 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           <div className="space-y-1.5">
             <Label>Dátum demontáže</Label>
             <Input
-              type="date"
-              value={form.dismantling_date ?? ""}
-              onChange={(e) => setForm({ ...form, dismantling_date: e.target.value || null })}
+              type="datetime-local"
+              value={isoToLocalDateTime(form.dismantling_date)}
+              onChange={(e) => setForm({ ...form, dismantling_date: localDateTimeToIso(e.target.value) })}
             />
           </div>
           <div className="space-y-1.5">
