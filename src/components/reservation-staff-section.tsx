@@ -327,7 +327,13 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium">{displayName(row)}</span>
-                    {row.user_id ? <Badge variant="secondary" className="text-[10px]">CRM</Badge> : <Badge variant="outline" className="text-[10px]">Externý</Badge>}
+                    {row.user_id ? (
+                      <Badge variant="secondary" className="text-[10px]">CRM</Badge>
+                    ) : row.helper_id ? (
+                      <Badge variant="secondary" className="text-[10px]">Helper</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">Externý</Badge>
+                    )}
                     {row.role && <Badge variant="outline">{row.role}</Badge>}
                     <StatusBadge row={row} />
                   </div>
@@ -426,6 +432,7 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="crm">Z CRM (existujúci užívateľ)</SelectItem>
+                    <SelectItem value="helper">Helper (dochádzka cez PIN)</SelectItem>
                     <SelectItem value="external">Externý (brigádnik / voľné meno)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -439,6 +446,21 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
                       {(profiles.data ?? []).map((p) => (
                         <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : form.source === "helper" ? (
+                <div>
+                  <Label className="text-xs">Helper</Label>
+                  <Select value={form.helper_id} onValueChange={(v) => setForm((f) => ({ ...f, helper_id: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Vyberte helpera…" /></SelectTrigger>
+                    <SelectContent>
+                      {(helpers.data ?? []).map((h) => (
+                        <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                      ))}
+                      {(helpers.data ?? []).length === 0 && (
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">Žiadny aktívny helper.</div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
