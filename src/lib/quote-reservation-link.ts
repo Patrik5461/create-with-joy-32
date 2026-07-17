@@ -121,13 +121,13 @@ export function buildReservationDatesPatch(q: {
   if (eventStart) patch.event_start_at = new Date(eventStart).toISOString();
   if (eventEnd) patch.event_end_at = new Date(eventEnd).toISOString();
 
-  // load_at ← installation_date (08:00) alebo začiatok eventu
-  const loadAt = q.installation_date ? dateAt(q.installation_date, 8) : eventStart;
+  // load_at ← installation_date (presný čas) alebo začiatok eventu
+  const loadAt = q.installation_date ? new Date(q.installation_date).toISOString() : eventStart;
   if (loadAt) patch.load_at = new Date(loadAt).toISOString();
 
-  // return_at ← dismantling_date (22:00) alebo koniec eventu;
+  // return_at ← dismantling_date (presný čas) alebo koniec eventu;
   // available_from_at ← nasledujúci deň 08:00 alebo return_at
-  const returnAt = q.dismantling_date ? dateAt(q.dismantling_date, 22) : eventEnd;
+  const returnAt = q.dismantling_date ? new Date(q.dismantling_date).toISOString() : eventEnd;
   if (returnAt) {
     patch.return_at = new Date(returnAt).toISOString();
     const nextDay = new Date(new Date(returnAt).getTime() + 10 * 3600 * 1000);
