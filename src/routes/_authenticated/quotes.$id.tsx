@@ -687,6 +687,9 @@ function PrintView({ quote: q, company, innerRef }: { quote: any; company?: any;
           <div className="font-mono text-lg">{q.quote_number}</div>
           <div className="text-xs text-gray-600 mt-1">Dátum: {new Date(q.issue_date).toLocaleDateString("sk-SK")}</div>
           {q.valid_until && <div className="text-xs text-gray-600">Platnosť do: {new Date(q.valid_until).toLocaleDateString("sk-SK")}</div>}
+          {q.installation_date && <div className="text-xs text-gray-600">Inštalácia: {new Date(q.installation_date).toLocaleString("sk-SK", { dateStyle: "short", timeStyle: "short" })}</div>}
+          {q.event_date && <div className="text-xs text-gray-600">Event: {new Date(q.event_date).toLocaleDateString("sk-SK")}</div>}
+          {q.dismantling_date && <div className="text-xs text-gray-600">Demontáž: {new Date(q.dismantling_date).toLocaleString("sk-SK", { dateStyle: "short", timeStyle: "short" })}</div>}
         </div>
       </div>
 
