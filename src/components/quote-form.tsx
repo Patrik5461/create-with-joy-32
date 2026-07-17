@@ -503,16 +503,16 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
             <Label>Začiatok eventu</Label>
             <Input
               type="datetime-local"
-              value={form.event_start_at ? form.event_start_at.slice(0, 16) : ""}
-              onChange={(e) => setForm({ ...form, event_start_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
+              value={isoToLocalDateTime(form.event_start_at)}
+              onChange={(e) => setForm({ ...form, event_start_at: localDateTimeToIso(e.target.value) })}
             />
           </div>
           <div className="space-y-1.5">
             <Label>Koniec eventu</Label>
             <Input
               type="datetime-local"
-              value={form.event_end_at ? form.event_end_at.slice(0, 16) : ""}
-              onChange={(e) => setForm({ ...form, event_end_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
+              value={isoToLocalDateTime(form.event_end_at)}
+              onChange={(e) => setForm({ ...form, event_end_at: localDateTimeToIso(e.target.value) })}
             />
           </div>
           <div className="space-y-1.5">
