@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LogIn, LogOut, Coffee, Play, Download } from "lucide-react";
+import { LogIn, LogOut, Coffee, Play, Download, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { format, startOfWeek, startOfMonth, endOfMonth, endOfWeek, startOfDay, endOfDay, addDays, differenceInMinutes } from "date-fns";
@@ -316,6 +317,7 @@ function computeSummary(
 }
 
 function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentUserId: string }) {
+  const qc = useQueryClient();
   const [range, setRange] = useState<Range>("week");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -361,8 +363,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
         const { data: bd } = await (supabase.from as any)("attendance_breaks").select("*").in("attendance_id", ids);
         breaks = (bd ?? []) as Break[];
       }
-      let staffQ: any = (supabase.from as any)("reservation_staff").select("id, user_id, reservation_id, actual_arrival, actual_departure")
-        .not("user_id", "is", null)
+      let staffQ: any = (supabase.from as any)("reservation_staff").select("id, user_id, helper_id, reservation_id, actual_arrival, actual_departure")
         .not("actual_arrival", "is", null).not("actual_departure", "is", null)
         .gte("actual_arrival", from.toISOString()).lte("actual_arrival", to.toISOString());
       if (!isAdmin) staffQ = staffQ.eq("user_id", currentUserId);
@@ -370,8 +371,17 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
       else if (selectedUser !== "all") staffQ = staffQ.eq("user_id", selectedUser);
       else if (category === "helpers") staffQ = staffQ.eq("user_id", "00000000-0000-0000-0000-000000000000");
       const { data: staffData } = await staffQ;
-      const staff = (staffData ?? []) as StaffRow[];
-      return { rows, breaks, staff };
+      const staff = (staffData ?? []) as (StaffRow & { helper_id: string | null })[];
+      const resIds = Array.from(new Set([
+        ...rows.map((r) => r.reservation_id).filter(Boolean) as string[],
+        ...staff.map((s) => s.reservation_id).filter(Boolean) as string[],
+      ]));
+      const eventNames = new Map<string, string>();
+      if (resIds.length) {
+        const { data: resData } = await supabase.from("reservations").select("id, event_name").in("id", resIds);
+        for (const r of (resData ?? []) as any[]) eventNames.set(r.id, r.event_name);
+      }
+      return { rows, breaks, staff, eventNames };
     },
   });
 
@@ -411,6 +421,40 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
   const totals = useMemo(() => {
     return summary.reduce((acc, r) => ({ manual: acc.manual + r.manualMin, event: acc.event + r.eventMin, total: acc.total + r.totalMin }), { manual: 0, event: 0, total: 0 });
   }, [summary]);
+
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) => setExpanded((prev) => {
+    const n = new Set(prev);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+
+  const saveTime = useMutation({
+    mutationFn: async ({ id, field, value }: { id: string; field: "clock_in" | "clock_out"; value: string }) => {
+      const iso = value ? new Date(value).toISOString() : null;
+      const { error } = await (supabase.from as any)("attendance").update({ [field]: iso }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["attendance-list"] }); qc.invalidateQueries({ queryKey: ["attendance-open"] }); qc.invalidateQueries({ queryKey: ["attendance-day"] }); toast.success("Uložené"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const removeAttendance = useMutation({
+    mutationFn: async (id: string) => {
+      await (supabase.from as any)("attendance_breaks").delete().eq("attendance_id", id);
+      const { error } = await (supabase.from as any)("attendance").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["attendance-list"] }); qc.invalidateQueries({ queryKey: ["attendance-open"] }); qc.invalidateQueries({ queryKey: ["attendance-day"] }); toast.success("Záznam odstránený"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const toLocal = (iso: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const p = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
 
   const exportCsv = () => {
     const lines = ["Zamestnanec;Dni;Bezna dochadzka;Na akciach;Spolu"];
@@ -507,6 +551,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8"></TableHead>
                 <TableHead>Zamestnanec</TableHead>
                 <TableHead className="text-right">Dni</TableHead>
                 <TableHead className="text-right">Bežná dochádzka</TableHead>
@@ -515,20 +560,114 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
               </TableRow>
             </TableHeader>
             <TableBody>
-              {summary.map((r) => (
-                <TableRow key={r.userId}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell className="text-right">{r.days}</TableCell>
-                  <TableCell className="text-right font-mono">{fmtHM(r.manualMin)}</TableCell>
-                  <TableCell className="text-right font-mono">{fmtHM(r.eventMin)}</TableCell>
-                  <TableCell className="text-right font-mono font-semibold">{fmtHM(r.totalMin)}</TableCell>
-                </TableRow>
-              ))}
+              {summary.map((r) => {
+                const isHelper = users.find((u) => u.id === r.userId)?.isHelper;
+                const userRows = (list.data?.rows ?? []).filter((a) =>
+                  isHelper ? a.helper_id === r.userId : a.user_id === r.userId,
+                ).sort((a, b) => new Date(a.clock_in).getTime() - new Date(b.clock_in).getTime());
+                const staffRowsForUser = (list.data?.staff ?? []).filter((s) =>
+                  isHelper ? s.helper_id === r.userId : s.user_id === r.userId,
+                );
+                // Map: date (yyyy-mm-dd) -> Set of event names for that user
+                const eventsByDay = new Map<string, Set<string>>();
+                for (const s of staffRowsForUser) {
+                  const key = format(new Date(s.actual_arrival!), "yyyy-MM-dd");
+                  const name = list.data?.eventNames.get(s.reservation_id);
+                  if (!name) continue;
+                  if (!eventsByDay.has(key)) eventsByDay.set(key, new Set());
+                  eventsByDay.get(key)!.add(name);
+                }
+                const isOpen = expanded.has(r.userId);
+                return (
+                  <>
+                    <TableRow key={r.userId} className="cursor-pointer hover:bg-muted/40" onClick={() => toggleExpand(r.userId)}>
+                      <TableCell>{isOpen ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</TableCell>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="text-right">{r.days}</TableCell>
+                      <TableCell className="text-right font-mono">{fmtHM(r.manualMin)}</TableCell>
+                      <TableCell className="text-right font-mono">{fmtHM(r.eventMin)}</TableCell>
+                      <TableCell className="text-right font-mono font-semibold">{fmtHM(r.totalMin)}</TableCell>
+                    </TableRow>
+                    {isOpen && (
+                      <TableRow key={`${r.userId}-detail`}>
+                        <TableCell colSpan={6} className="bg-muted/20 p-3">
+                          {userRows.length === 0 && (
+                            <div className="text-xs text-muted-foreground">Žiadne pichnutia v tomto období.</div>
+                          )}
+                          <div className="space-y-2">
+                            {userRows.map((a) => {
+                              const dayKey = format(new Date(a.clock_in), "yyyy-MM-dd");
+                              const eventsForDay = Array.from(eventsByDay.get(dayKey) ?? []);
+                              const directEvent = a.reservation_id ? list.data?.eventNames.get(a.reservation_id) : null;
+                              const eventLabels = directEvent ? [directEvent] : eventsForDay;
+                              const worked = a.clock_out ? differenceInMinutes(new Date(a.clock_out), new Date(a.clock_in)) : null;
+                              return (
+                                <div key={a.id} className="rounded-md border bg-background p-2 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] items-end">
+                                  <div className="text-xs space-y-1">
+                                    <div className="font-medium">
+                                      {format(new Date(a.clock_in), "EEEE d.M.yyyy", { locale: sk })}
+                                    </div>
+                                    <div className="text-muted-foreground">
+                                      Zapol o <b className="text-foreground">{fmtTime(a.clock_in)}</b>
+                                      {" · "}
+                                      Vypol o <b className="text-foreground">{a.clock_out ? fmtTime(a.clock_out) : "…"}</b>
+                                      {worked != null && <span className="ml-2 font-mono">({fmtHM(worked)})</span>}
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {a.source === "helper_pin" && <Badge variant="outline" className="text-[10px]">PIN</Badge>}
+                                      {a.source === "event" && <Badge variant="outline" className="text-[10px]">akcia</Badge>}
+                                      {eventLabels.map((n) => (
+                                        <Badge key={n} variant="secondary" className="text-[10px]">{n}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <Label className="text-[10px] text-muted-foreground">Zapol</Label>
+                                    <Input type="datetime-local" className="h-8 w-[180px] text-xs"
+                                      defaultValue={toLocal(a.clock_in)}
+                                      onBlur={(e) => e.target.value && saveTime.mutate({ id: a.id, field: "clock_in", value: e.target.value })} />
+                                  </div>
+                                  <div>
+                                    <Label className="text-[10px] text-muted-foreground">Vypol</Label>
+                                    <Input type="datetime-local" className="h-8 w-[180px] text-xs"
+                                      defaultValue={toLocal(a.clock_out)}
+                                      onBlur={(e) => saveTime.mutate({ id: a.id, field: "clock_out", value: e.target.value })} />
+                                  </div>
+                                  {isAdmin && (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button size="icon" variant="ghost" aria-label="Odstrániť"><Trash2 className="size-4" /></Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Odstrániť záznam?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Záznam z {format(new Date(a.clock_in), "d.M.yyyy HH:mm", { locale: sk })} bude natrvalo odstránený spolu s prestávkami.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Zrušiť</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => removeAttendance.mutate(a.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Odstrániť</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                );
+              })}
               {summary.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">Žiadne záznamy v tomto období.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">Žiadne záznamy v tomto období.</TableCell></TableRow>
               )}
               {summary.length > 1 && (
                 <TableRow className="bg-muted/40">
+                  <TableCell />
                   <TableCell className="font-semibold">Súčet</TableCell>
                   <TableCell />
                   <TableCell className="text-right font-mono">{fmtHM(totals.manual)}</TableCell>
