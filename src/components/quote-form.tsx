@@ -65,30 +65,52 @@ function isoToLocalDate(iso: string | null | undefined): string | null {
   return `${y}-${m}-${day}`;
 }
 
+function isoToLocalDateTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function localDateTimeToIso(v: string): string | null {
+  return v ? new Date(v).toISOString() : null;
+}
+
+function addDaysIso(dateStr: string, days: number): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
 export function QuoteForm({ initial, quoteId, versionParent }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState<QuoteRecord>(initial ?? {
+  const [form, setForm] = useState<QuoteRecord>(initial ?? (() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return {
     client_id: null,
     contact_id: null,
     reservation_id: null,
-    status: "draft",
-    issue_date: new Date().toISOString().slice(0, 10),
-    valid_until: null,
+    status: "draft" as const,
+    issue_date: today,
+    valid_until: addDaysIso(today, 14),
     event_start_at: null,
     event_end_at: null,
     event_date: null,
     installation_date: null,
     dismantling_date: null,
     vat_rate: 23,
-    discount_type: "none",
+    discount_type: "none" as const,
     discount_value: 0,
-    surcharge_type: "none",
+    surcharge_type: "none" as const,
     surcharge_value: 0,
     surcharge_label: null,
     notes: null,
-  });
+    };
+  })());
   const [lines, setLines] = useState<QuoteLine[]>(initial?.items ?? []);
 
   const clients = useQuery({
@@ -231,9 +253,9 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
       setForm((f) => ({
         ...f,
         client_id: r.client_id ?? f.client_id,
-        installation_date: f.installation_date ?? isoToLocalDate((r as any).load_at),
+        installation_date: f.installation_date ?? ((r as any).load_at ?? null),
         event_date: f.event_date ?? isoToLocalDate((r as any).event_start_at),
-        dismantling_date: f.dismantling_date ?? isoToLocalDate((r as any).return_at),
+        dismantling_date: f.dismantling_date ?? ((r as any).return_at ?? null),
       }));
     }
     const { data: ri } = await supabase
