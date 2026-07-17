@@ -21,6 +21,7 @@ type StaffRow = {
   id: string;
   reservation_id: string;
   user_id: string | null;
+  helper_id: string | null;
   external_name: string | null;
   role: string | null;
   planned_start: string | null;
@@ -34,11 +35,13 @@ type StaffRow = {
 
 type StaffWithProfile = StaffRow & {
   profile: { id: string; full_name: string | null; email: string | null; phone: string | null } | null;
+  helper: { id: string; name: string; note: string | null } | null;
 };
 
 type FormState = {
-  source: "crm" | "external";
+  source: "crm" | "helper" | "external";
   user_id: string;
+  helper_id: string;
   external_name: string;
   role: string;
   planned_start: string;
@@ -49,6 +52,7 @@ type FormState = {
 const emptyForm: FormState = {
   source: "crm",
   user_id: "",
+  helper_id: "",
   external_name: "",
   role: "",
   planned_start: "",
@@ -72,6 +76,7 @@ function toIso(v: string): string | null {
 
 function displayName(row: StaffWithProfile): string {
   if (row.user_id) return row.profile?.full_name || row.profile?.email || "—";
+  if (row.helper_id) return row.helper?.name || "—";
   return row.external_name || "—";
 }
 
@@ -101,12 +106,22 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
       if (error) throw error;
       const rows = (data ?? []) as StaffRow[];
       const ids = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean))) as string[];
+      const helperIds = Array.from(new Set(rows.map((r) => r.helper_id).filter(Boolean))) as string[];
       const profileMap = new Map<string, { id: string; full_name: string | null; email: string | null; phone: string | null }>();
       if (ids.length) {
         const { data: profs } = await supabase.from("profiles").select("id, full_name, email, phone").in("id", ids);
         for (const p of (profs ?? []) as any[]) profileMap.set(p.id, p);
       }
-      return rows.map((r) => ({ ...r, profile: r.user_id ? profileMap.get(r.user_id) ?? null : null })) as StaffWithProfile[];
+      const helperMap = new Map<string, { id: string; name: string; note: string | null }>();
+      if (helperIds.length) {
+        const { data: hs } = await supabase.from("helpers").select("id, name, note").in("id", helperIds);
+        for (const h of (hs ?? []) as any[]) helperMap.set(h.id, h);
+      }
+      return rows.map((r) => ({
+        ...r,
+        profile: r.user_id ? profileMap.get(r.user_id) ?? null : null,
+        helper: r.helper_id ? helperMap.get(r.helper_id) ?? null : null,
+      })) as StaffWithProfile[];
     },
   });
 
@@ -120,6 +135,16 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
     },
   });
 
+  const helpers = useQuery({
+    queryKey: ["helpers-min"],
+    enabled: canManage,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("helpers").select("id, name, is_active").eq("is_active", true).order("name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string; is_active: boolean }[];
+    },
+  });
+
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -128,8 +153,9 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
   const openEdit = (row: StaffWithProfile) => {
     setEditingId(row.id);
     setForm({
-      source: row.user_id ? "crm" : "external",
+      source: row.user_id ? "crm" : row.helper_id ? "helper" : "external",
       user_id: row.user_id ?? "",
+      helper_id: row.helper_id ?? "",
       external_name: row.external_name ?? "",
       role: row.role ?? "",
       planned_start: toLocalInput(row.planned_start),
@@ -144,6 +170,7 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
       const payload: any = {
         reservation_id: reservationId,
         user_id: form.source === "crm" ? (form.user_id || null) : null,
+        helper_id: form.source === "helper" ? (form.helper_id || null) : null,
         external_name: form.source === "external" ? form.external_name.trim() : null,
         role: form.role.trim() || null,
         planned_start: toIso(form.planned_start),
@@ -151,6 +178,7 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
         note: form.note.trim() || null,
       };
       if (form.source === "crm" && !payload.user_id) throw new Error("Vyberte používateľa z CRM.");
+      if (form.source === "helper" && !payload.helper_id) throw new Error("Vyberte helpera.");
       if (form.source === "external" && !payload.external_name) throw new Error("Zadajte meno externého pracovníka.");
       if (editingId) {
         const { error } = await (supabase.from as any)("reservation_staff").update(payload).eq("id", editingId);
@@ -299,7 +327,13 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium">{displayName(row)}</span>
-                    {row.user_id ? <Badge variant="secondary" className="text-[10px]">CRM</Badge> : <Badge variant="outline" className="text-[10px]">Externý</Badge>}
+                    {row.user_id ? (
+                      <Badge variant="secondary" className="text-[10px]">CRM</Badge>
+                    ) : row.helper_id ? (
+                      <Badge variant="secondary" className="text-[10px]">Helper</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">Externý</Badge>
+                    )}
                     {row.role && <Badge variant="outline">{row.role}</Badge>}
                     <StatusBadge row={row} />
                   </div>
@@ -398,6 +432,7 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="crm">Z CRM (existujúci užívateľ)</SelectItem>
+                    <SelectItem value="helper">Helper (dochádzka cez PIN)</SelectItem>
                     <SelectItem value="external">Externý (brigádnik / voľné meno)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -411,6 +446,21 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
                       {(profiles.data ?? []).map((p) => (
                         <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : form.source === "helper" ? (
+                <div>
+                  <Label className="text-xs">Helper</Label>
+                  <Select value={form.helper_id} onValueChange={(v) => setForm((f) => ({ ...f, helper_id: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Vyberte helpera…" /></SelectTrigger>
+                    <SelectContent>
+                      {(helpers.data ?? []).map((h) => (
+                        <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                      ))}
+                      {(helpers.data ?? []).length === 0 && (
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">Žiadny aktívny helper.</div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

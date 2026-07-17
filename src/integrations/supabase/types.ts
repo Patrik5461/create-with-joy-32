@@ -1406,6 +1406,7 @@ export type Database = {
           created_by: string | null
           departed: boolean
           external_name: string | null
+          helper_id: string | null
           id: string
           note: string | null
           planned_end: string | null
@@ -1423,6 +1424,7 @@ export type Database = {
           created_by?: string | null
           departed?: boolean
           external_name?: string | null
+          helper_id?: string | null
           id?: string
           note?: string | null
           planned_end?: string | null
@@ -1440,6 +1442,7 @@ export type Database = {
           created_by?: string | null
           departed?: boolean
           external_name?: string | null
+          helper_id?: string | null
           id?: string
           note?: string | null
           planned_end?: string | null
@@ -1450,6 +1453,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "reservation_staff_helper_id_fkey"
+            columns: ["helper_id"]
+            isOneToOne: false
+            referencedRelation: "helpers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "reservation_staff_reservation_id_fkey"
             columns: ["reservation_id"]
