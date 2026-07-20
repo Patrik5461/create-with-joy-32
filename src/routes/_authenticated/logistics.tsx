@@ -223,7 +223,7 @@ function MiniList({ title, icon: Icon, list, type, onSave }: any) {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <Link to="/reservations/$id" params={{ id: r.id }} className="text-sm font-medium hover:underline block truncate">{r.event_name}</Link>
-                <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name} · {r.venue}</div>
+                <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
               </div>
               <div className="text-sm font-mono font-semibold">{format(new Date(time), "HH:mm")}</div>
             </div>
@@ -450,7 +450,7 @@ function LogColumn({ title, icon: Icon, list, type, onSave }: any) {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <Link to="/reservations/$id" params={{ id: r.id }} className="font-medium hover:underline">{r.event_name}</Link>
-                  <div className="text-xs text-muted-foreground">{r.clients?.company_name} · {r.venue}</div>
+                  <div className="text-xs text-muted-foreground">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
                   {r.address && <div className="text-xs text-muted-foreground">{r.address}</div>}
                 </div>
                 <div className="text-right">
@@ -616,7 +616,7 @@ function StaffDay({ day, reservations }: { day: Date; reservations: any[] }) {
                       {r.event_name}
                     </Link>
                     <div className="text-xs text-muted-foreground truncate">
-                      {[r.clients?.company_name, r.venue].filter(Boolean).join(" · ")}
+                      {[r.clients?.company_name ?? r.contact_person, r.venue].filter(Boolean).join(" · ")}
                     </div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => setOpenFor(r.id)}>
