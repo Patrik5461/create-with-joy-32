@@ -87,6 +87,9 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
     return_at: seedReturn,
     available_from_at: seedAvailable,
   });
+  const [clientMode, setClientMode] = useState<"existing" | "quick">(
+    initial ? (initial?.client_id ? "existing" : "quick") : "existing",
+  );
   const [newClientOpen, setNewClientOpen] = useState(false);
   const [newClient, setNewClient] = useState({ company_name: "", contact_person: "", phone: "", email: "" });
   const [items, setItems] = useState<ItemRow[]>(
@@ -156,9 +159,15 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
 
   const save = useMutation({
     mutationFn: async () => {
+      if (clientMode === "existing" && !form.client_id) {
+        throw new Error("Vyberte klienta alebo prepnite na režim 'Bez klienta'.");
+      }
+      if (clientMode === "quick" && !form.contact_person.trim()) {
+        throw new Error("V režime 'Bez klienta' je meno kontaktu povinné.");
+      }
       const payload = {
-        client_id: form.client_id || null,
-        contact_id: form.contact_id || null,
+        client_id: clientMode === "existing" ? (form.client_id || null) : null,
+        contact_id: clientMode === "existing" ? (form.contact_id || null) : null,
         contact_person: form.contact_person || null,
         phone: form.phone || null,
         email: form.email || null,
@@ -269,6 +278,31 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
       <Card>
         <CardHeader><CardTitle className="text-base">Klient a event</CardTitle></CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-3">
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>Režim klienta</Label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={clientMode === "existing" ? "default" : "outline"}
+                onClick={() => setClientMode("existing")}
+              >
+                Existujúci klient
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={clientMode === "quick" ? "default" : "outline"}
+                onClick={() => {
+                  setClientMode("quick");
+                  setForm((f) => ({ ...f, client_id: "", contact_id: "" }));
+                }}
+              >
+                Bez klienta / rýchly kontakt
+              </Button>
+            </div>
+          </div>
+          {clientMode === "existing" && (
           <div className="space-y-1.5 md:col-span-2"><Label>Klient</Label>
             <div className="flex gap-2">
               <Select value={form.client_id} onValueChange={setClient}>
@@ -294,7 +328,9 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
               </div>
             )}
           </div>
-          <div className="space-y-1.5"><Label>Kontaktná osoba</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+          )}
+          <div className="space-y-1.5"><Label>{clientMode === "quick" ? "Meno kontaktu *" : "Kontaktná osoba"}</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+          {clientMode === "existing" && (
           <div className="space-y-1.5"><Label>Kontakt klienta</Label>
             <Select
               value={form.contact_id || "__none"}
@@ -312,6 +348,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
               </SelectContent>
             </Select>
           </div>
+          )}
           <div className="space-y-1.5"><Label>Telefón</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Stav</Label>

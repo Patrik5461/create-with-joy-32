@@ -56,7 +56,7 @@ function Logistics() {
     queryFn: async () => {
       let q = supabase
         .from("reservations")
-        .select("id,event_name,venue,address,load_at,depart_at,return_at,event_start_at,event_end_at,available_from_at,note,clients(company_name),logistics(id,internal_note,load_time,unload_time,return_time),logistics_surveys(status,floor,has_elevator,elevator_info,access_type,access_note,parking_note,distance_info,onsite_contact_name,onsite_contact_phone,time_restrictions)")
+        .select("id,event_name,venue,address,load_at,depart_at,return_at,event_start_at,event_end_at,available_from_at,note,contact_person,clients(company_name),logistics(id,internal_note,load_time,unload_time,return_time),logistics_surveys(status,floor,has_elevator,elevator_info,access_type,access_note,parking_note,distance_info,onsite_contact_name,onsite_contact_phone,time_restrictions)")
         .or(`and(load_at.gte.${from.toISOString()},load_at.lte.${to.toISOString()}),and(return_at.gte.${from.toISOString()},return_at.lte.${to.toISOString()})`)
         .neq("status", "cancelled");
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
@@ -223,7 +223,7 @@ function MiniList({ title, icon: Icon, list, type, onSave }: any) {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <Link to="/reservations/$id" params={{ id: r.id }} className="text-sm font-medium hover:underline block truncate">{r.event_name}</Link>
-                <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name} · {r.venue}</div>
+                <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
               </div>
               <div className="text-sm font-mono font-semibold">{format(new Date(time), "HH:mm")}</div>
             </div>
@@ -450,7 +450,7 @@ function LogColumn({ title, icon: Icon, list, type, onSave }: any) {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <Link to="/reservations/$id" params={{ id: r.id }} className="font-medium hover:underline">{r.event_name}</Link>
-                  <div className="text-xs text-muted-foreground">{r.clients?.company_name} · {r.venue}</div>
+                  <div className="text-xs text-muted-foreground">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
                   {r.address && <div className="text-xs text-muted-foreground">{r.address}</div>}
                 </div>
                 <div className="text-right">
@@ -542,7 +542,7 @@ function StaffDay({ day, reservations }: { day: Date; reservations: any[] }) {
           ? supabase.from("profiles").select("id, full_name, email, phone").in("id", userIds)
           : Promise.resolve({ data: [] as any[] }),
         resIds.length
-          ? supabase.from("reservations").select("id, event_name, venue, clients(company_name)").in("id", resIds)
+          ? supabase.from("reservations").select("id, event_name, venue, contact_person,clients(company_name)").in("id", resIds)
           : Promise.resolve({ data: [] as any[] }),
       ]);
       const pMap = new Map<string, any>();
@@ -616,7 +616,7 @@ function StaffDay({ day, reservations }: { day: Date; reservations: any[] }) {
                       {r.event_name}
                     </Link>
                     <div className="text-xs text-muted-foreground truncate">
-                      {[r.clients?.company_name, r.venue].filter(Boolean).join(" · ")}
+                      {[r.clients?.company_name ?? r.contact_person, r.venue].filter(Boolean).join(" · ")}
                     </div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => setOpenFor(r.id)}>

@@ -6,7 +6,7 @@ import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit3, Trash2, LayoutGrid, AlertTriangle, FileText } from "lucide-react";
+import { ArrowLeft, Edit3, Trash2, LayoutGrid, AlertTriangle, FileText, UserPlus } from "lucide-react";
 import { ReservationForm } from "@/components/reservation-form";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
@@ -150,11 +150,17 @@ function ReservationDetail() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                  <Info label="Klient" value={r.clients?.company_name ?? "—"} />
+                  <Info label="Klient" value={r.clients?.company_name ?? (r.contact_person ? `${r.contact_person} (bez klienta)` : "—")} />
                   <Info label="Kontaktná osoba" value={r.contact_person ?? "—"} />
                   <Info label="Telefón" value={r.phone ?? "—"} />
                   <Info label="Email" value={r.email ?? "—"} />
                 </div>
+                {!r.client_id && (r.contact_person || r.email || r.phone) && (
+                  <div className="rounded-md border bg-muted/30 p-3 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-muted-foreground flex-1 min-w-[10rem]">Rezervácia bez klienta. Chcete z týchto údajov vytvoriť klienta?</span>
+                    <CreateClientFromContact reservation={r} disabled={!canEdit} onCreated={() => reservation.refetch()} />
+                  </div>
+                )}
                 <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm border-t pt-4">
                   <Info label="Nakládka" value={fmt(r.load_at)} />
                   <Info label="Odchod" value={fmt(r.depart_at)} />
@@ -227,3 +233,34 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 function fmt(v: string | null) { return v ? format(new Date(v), "d.M.yyyy HH:mm", { locale: sk }) : "—"; }
+
+function CreateClientFromContact({ reservation, disabled, onCreated }: { reservation: any; disabled?: boolean; onCreated: () => void }) {
+  const mut = useMutation({
+    mutationFn: async () => {
+      const name = (reservation.contact_person ?? "").trim() || (reservation.email ?? "").trim() || "Nový klient";
+      const { data: c, error } = await supabase
+        .from("clients")
+        .insert({
+          company_name: name,
+          contact_person: reservation.contact_person ?? null,
+          email: reservation.email ?? null,
+          phone: reservation.phone ?? null,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const { error: eUpd } = await supabase
+        .from("reservations")
+        .update({ client_id: c.id })
+        .eq("id", reservation.id);
+      if (eUpd) throw eUpd;
+    },
+    onSuccess: () => { toast.success("Klient vytvorený a prepojený."); onCreated(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <Button size="sm" variant="outline" disabled={disabled || mut.isPending} onClick={() => mut.mutate()}>
+      <UserPlus className="size-4 mr-1" />Vytvoriť klienta
+    </Button>
+  );
+}
