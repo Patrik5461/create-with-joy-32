@@ -49,7 +49,7 @@ function Reservations() {
       const toIso = range.to.toISOString();
       let q = supabase
         .from("reservations")
-        .select("id, event_name, venue, status, color, load_at, event_start_at, event_end_at, return_at, clients(company_name)")
+        .select("id, event_name, venue, status, color, load_at, event_start_at, event_end_at, return_at, contact_person, clients(company_name)")
         .or(
           [
             `and(event_start_at.gte.${fromIso},event_start_at.lte.${toIso})`,
@@ -222,7 +222,7 @@ function Reservations() {
               Personál
               {dialogRes && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
-                  · {(dialogRes as any).clients?.company_name || (dialogRes as any).event_name || "—"}
+                  · {(dialogRes as any).clients?.company_name || (dialogRes as any).contact_person || (dialogRes as any).event_name || "—"}
                 </span>
               )}
             </DialogTitle>
@@ -325,7 +325,7 @@ function ReservationCard({ o, overbooked, staff, conflict, onOpenStaff }: { o: O
   const r = o.r;
   const cls = STATUS_COLOR[r.status as ReservationStatus] ?? "";
   const color = r.color as string | null;
-  const clientName = r.clients?.company_name as string | undefined;
+  const clientName = (r.clients?.company_name as string | undefined) || (r.contact_person as string | undefined);
   const eventName = r.event_name as string | undefined;
   const base = clientName || eventName || "—";
   const primary = `${occurrenceLabel(o)} — ${base}`;
@@ -452,7 +452,7 @@ function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet, staf
                       {overbookedSet.has(o.r.id) && "⚠ "}
                       {occurrenceLabel(o)}{": "}
                       {format(o.date, "HH:mm")}{" "}
-                      {(o.r.clients?.company_name as string | undefined) || (o.r.event_name as string | undefined) || "—"}
+                      {(o.r.clients?.company_name as string | undefined) || (o.r.contact_person as string | undefined) || (o.r.event_name as string | undefined) || "—"}
                     </Link>
                     <button
                       type="button"
