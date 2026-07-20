@@ -87,6 +87,9 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
     return_at: seedReturn,
     available_from_at: seedAvailable,
   });
+  const [clientMode, setClientMode] = useState<"existing" | "quick">(
+    initial ? (initial?.client_id ? "existing" : "quick") : "existing",
+  );
   const [newClientOpen, setNewClientOpen] = useState(false);
   const [newClient, setNewClient] = useState({ company_name: "", contact_person: "", phone: "", email: "" });
   const [items, setItems] = useState<ItemRow[]>(
@@ -156,9 +159,15 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
 
   const save = useMutation({
     mutationFn: async () => {
+      if (clientMode === "existing" && !form.client_id) {
+        throw new Error("Vyberte klienta alebo prepnite na režim 'Bez klienta'.");
+      }
+      if (clientMode === "quick" && !form.contact_person.trim()) {
+        throw new Error("V režime 'Bez klienta' je meno kontaktu povinné.");
+      }
       const payload = {
-        client_id: form.client_id || null,
-        contact_id: form.contact_id || null,
+        client_id: clientMode === "existing" ? (form.client_id || null) : null,
+        contact_id: clientMode === "existing" ? (form.contact_id || null) : null,
         contact_person: form.contact_person || null,
         phone: form.phone || null,
         email: form.email || null,
