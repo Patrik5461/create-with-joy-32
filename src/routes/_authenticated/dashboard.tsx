@@ -160,7 +160,7 @@ function Dashboard() {
                 <div key={r.id} className="flex items-center justify-between rounded-md border p-3">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{r.event_name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name} · {r.venue}</div>
+                    <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
                   </div>
                   <div className="text-right text-sm">
                     <div className="font-mono">{format(new Date(r.load_at), "HH:mm")}</div>
@@ -182,7 +182,7 @@ function Dashboard() {
                 <div key={r.id} className="flex items-center justify-between rounded-md border p-3">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{r.event_name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name} · {r.venue}</div>
+                    <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
                   </div>
                   <div className="text-right text-sm font-mono">{format(new Date(r.return_at), "HH:mm")}</div>
                 </div>
@@ -203,7 +203,7 @@ function Dashboard() {
                 <div key={r.id} className="flex items-center justify-between rounded-md border p-3">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{r.event_name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name} · {r.venue}</div>
+                    <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
                   </div>
                   <div className="text-right text-xs">
                     <div>{format(new Date(r.event_start_at), "d. MMM HH:mm", { locale: sk })}</div>
@@ -239,7 +239,7 @@ function Dashboard() {
               {!isLoading && data?.outNow.length === 0 && <p className="text-sm text-muted-foreground">Všetko je na sklade.</p>}
               {data?.outNow.map((r: any) => (
                 <div key={r.id} className="flex items-center justify-between py-2 border-b last:border-0 text-sm">
-                  <span className="truncate">{r.event_name} · {r.clients?.company_name}</span>
+                  <span className="truncate">{r.event_name} · {r.clients?.company_name ?? r.contact_person ?? "—"}</span>
                   <span className="text-xs text-muted-foreground">návrat {format(new Date(r.return_at), "d.M. HH:mm")}</span>
                 </div>
               ))}
