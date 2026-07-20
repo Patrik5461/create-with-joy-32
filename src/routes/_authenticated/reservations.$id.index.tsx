@@ -233,3 +233,34 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 function fmt(v: string | null) { return v ? format(new Date(v), "d.M.yyyy HH:mm", { locale: sk }) : "—"; }
+
+function CreateClientFromContact({ reservation, disabled, onCreated }: { reservation: any; disabled?: boolean; onCreated: () => void }) {
+  const mut = useMutation({
+    mutationFn: async () => {
+      const name = (reservation.contact_person ?? "").trim() || (reservation.email ?? "").trim() || "Nový klient";
+      const { data: c, error } = await supabase
+        .from("clients")
+        .insert({
+          company_name: name,
+          contact_person: reservation.contact_person ?? null,
+          email: reservation.email ?? null,
+          phone: reservation.phone ?? null,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const { error: eUpd } = await supabase
+        .from("reservations")
+        .update({ client_id: c.id })
+        .eq("id", reservation.id);
+      if (eUpd) throw eUpd;
+    },
+    onSuccess: () => { toast.success("Klient vytvorený a prepojený."); onCreated(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <Button size="sm" variant="outline" disabled={disabled || mut.isPending} onClick={() => mut.mutate()}>
+      <UserPlus className="size-4 mr-1" />Vytvoriť klienta
+    </Button>
+  );
+}
