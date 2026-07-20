@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, Users, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { RESERVATION_STATUSES, STATUS_LABEL, type ReservationStatus } from "@/lib/reservation-status";
 
@@ -30,6 +31,28 @@ interface ItemRow {
   availability?: { total: number; available: number; reserved: number } | null;
   loading?: boolean;
 }
+
+type StaffDraft = {
+  source: "crm" | "helper" | "external";
+  user_id: string;
+  helper_id: string;
+  external_name: string;
+  role: string;
+  planned_start: string;
+  planned_end: string;
+  note: string;
+};
+
+const emptyStaffDraft: StaffDraft = {
+  source: "crm",
+  user_id: "",
+  helper_id: "",
+  external_name: "",
+  role: "",
+  planned_start: "",
+  planned_end: "",
+  note: "",
+};
 
 function toLocalInput(iso: string | null) {
   if (!iso) return "";
