@@ -278,6 +278,31 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
       <Card>
         <CardHeader><CardTitle className="text-base">Klient a event</CardTitle></CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-3">
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>Režim klienta</Label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={clientMode === "existing" ? "default" : "outline"}
+                onClick={() => setClientMode("existing")}
+              >
+                Existujúci klient
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={clientMode === "quick" ? "default" : "outline"}
+                onClick={() => {
+                  setClientMode("quick");
+                  setForm((f) => ({ ...f, client_id: "", contact_id: "" }));
+                }}
+              >
+                Bez klienta / rýchly kontakt
+              </Button>
+            </div>
+          </div>
+          {clientMode === "existing" && (
           <div className="space-y-1.5 md:col-span-2"><Label>Klient</Label>
             <div className="flex gap-2">
               <Select value={form.client_id} onValueChange={setClient}>
@@ -303,7 +328,9 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
               </div>
             )}
           </div>
-          <div className="space-y-1.5"><Label>Kontaktná osoba</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+          )}
+          <div className="space-y-1.5"><Label>{clientMode === "quick" ? "Meno kontaktu *" : "Kontaktná osoba"}</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+          {clientMode === "existing" && (
           <div className="space-y-1.5"><Label>Kontakt klienta</Label>
             <Select
               value={form.contact_id || "__none"}
@@ -321,6 +348,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
               </SelectContent>
             </Select>
           </div>
+          )}
           <div className="space-y-1.5"><Label>Telefón</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Stav</Label>
