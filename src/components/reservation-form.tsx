@@ -248,6 +248,22 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
         );
         if (riError) throw riError;
       }
+
+      // Uloženie draftov personálu iba pri vytvorení novej rezervácie.
+      if (!existingId && staffDrafts.length > 0) {
+        const rows = staffDrafts.map((s) => ({
+          reservation_id: reservationId!,
+          user_id: s.source === "crm" ? (s.user_id || null) : null,
+          helper_id: s.source === "helper" ? (s.helper_id || null) : null,
+          external_name: s.source === "external" ? (s.external_name.trim() || null) : null,
+          role: s.role.trim() || null,
+          planned_start: fromLocalInput(s.planned_start),
+          planned_end: fromLocalInput(s.planned_end),
+          note: s.note.trim() || null,
+        }));
+        const { error: rsErr } = await (supabase.from as any)("reservation_staff").insert(rows);
+        if (rsErr) throw rsErr;
+      }
       return reservationId!;
     },
     onSuccess: (id) => {
