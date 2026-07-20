@@ -118,6 +118,12 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
   const [items, setItems] = useState<ItemRow[]>(
     initial?.reservation_items?.map((ri: any) => ({ furniture_item_id: ri.furniture_item_id, qty: ri.qty })) ?? [],
   );
+  // Personál k rezervácii — v novom formulári sa zbiera do local state a uloží po vytvorení.
+  // V editačnom móde ponechávame správu personálu v detaile (sekcia ReservationStaffSection).
+  const [staffDrafts, setStaffDrafts] = useState<StaffDraft[]>([]);
+  const [staffDialogOpen, setStaffDialogOpen] = useState(false);
+  const [staffEditIdx, setStaffEditIdx] = useState<number | null>(null);
+  const [staffForm, setStaffForm] = useState<StaffDraft>(emptyStaffDraft);
 
   const clients = useQuery({ queryKey: ["clients-min"], queryFn: async () => (await supabase.from("clients").select("id,company_name,phone,email,contact_person").order("company_name")).data ?? [] });
   const contacts = useQuery({
@@ -150,6 +156,17 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
   const vehicles = useQuery({
     queryKey: ["vehicles-min"],
     queryFn: async () => (await supabase.from("vehicles").select("id,name,license_plate,capacity_kg,status").order("name")).data ?? [],
+  });
+
+  const profilesQ = useQuery({
+    queryKey: ["profiles-min-resform"],
+    enabled: !existingId,
+    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email").order("full_name")).data ?? [],
+  });
+  const helpersQ = useQuery({
+    queryKey: ["helpers-min-resform"],
+    enabled: !existingId,
+    queryFn: async () => (await supabase.from("helpers").select("id, name, is_active").eq("is_active", true).order("name")).data ?? [],
   });
 
   // Refresh availability for all items when time window or items change
