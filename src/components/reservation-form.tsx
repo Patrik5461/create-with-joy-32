@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, Users, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { RESERVATION_STATUSES, STATUS_LABEL, type ReservationStatus } from "@/lib/reservation-status";
 
@@ -30,6 +31,28 @@ interface ItemRow {
   availability?: { total: number; available: number; reserved: number } | null;
   loading?: boolean;
 }
+
+type StaffDraft = {
+  source: "crm" | "helper" | "external";
+  user_id: string;
+  helper_id: string;
+  external_name: string;
+  role: string;
+  planned_start: string;
+  planned_end: string;
+  note: string;
+};
+
+const emptyStaffDraft: StaffDraft = {
+  source: "crm",
+  user_id: "",
+  helper_id: "",
+  external_name: "",
+  role: "",
+  planned_start: "",
+  planned_end: "",
+  note: "",
+};
 
 function toLocalInput(iso: string | null) {
   if (!iso) return "";
@@ -95,6 +118,12 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
   const [items, setItems] = useState<ItemRow[]>(
     initial?.reservation_items?.map((ri: any) => ({ furniture_item_id: ri.furniture_item_id, qty: ri.qty })) ?? [],
   );
+  // Personál k rezervácii — v novom formulári sa zbiera do local state a uloží po vytvorení.
+  // V editačnom móde ponechávame správu personálu v detaile (sekcia ReservationStaffSection).
+  const [staffDrafts, setStaffDrafts] = useState<StaffDraft[]>([]);
+  const [staffDialogOpen, setStaffDialogOpen] = useState(false);
+  const [staffEditIdx, setStaffEditIdx] = useState<number | null>(null);
+  const [staffForm, setStaffForm] = useState<StaffDraft>(emptyStaffDraft);
 
   const clients = useQuery({ queryKey: ["clients-min"], queryFn: async () => (await supabase.from("clients").select("id,company_name,phone,email,contact_person").order("company_name")).data ?? [] });
   const contacts = useQuery({
@@ -127,6 +156,17 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
   const vehicles = useQuery({
     queryKey: ["vehicles-min"],
     queryFn: async () => (await supabase.from("vehicles").select("id,name,license_plate,capacity_kg,status").order("name")).data ?? [],
+  });
+
+  const profilesQ = useQuery({
+    queryKey: ["profiles-min-resform"],
+    enabled: !existingId,
+    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email").order("full_name")).data ?? [],
+  });
+  const helpersQ = useQuery({
+    queryKey: ["helpers-min-resform"],
+    enabled: !existingId,
+    queryFn: async () => (await supabase.from("helpers").select("id, name, is_active").eq("is_active", true).order("name")).data ?? [],
   });
 
   // Refresh availability for all items when time window or items change
@@ -207,6 +247,22 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
           })),
         );
         if (riError) throw riError;
+      }
+
+      // Uloženie draftov personálu iba pri vytvorení novej rezervácie.
+      if (!existingId && staffDrafts.length > 0) {
+        const rows = staffDrafts.map((s) => ({
+          reservation_id: reservationId!,
+          user_id: s.source === "crm" ? (s.user_id || null) : null,
+          helper_id: s.source === "helper" ? (s.helper_id || null) : null,
+          external_name: s.source === "external" ? (s.external_name.trim() || null) : null,
+          role: s.role.trim() || null,
+          planned_start: fromLocalInput(s.planned_start),
+          planned_end: fromLocalInput(s.planned_end),
+          note: s.note.trim() || null,
+        }));
+        const { error: rsErr } = await (supabase.from as any)("reservation_staff").insert(rows);
+        if (rsErr) throw rsErr;
       }
       return reservationId!;
     },
@@ -497,6 +553,130 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
           <TimeField label="Opätovne dostupné od" value={form.available_from_at} onChange={(v) => setForm({ ...form, available_from_at: v })} />
         </CardContent>
       </Card>
+
+      {!existingId && (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base flex items-center gap-2"><Users className="size-4" />Personál (voliteľné)</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => { setStaffEditIdx(null); setStaffForm({ ...emptyStaffDraft, planned_start: form.load_at, planned_end: form.return_at }); setStaffDialogOpen(true); }}>
+            <Plus className="size-3.5 mr-1" />Pridať človeka
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {staffDrafts.length === 0 && (
+            <p className="text-sm text-muted-foreground">Zatiaľ nikto. Personál môžete doplniť aj neskôr v detaile rezervácie.</p>
+          )}
+          {staffDrafts.map((s, idx) => {
+            const name = s.source === "crm"
+              ? (profilesQ.data?.find((p: any) => p.id === s.user_id)?.full_name || profilesQ.data?.find((p: any) => p.id === s.user_id)?.email || "—")
+              : s.source === "helper"
+                ? (helpersQ.data?.find((h: any) => h.id === s.helper_id)?.name || "—")
+                : (s.external_name || "—");
+            return (
+              <div key={idx} className="rounded-md border p-2 flex items-start justify-between gap-2">
+                <div className="min-w-0 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{name}</span>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {s.source === "crm" ? "CRM" : s.source === "helper" ? "Helper" : "Externý"}
+                    </Badge>
+                    {s.role && <Badge variant="outline">{s.role}</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5 font-mono">
+                    {s.planned_start || "—"} – {s.planned_end || "—"}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button size="icon" variant="ghost" aria-label="Upraviť" onClick={() => { setStaffEditIdx(idx); setStaffForm(s); setStaffDialogOpen(true); }}><Pencil className="size-4" /></Button>
+                  <Button size="icon" variant="ghost" aria-label="Odstrániť" onClick={() => setStaffDrafts((p) => p.filter((_, i) => i !== idx))}><Trash2 className="size-4" /></Button>
+                </div>
+              </div>
+            );
+          })}
+          {existingId ? null : (
+            <p className="text-[11px] text-muted-foreground">Uloží sa po vytvorení rezervácie. Dochádzka a stavy (prišiel/odišiel) sa spravujú v detaile.</p>
+          )}
+        </CardContent>
+      </Card>
+      )}
+
+      <Dialog open={staffDialogOpen} onOpenChange={setStaffDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{staffEditIdx === null ? "Pridať človeka" : "Upraviť"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Zdroj</Label>
+              <Select value={staffForm.source} onValueChange={(v) => setStaffForm({ ...staffForm, source: v as StaffDraft["source"], user_id: "", helper_id: "", external_name: "" })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="crm">CRM používateľ</SelectItem>
+                  <SelectItem value="helper">Helper</SelectItem>
+                  <SelectItem value="external">Externý (voľné meno)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {staffForm.source === "crm" && (
+              <div className="space-y-1.5">
+                <Label>Používateľ</Label>
+                <Select value={staffForm.user_id} onValueChange={(v) => setStaffForm({ ...staffForm, user_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Vyberte" /></SelectTrigger>
+                  <SelectContent>
+                    {(profilesQ.data ?? []).map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {staffForm.source === "helper" && (
+              <div className="space-y-1.5">
+                <Label>Helper</Label>
+                <Select value={staffForm.helper_id} onValueChange={(v) => setStaffForm({ ...staffForm, helper_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Vyberte" /></SelectTrigger>
+                  <SelectContent>
+                    {(helpersQ.data ?? []).map((h: any) => (
+                      <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {staffForm.source === "external" && (
+              <div className="space-y-1.5">
+                <Label>Meno *</Label>
+                <Input value={staffForm.external_name} onChange={(e) => setStaffForm({ ...staffForm, external_name: e.target.value })} />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Rola</Label>
+              <Input placeholder="napr. Vodič, Technik" value={staffForm.role} onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <TimeField label="Plán od" value={staffForm.planned_start} onChange={(v) => setStaffForm({ ...staffForm, planned_start: v })} />
+              <TimeField label="Plán do" value={staffForm.planned_end} onChange={(v) => setStaffForm({ ...staffForm, planned_end: v })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Poznámka</Label>
+              <Textarea rows={2} value={staffForm.note} onChange={(e) => setStaffForm({ ...staffForm, note: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStaffDialogOpen(false)}>Zrušiť</Button>
+            <Button onClick={() => {
+              if (staffForm.source === "crm" && !staffForm.user_id) { toast.error("Vyberte používateľa."); return; }
+              if (staffForm.source === "helper" && !staffForm.helper_id) { toast.error("Vyberte helpera."); return; }
+              if (staffForm.source === "external" && !staffForm.external_name.trim()) { toast.error("Zadajte meno."); return; }
+              setStaffDrafts((prev) => {
+                if (staffEditIdx === null) return [...prev, staffForm];
+                return prev.map((r, i) => i === staffEditIdx ? staffForm : r);
+              });
+              setStaffDialogOpen(false);
+            }}>{staffEditIdx === null ? "Pridať" : "Uložiť"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={() => navigate({ to: "/reservations" })}>Zrušiť</Button>
