@@ -80,11 +80,6 @@ function AuthPage() {
               </div>
             </form>
             <ForgotPasswordDialog open={forgotOpen} onOpenChange={setForgotOpen} defaultIdentifier={identifier} />
-            <div className="mt-4 rounded-md border border-dashed border-border bg-muted/40 p-3 text-xs">
-              <p className="font-medium text-foreground mb-1">Dočasné prihlasovacie údaje (počas vývoja systému)</p>
-              <p className="text-muted-foreground">Meno: <span className="font-mono">admin</span></p>
-              <p className="text-muted-foreground">Heslo: <span className="font-mono">Mima2026</span></p>
-            </div>
           </CardContent>
         </Card>
         <p className="text-center text-xs text-muted-foreground mt-4">
