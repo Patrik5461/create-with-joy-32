@@ -86,7 +86,10 @@ function AuthPage() {
           Nie ste zamestnanec? <a href="/katalog" className="underline hover:text-foreground">Pozrieť verejný katalóg</a>
         </p>
         <p className="text-center text-xs text-muted-foreground mt-2">
-          Správca CRM a CRM vytvorilo Digosta.sk
+          Správca CRM a CRM vytvorilo{" "}
+          <a href="https://digosta.sk" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+            Digosta.sk
+          </a>
         </p>
       </div>
     </div>
