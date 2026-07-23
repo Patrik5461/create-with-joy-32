@@ -90,6 +90,9 @@ function AuthPage() {
         <p className="text-center text-xs text-muted-foreground mt-4">
           Nie ste zamestnanec? <a href="/katalog" className="underline hover:text-foreground">Pozrieť verejný katalóg</a>
         </p>
+        <p className="text-center text-xs text-muted-foreground mt-2">
+          Správca CRM a CRM vytvorilo Digosta.sk
+        </p>
       </div>
     </div>
   );
