@@ -609,9 +609,9 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                                       {format(new Date(a.clock_in), "EEEE d.M.yyyy", { locale: sk })}
                                     </div>
                                     <div className="text-muted-foreground">
-                                      Zapol o <b className="text-foreground">{fmtTime(a.clock_in)}</b>
+                                      Príchod o <b className="text-foreground">{fmtTime(a.clock_in)}</b>
                                       {" · "}
-                                      Vypol o <b className="text-foreground">{a.clock_out ? fmtTime(a.clock_out) : "…"}</b>
+                                      Odchod o <b className="text-foreground">{a.clock_out ? fmtTime(a.clock_out) : "…"}</b>
                                       {worked != null && <span className="ml-2 font-mono">({fmtHM(worked)})</span>}
                                     </div>
                                     <div className="flex flex-wrap gap-1">
@@ -623,13 +623,13 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                                     </div>
                                   </div>
                                   <div>
-                                    <Label className="text-[10px] text-muted-foreground">Zapol</Label>
+                                    <Label className="text-[10px] text-muted-foreground">Príchod</Label>
                                     <Input type="datetime-local" className="h-8 w-[180px] text-xs"
                                       defaultValue={toLocal(a.clock_in)}
                                       onBlur={(e) => e.target.value && saveTime.mutate({ id: a.id, field: "clock_in", value: e.target.value })} />
                                   </div>
                                   <div>
-                                    <Label className="text-[10px] text-muted-foreground">Vypol</Label>
+                                    <Label className="text-[10px] text-muted-foreground">Odchod</Label>
                                     <Input type="datetime-local" className="h-8 w-[180px] text-xs"
                                       defaultValue={toLocal(a.clock_out)}
                                       onBlur={(e) => saveTime.mutate({ id: a.id, field: "clock_out", value: e.target.value })} />
