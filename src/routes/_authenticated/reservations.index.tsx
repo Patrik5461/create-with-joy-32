@@ -20,7 +20,7 @@ import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 export const Route = createFileRoute("/_authenticated/reservations/")({
   head: () => ({ meta: [{ title: "Rezervácie · Mima Production CRM" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
-    status: typeof s.status === "string" ? (s.status as ReservationStatus | "all") : "all",
+    status: typeof s.status === "string" ? (s.status as ReservationStatus | "all") : undefined,
   }),
   component: Reservations,
 });
@@ -165,7 +165,7 @@ function Reservations() {
             <p className="text-sm text-muted-foreground">Prehľad eventov a rezervácií nábytku.</p>
           </div>
           {canCreate && (
-            <Button asChild><Link to="/reservations/new"><Plus className="size-4 mr-1" />Nová rezervácia</Link></Button>
+            <Button asChild><Link to="/reservations/new" search={{ start: undefined } as any}><Plus className="size-4 mr-1" />Nová rezervácia</Link></Button>
           )}
         </div>
 
