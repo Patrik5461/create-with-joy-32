@@ -119,10 +119,16 @@ function QuoteDetail() {
 
   const createRes = useMutation({
     mutationFn: async () => createReservationFromQuote((quote.data as any).id),
-    onSuccess: (rid) => {
+    onSuccess: ({ id: rid, skipped }) => {
       qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
       qc.invalidateQueries({ queryKey: ["reservations"] });
       toast.success("Rezervácia vytvorená z kalkulácie");
+      if (skipped.length) {
+        toast.warning(
+          `Položky mimo skladu (${skipped.length}) sú zapísané v poznámke rezervácie: ` +
+            skipped.map((s) => `${s.name} ×${s.qty}`).join(", "),
+        );
+      }
       navigate({ to: "/reservations/$id", params: { id: rid } });
     },
     onError: (e: any) => toast.error(e.message ?? "Nepodarilo sa vytvoriť rezerváciu"),
@@ -132,14 +138,20 @@ function QuoteDetail() {
     mutationFn: async () => {
       const r = linkedReservation.data;
       if (!r) throw new Error("Nie je prepojená rezervácia.");
-      await syncReservationFromQuote(r.id, (quote.data as any).id);
-      return r.id;
+      const { skipped } = await syncReservationFromQuote(r.id, (quote.data as any).id);
+      return { rid: r.id, skipped };
     },
-    onSuccess: (rid) => {
+    onSuccess: ({ rid, skipped }) => {
       qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
       qc.invalidateQueries({ queryKey: ["reservation", rid] });
       qc.invalidateQueries({ queryKey: ["reservations"] });
       toast.success("Rezervácia zosúladená s aktuálnou verziou kalkulácie");
+      if (skipped.length) {
+        toast.warning(
+          `Položky mimo skladu (${skipped.length}) sú zapísané v poznámke rezervácie: ` +
+            skipped.map((s) => `${s.name} ×${s.qty}`).join(", "),
+        );
+      }
       setSyncOpen(false);
     },
     onError: (e: any) => toast.error(e.message ?? "Zosúladenie zlyhalo"),
