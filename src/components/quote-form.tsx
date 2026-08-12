@@ -28,6 +28,8 @@ interface QuoteRecord {
   event_date: string | null;
   installation_date: string | null;
   dismantling_date: string | null;
+  venue: string | null;
+  address: string | null;
   vat_rate: number;
   discount_type: AdjustType;
   discount_value: number;
@@ -102,6 +104,8 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
     event_date: null,
     installation_date: null,
     dismantling_date: null,
+    venue: null,
+    address: null,
     vat_rate: 23,
     discount_type: "none" as const,
     discount_value: 0,
@@ -246,13 +250,15 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
   const prefillFromReservation = async (reservationId: string) => {
     const { data: r } = await supabase
       .from("reservations")
-      .select("client_id, load_at, event_start_at, return_at")
+      .select("client_id, load_at, event_start_at, return_at, venue, address")
       .eq("id", reservationId)
       .maybeSingle();
     if (r) {
       setForm((f) => ({
         ...f,
         client_id: r.client_id ?? f.client_id,
+        venue: f.venue ?? (r as any).venue ?? null,
+        address: f.address ?? (r as any).address ?? null,
         installation_date: f.installation_date ?? ((r as any).load_at ?? null),
         event_date: f.event_date ?? isoToLocalDate((r as any).event_start_at),
         dismantling_date: f.dismantling_date ?? ((r as any).return_at ?? null),
@@ -351,6 +357,8 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         event_date: form.event_date,
         installation_date: form.installation_date,
         dismantling_date: form.dismantling_date,
+        venue: form.venue,
+        address: form.address,
         vat_rate: form.vat_rate,
         discount_type: form.discount_type,
         discount_value: form.discount_value,
@@ -494,6 +502,22 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           <div className="space-y-1.5">
             <Label>Dátum vystavenia</Label>
             <Input type="date" value={form.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Miesto konania / montáže</Label>
+            <Input
+              value={form.venue ?? ""}
+              placeholder="Napr. Incheba Expo Bratislava"
+              onChange={(e) => setForm({ ...form, venue: e.target.value || null })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Adresa miesta</Label>
+            <Input
+              value={form.address ?? ""}
+              placeholder="Ulica, PSČ, mesto"
+              onChange={(e) => setForm({ ...form, address: e.target.value || null })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Platnosť do</Label>

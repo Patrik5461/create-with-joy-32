@@ -50,7 +50,7 @@ function QuoteDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("*, clients(*), client_contacts(id, full_name, role, phone, email), reservations(event_name, venue), quote_items(*)")
+        .select("*, clients(*), client_contacts(id, full_name, role, phone, email), reservations(event_name, venue, address), quote_items(*)")
         .eq("id", id)
         .single();
       if (error) throw error;
@@ -504,6 +504,8 @@ function QuoteDetail() {
             <CardContent className="text-sm space-y-1">
               <div><span className="text-muted-foreground">Dátum vystavenia:</span> {new Date(q.issue_date).toLocaleDateString("sk-SK")}</div>
               {q.valid_until && <div><span className="text-muted-foreground">Platnosť do:</span> {new Date(q.valid_until).toLocaleDateString("sk-SK")}</div>}
+              {(q.venue ?? q.reservations?.venue) && <div><span className="text-muted-foreground">Miesto konania:</span> {q.venue ?? q.reservations?.venue}</div>}
+              {(q.address ?? q.reservations?.address) && <div><span className="text-muted-foreground">Adresa miesta:</span> {q.address ?? q.reservations?.address}</div>}
               {q.event_start_at && <div><span className="text-muted-foreground">Začiatok eventu:</span> {new Date(q.event_start_at).toLocaleString("sk-SK")}</div>}
               {q.event_end_at && <div><span className="text-muted-foreground">Koniec eventu:</span> {new Date(q.event_end_at).toLocaleString("sk-SK")}</div>}
               {q.installation_date && <div><span className="text-muted-foreground">Dátum inštalácie:</span> {new Date(q.installation_date).toLocaleString("sk-SK", { dateStyle: "short", timeStyle: "short" })}</div>}
@@ -702,6 +704,12 @@ function PrintView({ quote: q, company, innerRef }: { quote: any; company?: any;
           {q.installation_date && <div className="text-xs text-gray-600">Inštalácia: {new Date(q.installation_date).toLocaleString("sk-SK", { dateStyle: "short", timeStyle: "short" })}</div>}
           {q.event_date && <div className="text-xs text-gray-600">Event: {new Date(q.event_date).toLocaleDateString("sk-SK")}</div>}
           {q.dismantling_date && <div className="text-xs text-gray-600">Demontáž: {new Date(q.dismantling_date).toLocaleString("sk-SK", { dateStyle: "short", timeStyle: "short" })}</div>}
+          {(q.venue ?? q.reservations?.venue) && (
+            <div className="text-xs text-gray-600">Miesto: {q.venue ?? q.reservations?.venue}</div>
+          )}
+          {(q.address ?? q.reservations?.address) && (
+            <div className="text-xs text-gray-600">{q.address ?? q.reservations?.address}</div>
+          )}
         </div>
       </div>
 
