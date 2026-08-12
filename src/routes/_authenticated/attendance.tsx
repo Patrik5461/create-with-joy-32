@@ -609,9 +609,9 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                                       {format(new Date(a.clock_in), "EEEE d.M.yyyy", { locale: sk })}
                                     </div>
                                     <div className="text-muted-foreground">
-                                      Zapol o <b className="text-foreground">{fmtTime(a.clock_in)}</b>
+                                      Príchod o <b className="text-foreground">{fmtTime(a.clock_in)}</b>
                                       {" · "}
-                                      Vypol o <b className="text-foreground">{a.clock_out ? fmtTime(a.clock_out) : "…"}</b>
+                                      Odchod o <b className="text-foreground">{a.clock_out ? fmtTime(a.clock_out) : "…"}</b>
                                       {worked != null && <span className="ml-2 font-mono">({fmtHM(worked)})</span>}
                                     </div>
                                     <div className="flex flex-wrap gap-1">
