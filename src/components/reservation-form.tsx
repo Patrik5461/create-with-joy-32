@@ -679,7 +679,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
       </Dialog>
 
       <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => navigate({ to: "/reservations" })}>Zrušiť</Button>
+        <Button variant="outline" onClick={() => navigate({ to: "/reservations", search: {} })}>Zrušiť</Button>
         <Button onClick={handleSave} disabled={save.isPending || !form.event_name || !form.load_at || !form.available_from_at}>
           {existingId ? "Uložiť zmeny" : "Vytvoriť rezerváciu"}
         </Button>

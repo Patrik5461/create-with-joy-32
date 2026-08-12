@@ -165,7 +165,7 @@ function Reservations() {
             <p className="text-sm text-muted-foreground">Prehľad eventov a rezervácií nábytku.</p>
           </div>
           {canCreate && (
-            <Button asChild><Link to="/reservations/new"><Plus className="size-4 mr-1" />Nová rezervácia</Link></Button>
+            <Button asChild><Link to="/reservations/new" search={{}}><Plus className="size-4 mr-1" />Nová rezervácia</Link></Button>
           )}
         </div>
 
