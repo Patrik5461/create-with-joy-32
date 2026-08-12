@@ -688,19 +688,37 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
 }
 
 function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
-  void isAdmin;
   const qc = useQueryClient();
   const [date, setDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const from = startOfDay(new Date(date));
   const to = endOfDay(new Date(date));
 
-  const rows = useQuery({
-    queryKey: ["attendance-day", userId, date],
+  const profilesQ = useQuery({
+    queryKey: ["profiles-daily"],
     queryFn: async () => {
-      const { data } = await (supabase.from as any)("attendance").select("*")
-        .eq("user_id", userId)
+      const { data } = await supabase.from("profiles").select("id, full_name, email");
+      return (data ?? []) as { id: string; full_name: string | null; email: string | null }[];
+    },
+  });
+
+  const helpersQ = useQuery({
+    queryKey: ["helpers-daily"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data } = await (supabase.from as any)("helpers").select("id, name");
+      return (data ?? []) as { id: string; name: string }[];
+    },
+  });
+
+  const rows = useQuery({
+    queryKey: ["attendance-day", userId, date, isAdmin],
+    queryFn: async () => {
+      let q: any = (supabase.from as any)("attendance").select("*")
         .gte("clock_in", from.toISOString()).lte("clock_in", to.toISOString())
         .order("clock_in");
+      if (!isAdmin) q = q.eq("user_id", userId);
+      const { data, error } = await q;
+      if (error) throw error;
       return (data ?? []) as Attendance[];
     },
   });
@@ -722,6 +740,15 @@ function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
   };
 
+  const nameFor = (r: Attendance) => {
+    if (r.helper_id) {
+      const h = (helpersQ.data ?? []).find((x) => x.id === r.helper_id);
+      return h ? `${h.name} (helper)` : "Helper";
+    }
+    const p = (profilesQ.data ?? []).find((x) => x.id === r.user_id);
+    return p?.full_name || p?.email || "—";
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -729,11 +756,17 @@ function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
         <Input type="date" className="w-[180px]" value={date} onChange={(e) => setDate(e.target.value)} />
       </CardHeader>
       <CardContent className="space-y-2">
-        {(rows.data ?? []).length === 0 && <p className="text-sm text-muted-foreground">Žiadne záznamy v tento deň.</p>}
+        {rows.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
+        {rows.error && <p className="text-sm text-destructive">Chyba: {(rows.error as any).message}</p>}
+        {!rows.isLoading && !rows.error && (rows.data ?? []).length === 0 && (
+          <p className="text-sm text-muted-foreground">Žiadne záznamy v tento deň.</p>
+        )}
         {(rows.data ?? []).map((r) => {
           const worked = r.clock_out ? differenceInMinutes(new Date(r.clock_out), new Date(r.clock_in)) : null;
           return (
-            <div key={r.id} className="rounded-md border p-3 grid gap-2 sm:grid-cols-3">
+            <div key={r.id} className="rounded-md border p-3 space-y-2">
+              <div className="text-sm font-medium">{nameFor(r)}</div>
+              <div className="grid gap-2 sm:grid-cols-3">
               <div>
                 <Label className="text-xs">Príchod</Label>
                 <Input type="datetime-local" defaultValue={toLocal(r.clock_in)}
@@ -748,6 +781,8 @@ function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
                 <div className="text-muted-foreground uppercase tracking-wider">Odpracované (hrubé)</div>
                 <div className="font-mono">{worked != null ? fmtHM(worked) : "otvorené"}</div>
                 {r.source === "event" && <Badge variant="outline" className="mt-1 w-fit">akcia</Badge>}
+                {r.source === "helper_pin" && <Badge variant="outline" className="mt-1 w-fit">PIN</Badge>}
+              </div>
               </div>
             </div>
           );
