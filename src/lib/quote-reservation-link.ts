@@ -53,29 +53,69 @@ export function computeItemsDiff(
   return diffs;
 }
 
-/** Rebuild reservation_items from a quote's items. */
-export async function syncReservationFromQuote(reservationId: string, quoteId: string) {
+export type SkippedItem = { name: string; qty: number; reason: string };
+
+const OFF_STOCK_MARKER = "── Položky mimo skladu ──";
+
+function stripOffStockBlock(note: string | null | undefined): string {
+  const n = note ?? "";
+  const idx = n.indexOf(OFF_STOCK_MARKER);
+  return (idx >= 0 ? n.slice(0, idx) : n).trimEnd();
+}
+
+/** Rebuild reservation_items from a quote's items. Returns items that could not
+ *  be reserved (not in warehouse / insufficient stock) — those are written into
+ *  the reservation note so they are visible in the calendar & detail. */
+export async function syncReservationFromQuote(
+  reservationId: string,
+  quoteId: string,
+): Promise<{ skipped: SkippedItem[] }> {
   // 1) Rebuild reservation_items from quote_items
   const { data: items, error: e1 } = await supabase
     .from("quote_items")
-    .select("kind, furniture_item_id, qty")
-    .eq("quote_id", quoteId);
+    .select("kind, name, furniture_item_id, qty")
+    .eq("quote_id", quoteId)
+    .order("sort_order");
   if (e1) throw e1;
   const { error: eDel } = await supabase
     .from("reservation_items")
     .delete()
     .eq("reservation_id", reservationId);
   if (eDel) throw eDel;
-  const rows = (items ?? [])
-    .filter((it: any) => it.kind === "furniture" && it.furniture_item_id && Number(it.qty) > 0)
-    .map((it: any) => ({
-      reservation_id: reservationId,
-      furniture_item_id: it.furniture_item_id,
-      qty: Number(it.qty),
-    }));
-  if (rows.length) {
-    const { error: eIns } = await supabase.from("reservation_items").insert(rows);
-    if (eIns) throw eIns;
+
+  const skipped: SkippedItem[] = [];
+  const furniture = (items ?? []).filter((it: any) => it.kind === "furniture" && Number(it.qty) > 0);
+
+  for (const it of furniture as any[]) {
+    const qty = Math.max(1, Math.round(Number(it.qty)));
+    // Voľne napísaná položka (nie je v sklade) → nedá sa rezervovať, ide do poznámky.
+    if (!it.furniture_item_id) {
+      skipped.push({ name: it.name || "Položka", qty, reason: "nie je v sklade" });
+      continue;
+    }
+    const { error: eIns } = await supabase
+      .from("reservation_items")
+      .insert({ reservation_id: reservationId, furniture_item_id: it.furniture_item_id, qty });
+    if (eIns) {
+      skipped.push({ name: it.name || "Položka", qty, reason: eIns.message });
+    }
+  }
+
+  // 1b) Zapíš neuložiteľné položky do poznámky rezervácie (aby boli vidieť).
+  {
+    const { data: resRow } = await supabase
+      .from("reservations")
+      .select("note")
+      .eq("id", reservationId)
+      .maybeSingle();
+    const base = stripOffStockBlock(resRow?.note);
+    const block = skipped.length
+      ? `${base ? base + "\n\n" : ""}${OFF_STOCK_MARKER}\n` +
+        skipped.map((s) => `• ${s.name} — ${s.qty} ks (${s.reason})`).join("\n")
+      : base;
+    if ((resRow?.note ?? "") !== block) {
+      await supabase.from("reservations").update({ note: block }).eq("id", reservationId);
+    }
   }
 
   // 2) Propagate date/time fields from the quote to the reservation so that
@@ -96,6 +136,8 @@ export async function syncReservationFromQuote(reservationId: string, quoteId: s
       if (eUpd) throw eUpd;
     }
   }
+
+  return { skipped };
 }
 
 function dateAt(date: string, hh: number, mm = 0): string {
