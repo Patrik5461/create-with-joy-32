@@ -20,7 +20,7 @@ import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 export const Route = createFileRoute("/_authenticated/reservations/")({
   head: () => ({ meta: [{ title: "Rezervácie · Mima Production CRM" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
-    status: typeof s.status === "string" ? (s.status as ReservationStatus | "all") : "all",
+    status: typeof s.status === "string" ? (s.status as ReservationStatus | "all") : undefined,
   }),
   component: Reservations,
 });
