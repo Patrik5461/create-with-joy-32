@@ -102,7 +102,7 @@ function ReservationDetail() {
       <AppHeader title={r?.event_name ?? "Rezervácia"} />
       <div className="p-4 md:p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" asChild><Link to="/reservations" search={{}}><ArrowLeft className="size-4 mr-1" />Späť</Link></Button>
+          <Button variant="ghost" size="sm" asChild><Link to="/reservations" search={{ status: undefined } as any}><ArrowLeft className="size-4 mr-1" />Späť</Link></Button>
           <div className="flex gap-2">
             {!editing && (
               <Button variant="outline" size="sm" asChild>
