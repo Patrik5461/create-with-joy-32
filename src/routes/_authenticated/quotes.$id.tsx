@@ -704,6 +704,12 @@ function PrintView({ quote: q, company, innerRef }: { quote: any; company?: any;
           {q.installation_date && <div className="text-xs text-gray-600">Inštalácia: {new Date(q.installation_date).toLocaleString("sk-SK", { dateStyle: "short", timeStyle: "short" })}</div>}
           {q.event_date && <div className="text-xs text-gray-600">Event: {new Date(q.event_date).toLocaleDateString("sk-SK")}</div>}
           {q.dismantling_date && <div className="text-xs text-gray-600">Demontáž: {new Date(q.dismantling_date).toLocaleString("sk-SK", { dateStyle: "short", timeStyle: "short" })}</div>}
+          {(q.venue ?? q.reservations?.venue) && (
+            <div className="text-xs text-gray-600">Miesto: {q.venue ?? q.reservations?.venue}</div>
+          )}
+          {(q.address ?? q.reservations?.address) && (
+            <div className="text-xs text-gray-600">{q.address ?? q.reservations?.address}</div>
+          )}
         </div>
       </div>
 
