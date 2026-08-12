@@ -180,7 +180,9 @@ export function buildReservationDatesPatch(q: {
 }
 
 /** Create a reservation from a quote (and link both sides). Returns new reservation id. */
-export async function createReservationFromQuote(quoteId: string): Promise<string> {
+export async function createReservationFromQuote(
+  quoteId: string,
+): Promise<{ id: string; skipped: SkippedItem[] }> {
   const { data: q, error } = await supabase
     .from("quotes")
     .select("id, quote_number, quote_group_id, client_id, contact_id, issue_date, event_start_at, event_end_at, event_date, installation_date, dismantling_date, notes, valid_until, client_contacts(full_name, phone, email)")
@@ -224,7 +226,7 @@ export async function createReservationFromQuote(quoteId: string): Promise<strin
     .single();
   if (eIns) throw eIns;
 
-  await syncReservationFromQuote(ins.id, quoteId);
+  const { skipped } = await syncReservationFromQuote(ins.id, quoteId);
 
   // Back-link: point all quotes in the group to this reservation (legacy field).
   if (q.quote_group_id) {
@@ -232,5 +234,5 @@ export async function createReservationFromQuote(quoteId: string): Promise<strin
   } else {
     await supabase.from("quotes").update({ reservation_id: ins.id }).eq("id", quoteId);
   }
-  return ins.id;
+  return { id: ins.id, skipped };
 }
