@@ -456,6 +456,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "damaged_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damaged_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "web_content_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "damaged_items_reservation_id_fkey"
             columns: ["reservation_id"]
             isOneToOne: false
@@ -632,7 +646,91 @@ export type Database = {
             foreignKeyName: "furniture_items_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
+            referencedRelation: "categories_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "furniture_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
             referencedRelation: "furniture_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      galleries: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          event_date: string | null
+          id: string
+          is_active: boolean
+          slug: string
+          sort_order: number
+          title: string
+          updated_at: string
+          venue: string | null
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          event_date?: string | null
+          id?: string
+          is_active?: boolean
+          slug: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          event_date?: string | null
+          id?: string
+          is_active?: boolean
+          slug?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Relationships: []
+      }
+      gallery_images: {
+        Row: {
+          caption: string | null
+          created_at: string
+          gallery_id: string
+          id: string
+          image_url: string
+          sort_order: number
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          gallery_id: string
+          id?: string
+          image_url: string
+          sort_order?: number
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          gallery_id?: string
+          id?: string
+          image_url?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_images_gallery_id_fkey"
+            columns: ["gallery_id"]
+            isOneToOne: false
+            referencedRelation: "galleries"
             referencedColumns: ["id"]
           },
         ]
@@ -672,6 +770,7 @@ export type Database = {
           client_id: string | null
           company: string | null
           created_at: string
+          created_by_user_id: string | null
           email: string
           event_end_at: string | null
           event_start_at: string | null
@@ -691,6 +790,7 @@ export type Database = {
           client_id?: string | null
           company?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           email: string
           event_end_at?: string | null
           event_start_at?: string | null
@@ -710,6 +810,7 @@ export type Database = {
           client_id?: string | null
           company?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           email?: string
           event_end_at?: string | null
           event_start_at?: string | null
@@ -738,6 +839,71 @@ export type Database = {
             columns: ["reservation_id"]
             isOneToOne: false
             referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inquiry_items: {
+        Row: {
+          created_at: string
+          furniture_item_id: string | null
+          id: string
+          inquiry_id: string
+          item_code: string | null
+          item_name: string
+          note: string | null
+          quantity: number
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          furniture_item_id?: string | null
+          id?: string
+          inquiry_id: string
+          item_code?: string | null
+          item_name: string
+          note?: string | null
+          quantity: number
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          furniture_item_id?: string | null
+          id?: string
+          inquiry_id?: string
+          item_code?: string | null
+          item_name?: string
+          note?: string | null
+          quantity?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inquiry_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "furniture_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inquiry_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inquiry_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "web_content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inquiry_items_inquiry_id_fkey"
+            columns: ["inquiry_id"]
+            isOneToOne: false
+            referencedRelation: "inquiries"
             referencedColumns: ["id"]
           },
         ]
@@ -1075,6 +1241,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "protocol_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "protocol_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "web_content_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "protocol_items_protocol_id_fkey"
             columns: ["protocol_id"]
             isOneToOne: false
@@ -1161,6 +1341,30 @@ export type Database = {
           },
         ]
       }
+      public_carts: {
+        Row: {
+          created_at: string
+          id: string
+          items: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          items?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          items?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       quote_items: {
         Row: {
           created_at: string
@@ -1210,6 +1414,20 @@ export type Database = {
             columns: ["furniture_item_id"]
             isOneToOne: false
             referencedRelation: "furniture_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "web_content_items"
             referencedColumns: ["id"]
           },
           {
@@ -1386,6 +1604,20 @@ export type Database = {
             columns: ["furniture_item_id"]
             isOneToOne: false
             referencedRelation: "furniture_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservation_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservation_items_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: false
+            referencedRelation: "web_content_items"
             referencedColumns: ["id"]
           },
           {
@@ -1613,6 +1845,51 @@ export type Database = {
           },
         ]
       }
+      site_slides: {
+        Row: {
+          created_at: string
+          cta_link: string | null
+          cta_text: string | null
+          id: string
+          image_url: string
+          image_url_after: string | null
+          image_url_before: string | null
+          is_active: boolean
+          sort_order: number
+          subtitle: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cta_link?: string | null
+          cta_text?: string | null
+          id?: string
+          image_url: string
+          image_url_after?: string | null
+          image_url_before?: string | null
+          is_active?: boolean
+          sort_order?: number
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cta_link?: string | null
+          cta_text?: string | null
+          id?: string
+          image_url?: string
+          image_url_after?: string | null
+          image_url_before?: string | null
+          is_active?: boolean
+          sort_order?: number
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           created_at: string
@@ -1706,9 +1983,102 @@ export type Database = {
         }
         Relationships: []
       }
+      web_visibility: {
+        Row: {
+          furniture_item_id: string
+          updated_at: string
+          updated_by: string | null
+          visible: boolean
+        }
+        Insert: {
+          furniture_item_id: string
+          updated_at?: string
+          updated_by?: string | null
+          visible?: boolean
+        }
+        Update: {
+          furniture_item_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          visible?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_visibility_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: true
+            referencedRelation: "furniture_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_visibility_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: true
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_visibility_furniture_item_id_fkey"
+            columns: ["furniture_item_id"]
+            isOneToOne: true
+            referencedRelation: "web_content_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      categories_public: {
+        Row: {
+          id: string | null
+          name: string | null
+          slug: string | null
+          sort_order: number | null
+        }
+        Insert: {
+          id?: string | null
+          name?: string | null
+          slug?: string | null
+          sort_order?: number | null
+        }
+        Update: {
+          id?: string | null
+          name?: string | null
+          slug?: string | null
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      products_public: {
+        Row: {
+          available_qty: number | null
+          category: string | null
+          category_name: string | null
+          color: string | null
+          description: string | null
+          dimensions: string | null
+          id: string | null
+          image_urls: string[] | null
+          name: string | null
+          slug: string | null
+          sort_key: string | null
+        }
+        Relationships: []
+      }
+      web_content_items: {
+        Row: {
+          category_name: string | null
+          display_order: number | null
+          has_photo: boolean | null
+          id: string | null
+          internal_code: string | null
+          name: string | null
+          photo_public_url: string | null
+          web_visibility_updated_at: string | null
+          web_visible: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_item_availability: {
