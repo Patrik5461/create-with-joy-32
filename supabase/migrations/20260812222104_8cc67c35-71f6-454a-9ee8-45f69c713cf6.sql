@@ -1,0 +1,1 @@
+ALTER TABLE public.quotes ADD COLUMN IF NOT EXISTS venue text, ADD COLUMN IF NOT EXISTS address text;

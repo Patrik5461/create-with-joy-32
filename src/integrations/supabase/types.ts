@@ -1441,6 +1441,7 @@ export type Database = {
       }
       quotes: {
         Row: {
+          address: string | null
           client_id: string | null
           contact_id: string | null
           created_at: string
@@ -1473,9 +1474,11 @@ export type Database = {
           valid_until: string | null
           vat_amount: number
           vat_rate: number
+          venue: string | null
           version_number: number
         }
         Insert: {
+          address?: string | null
           client_id?: string | null
           contact_id?: string | null
           created_at?: string
@@ -1508,9 +1511,11 @@ export type Database = {
           valid_until?: string | null
           vat_amount?: number
           vat_rate?: number
+          venue?: string | null
           version_number?: number
         }
         Update: {
+          address?: string | null
           client_id?: string | null
           contact_id?: string | null
           created_at?: string
@@ -1543,6 +1548,7 @@ export type Database = {
           valid_until?: string | null
           vat_amount?: number
           vat_rate?: number
+          venue?: string | null
           version_number?: number
         }
         Relationships: [
