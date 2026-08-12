@@ -623,13 +623,13 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                                     </div>
                                   </div>
                                   <div>
-                                    <Label className="text-[10px] text-muted-foreground">Zapol</Label>
+                                    <Label className="text-[10px] text-muted-foreground">Príchod</Label>
                                     <Input type="datetime-local" className="h-8 w-[180px] text-xs"
                                       defaultValue={toLocal(a.clock_in)}
                                       onBlur={(e) => e.target.value && saveTime.mutate({ id: a.id, field: "clock_in", value: e.target.value })} />
                                   </div>
                                   <div>
-                                    <Label className="text-[10px] text-muted-foreground">Vypol</Label>
+                                    <Label className="text-[10px] text-muted-foreground">Odchod</Label>
                                     <Input type="datetime-local" className="h-8 w-[180px] text-xs"
                                       defaultValue={toLocal(a.clock_out)}
                                       onBlur={(e) => saveTime.mutate({ id: a.id, field: "clock_out", value: e.target.value })} />
