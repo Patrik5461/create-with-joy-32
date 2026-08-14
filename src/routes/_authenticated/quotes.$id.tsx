@@ -528,7 +528,7 @@ function QuoteDetail() {
               <tbody>
                 {(q.quote_items ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order).map((it: any) => (
                   <tr key={it.id} className="border-b last:border-0">
-                    <td className="py-2">{it.name} {it.kind === "service" && <span className="text-xs text-muted-foreground">(služba)</span>}</td>
+                    <td className="py-2">{it.name} {it.kind === "service" && <span className="text-xs text-muted-foreground">(služba)</span>}{it.kind === "other" && <span className="text-xs text-muted-foreground">(iné)</span>}</td>
                     <td>{it.qty}</td>
                     <td className="text-xs text-muted-foreground">{it.price_mode === "per_day" ? "denná" : it.price_mode === "fixed" ? "fixná" : "—"}</td>
                     <td>{it.price_mode === "per_day" ? it.days : "—"}</td>
@@ -548,7 +548,7 @@ function QuoteDetail() {
             <div className="border-t pt-2 mt-2">
               <Row label="Spolu s DPH" value={formatEur(Number(q.total_with_vat))} bold big />
             </div>
-            <p className="text-xs text-muted-foreground pt-1">Zľava sa vzťahuje výhradne na nábytok; služby a doprava sa nezľavňujú.</p>
+            <p className="text-xs text-muted-foreground pt-1">Zľava sa vzťahuje výhradne na nábytok; služby, doprava a položky „Iné“ sa nezľavňujú.</p>
           </CardContent>
         </Card>
 
@@ -645,15 +645,17 @@ function deriveBreakdown(q: any) {
     .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
   const services = items.filter((it) => it.kind === "service")
     .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
+  const other = items.filter((it) => it.kind === "other")
+    .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
   const totalWithoutVat = Number(q.total_without_vat ?? 0);
   const dtype = q.discount_type ?? "none";
   const dval = Number(q.discount_value ?? 0);
   const rawDiscount = dtype === "percent" ? (furniture * dval) / 100 : dtype === "fixed" ? dval : 0;
   const discount = Math.min(Math.max(0, rawDiscount), furniture);
   const furnitureAfter = Math.max(0, furniture - discount);
-  const baseForSurcharge = furnitureAfter + services;
+  const baseForSurcharge = furnitureAfter + services + other;
   const surcharge = Math.max(0, totalWithoutVat - baseForSurcharge);
-  return { furniture, services, discount, surcharge };
+  return { furniture, services, other, discount, surcharge };
 }
 
 function renderBreakdown(q: any) {
@@ -663,6 +665,7 @@ function renderBreakdown(q: any) {
       <Row label="Medzisúčet – nábytok" value={formatEur(b.furniture)} />
       {b.discount > 0 && <Row label="Zľava (len nábytok)" value={`− ${formatEur(b.discount)}`} />}
       {b.services > 0 && <Row label="Medzisúčet – služby / doprava" value={formatEur(b.services)} />}
+      {b.other > 0 && <Row label="Medzisúčet – iné" value={formatEur(b.other)} />}
       {b.surcharge > 0 && <Row label={q.surcharge_label || "Príplatok"} value={`+ ${formatEur(b.surcharge)}`} />}
       <Row label="Spolu bez DPH" value={formatEur(Number(q.total_without_vat))} bold />
     </>
@@ -679,6 +682,9 @@ function renderPrintBreakdown(q: any) {
       )}
       {b.services > 0 && (
         <div className="flex justify-between"><span>Medzisúčet – služby / doprava</span><span>{formatEur(b.services)}</span></div>
+      )}
+      {b.other > 0 && (
+        <div className="flex justify-between"><span>Medzisúčet – iné</span><span>{formatEur(b.other)}</span></div>
       )}
       {b.surcharge > 0 && (
         <div className="flex justify-between"><span>{q.surcharge_label || "Príplatok"}</span><span>+ {formatEur(b.surcharge)}</span></div>
@@ -741,8 +747,9 @@ function PrintView({ quote: q, company, innerRef }: { quote: any; company?: any;
         </thead>
         <tbody>
           {(q.quote_items ?? []).slice().sort((a: any, b: any) => {
-            const ak = a.kind === "service" ? 1 : 0;
-            const bk = b.kind === "service" ? 1 : 0;
+            const rank = (k: string) => (k === "furniture" ? 0 : k === "other" ? 1 : 2);
+            const ak = rank(a.kind);
+            const bk = rank(b.kind);
             if (ak !== bk) return ak - bk;
             return (a.sort_order ?? 0) - (b.sort_order ?? 0);
           }).map((it: any) => (
