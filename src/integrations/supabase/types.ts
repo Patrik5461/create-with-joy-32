@@ -1851,6 +1851,27 @@ export type Database = {
           },
         ]
       }
+      site_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       site_slides: {
         Row: {
           created_at: string
@@ -1995,18 +2016,24 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           visible: boolean
+          web_order: number | null
+          web_order_all: number | null
         }
         Insert: {
           furniture_item_id: string
           updated_at?: string
           updated_by?: string | null
           visible?: boolean
+          web_order?: number | null
+          web_order_all?: number | null
         }
         Update: {
           furniture_item_id?: string
           updated_at?: string
           updated_by?: string | null
           visible?: boolean
+          web_order?: number | null
+          web_order_all?: number | null
         }
         Relationships: [
           {
@@ -2068,6 +2095,8 @@ export type Database = {
           name: string | null
           slug: string | null
           sort_key: string | null
+          web_order: number | null
+          web_order_all: number | null
         }
         Relationships: []
       }
@@ -2080,6 +2109,8 @@ export type Database = {
           internal_code: string | null
           name: string | null
           photo_public_url: string | null
+          web_order: number | null
+          web_order_all: number | null
           web_visibility_updated_at: string | null
           web_visible: boolean | null
         }
