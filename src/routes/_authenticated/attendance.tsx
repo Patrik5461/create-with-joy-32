@@ -687,9 +687,32 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
   );
 }
 
+function calcWorkMinutes(rows: Attendance[], breaks: Break[]): number {
+  const breaksBy = new Map<string, Break[]>();
+  for (const b of breaks) {
+    const arr = breaksBy.get(b.attendance_id) ?? [];
+    arr.push(b);
+    breaksBy.set(b.attendance_id, arr);
+  }
+  const intervals: Interval[] = [];
+  for (const r of rows) {
+    const cin = new Date(r.clock_in).getTime();
+    const cout = r.clock_out ? new Date(r.clock_out).getTime() : Date.now();
+    if (cout <= cin) continue;
+    const iv: Interval = { start: cin, end: cout };
+    const holes = (breaksBy.get(r.id) ?? [])
+      .filter((b) => b.break_end)
+      .map((b) => ({ start: new Date(b.break_start).getTime(), end: new Date(b.break_end!).getTime() }))
+      .filter((x) => x.end > x.start);
+    intervals.push(...subtractIntervals(iv, holes));
+  }
+  return unionMinutes(intervals);
+}
+
 function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
   const qc = useQueryClient();
   const [date, setDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [selectedPerson, setSelectedPerson] = useState<string>("all");
   const from = startOfDay(new Date(date));
   const to = endOfDay(new Date(date));
 
@@ -723,13 +746,29 @@ function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
     },
   });
 
+  const breaks = useQuery({
+    queryKey: ["attendance-day-breaks", rows.data?.map((r) => r.id).join(",") ?? "empty"],
+    enabled: rows.isSuccess && (rows.data ?? []).length > 0,
+    queryFn: async () => {
+      const ids = rows.data!.map((r) => r.id);
+      const { data, error } = await (supabase.from as any)("attendance_breaks").select("*").in("attendance_id", ids);
+      if (error) throw error;
+      return (data ?? []) as Break[];
+    },
+  });
+
   const saveTime = useMutation({
     mutationFn: async ({ id, field, value }: { id: string; field: "clock_in" | "clock_out"; value: string }) => {
       const iso = value ? new Date(value).toISOString() : null;
       const { error } = await (supabase.from as any)("attendance").update({ [field]: iso }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["attendance-day"] }); qc.invalidateQueries({ queryKey: ["attendance-list"] }); qc.invalidateQueries({ queryKey: ["attendance-open"] }); toast.success("Uložené"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["attendance-day"] });
+      qc.invalidateQueries({ queryKey: ["attendance-list"] });
+      qc.invalidateQueries({ queryKey: ["attendance-open"] });
+      toast.success("Uložené");
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -740,14 +779,69 @@ function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
   };
 
-  const nameFor = (r: Attendance) => {
-    if (r.helper_id) {
-      const h = (helpersQ.data ?? []).find((x) => x.id === r.helper_id);
+  const profiles = profilesQ.data ?? [];
+  const helpers = helpersQ.data ?? [];
+
+  const personName = (key: string, isHelper?: boolean): string => {
+    if (isHelper || key.startsWith("helper:")) {
+      const hid = key.startsWith("helper:") ? key.slice(7) : key;
+      const h = helpers.find((x) => x.id === hid);
       return h ? `${h.name} (helper)` : "Helper";
     }
-    const p = (profilesQ.data ?? []).find((x) => x.id === r.user_id);
+    const p = profiles.find((x) => x.id === key);
     return p?.full_name || p?.email || "—";
   };
+
+  const peopleOptions = useMemo(() => {
+    const opts = [{ value: "all", label: "Všetci" }];
+    if (isAdmin) {
+      for (const p of profiles) opts.push({ value: p.id, label: p.full_name || p.email || "—" });
+      for (const h of helpers) opts.push({ value: `helper:${h.id}`, label: `${h.name} (helper)` });
+    }
+    return opts;
+  }, [profiles, helpers, isAdmin]);
+
+  const filteredRows = useMemo(() => {
+    if (!rows.data) return [];
+    if (selectedPerson === "all") return rows.data;
+    if (selectedPerson.startsWith("helper:")) {
+      const hid = selectedPerson.slice(7);
+      return rows.data.filter((r) => r.helper_id === hid);
+    }
+    return rows.data.filter((r) => r.user_id === selectedPerson);
+  }, [rows.data, selectedPerson]);
+
+  const filteredBreaks = useMemo(() => {
+    const ids = new Set(filteredRows.map((r) => r.id));
+    return (breaks.data ?? []).filter((b) => ids.has(b.attendance_id));
+  }, [filteredRows, breaks.data]);
+
+  const totalMinutes = useMemo(() => calcWorkMinutes(filteredRows, filteredBreaks), [filteredRows, filteredBreaks]);
+  const uniquePersons = useMemo(() => new Set(filteredRows.map((r) => (r.helper_id ? `helper:${r.helper_id}` : r.user_id))).size, [filteredRows]);
+
+  const perPersonTotals = useMemo(() => {
+    if (selectedPerson !== "all") return [];
+    const groups = new Map<string, { rows: Attendance[]; isHelper: boolean }>();
+    for (const r of filteredRows) {
+      const isHelper = !!r.helper_id;
+      const key = isHelper ? `helper:${r.helper_id}` : r.user_id;
+      if (!groups.has(key)) groups.set(key, { rows: [], isHelper });
+      groups.get(key)!.rows.push(r);
+    }
+    return Array.from(groups.entries())
+      .map(([key, { rows, isHelper }]) => {
+        const relevantBreaks = (breaks.data ?? []).filter((b) => rows.some((r) => r.id === b.attendance_id));
+        return {
+          key,
+          name: personName(key, isHelper),
+          minutes: calcWorkMinutes(rows, relevantBreaks),
+          rowCount: rows.length,
+        };
+      })
+      .sort((a, b) => b.minutes - a.minutes);
+  }, [filteredRows, breaks.data, selectedPerson]);
+
+  const nameFor = (r: Attendance) => personName(r.helper_id ? `helper:${r.helper_id}` : r.user_id, !!r.helper_id);
 
   return (
     <Card>
@@ -755,34 +849,105 @@ function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
         <CardTitle className="text-base">Denný záznam</CardTitle>
         <Input type="date" className="w-[180px]" value={date} onChange={(e) => setDate(e.target.value)} />
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-end gap-3">
+          {isAdmin && (
+            <div>
+              <Label className="text-xs">Osoba</Label>
+              <Select value={selectedPerson} onValueChange={setSelectedPerson}>
+                <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {peopleOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="text-sm text-muted-foreground ml-auto">
+            {format(new Date(date), "EEEE d.M.yyyy", { locale: sk })}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">Odpracované</div>
+            <div className="text-2xl font-bold font-mono">{fmtHM(totalMinutes)}</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">Záznamov</div>
+            <div className="text-2xl font-bold">{filteredRows.length}</div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">Osob</div>
+            <div className="text-2xl font-bold">{uniquePersons}</div>
+          </div>
+        </div>
+
+        {selectedPerson === "all" && perPersonTotals.length > 0 && (
+          <div className="rounded-md border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Osoba</TableHead>
+                  <TableHead className="text-right">Záznamov</TableHead>
+                  <TableHead className="text-right">Odpracované</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {perPersonTotals.map((p) => (
+                  <TableRow key={p.key}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell className="text-right">{p.rowCount}</TableCell>
+                    <TableCell className="text-right font-mono">{fmtHM(p.minutes)}</TableCell>
+                  </TableRow>
+                ))}
+                {perPersonTotals.length > 1 && (
+                  <TableRow className="bg-muted/40">
+                    <TableCell className="font-semibold">Spolu</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {perPersonTotals.reduce((a, b) => a + b.rowCount, 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-bold">
+                      {fmtHM(perPersonTotals.reduce((a, b) => a + b.minutes, 0))}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
         {rows.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
         {rows.error && <p className="text-sm text-destructive">Chyba: {(rows.error as any).message}</p>}
-        {!rows.isLoading && !rows.error && (rows.data ?? []).length === 0 && (
+        {!rows.isLoading && !rows.error && filteredRows.length === 0 && (
           <p className="text-sm text-muted-foreground">Žiadne záznamy v tento deň.</p>
         )}
-        {(rows.data ?? []).map((r) => {
-          const worked = r.clock_out ? differenceInMinutes(new Date(r.clock_out), new Date(r.clock_in)) : null;
+        {filteredRows.map((r) => {
+          const rowBreaks = (breaks.data ?? []).filter((b) => b.attendance_id === r.id);
+          const worked = r.clock_out
+            ? calcWorkMinutes([r], rowBreaks)
+            : null;
           return (
             <div key={r.id} className="rounded-md border p-3 space-y-2">
               <div className="text-sm font-medium">{nameFor(r)}</div>
               <div className="grid gap-2 sm:grid-cols-3">
-              <div>
-                <Label className="text-xs">Príchod</Label>
-                <Input type="datetime-local" defaultValue={toLocal(r.clock_in)}
-                  onBlur={(e) => e.target.value && saveTime.mutate({ id: r.id, field: "clock_in", value: e.target.value })} />
-              </div>
-              <div>
-                <Label className="text-xs">Odchod</Label>
-                <Input type="datetime-local" defaultValue={toLocal(r.clock_out)}
-                  onBlur={(e) => saveTime.mutate({ id: r.id, field: "clock_out", value: e.target.value })} />
-              </div>
-              <div className="text-xs flex flex-col justify-center">
-                <div className="text-muted-foreground uppercase tracking-wider">Odpracované (hrubé)</div>
-                <div className="font-mono">{worked != null ? fmtHM(worked) : "otvorené"}</div>
-                {r.source === "event" && <Badge variant="outline" className="mt-1 w-fit">akcia</Badge>}
-                {r.source === "helper_pin" && <Badge variant="outline" className="mt-1 w-fit">PIN</Badge>}
-              </div>
+                <div>
+                  <Label className="text-xs">Príchod</Label>
+                  <Input type="datetime-local" defaultValue={toLocal(r.clock_in)}
+                    onBlur={(e) => e.target.value && saveTime.mutate({ id: r.id, field: "clock_in", value: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs">Odchod</Label>
+                  <Input type="datetime-local" defaultValue={toLocal(r.clock_out)}
+                    onBlur={(e) => saveTime.mutate({ id: r.id, field: "clock_out", value: e.target.value })} />
+                </div>
+                <div className="text-xs flex flex-col justify-center">
+                  <div className="text-muted-foreground uppercase tracking-wider">Odpracované (čisté)</div>
+                  <div className="font-mono">{worked != null ? fmtHM(worked) : "otvorené"}</div>
+                  {r.source === "event" && <Badge variant="outline" className="mt-1 w-fit">akcia</Badge>}
+                  {r.source === "helper_pin" && <Badge variant="outline" className="mt-1 w-fit">PIN</Badge>}
+                </div>
               </div>
             </div>
           );
