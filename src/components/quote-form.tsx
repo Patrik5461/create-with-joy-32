@@ -323,6 +323,18 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
       days: 1,
     }, ...ls]);
   };
+  const addOtherRow = () => {
+    setLines((ls) => [{
+      id: uid(),
+      kind: "other",
+      furniture_item_id: null,
+      name: "",
+      qty: 1,
+      price_mode: "fixed",
+      unit_price: 0,
+      days: 1,
+    }, ...ls]);
+  };
 
   const updateLine = (id: string, patch: Partial<QuoteLine>) => {
     setLines((ls) => ls.map((l) => l.id === id ? { ...l, ...patch } : l));
@@ -589,6 +601,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
             <Button size="sm" variant="outline" onClick={addFurnitureRow}><Plus className="size-3.5 mr-1" />Nábytok</Button>
             <Button size="sm" variant="outline" onClick={addCustomFurnitureRow}><Plus className="size-3.5 mr-1" />Mimo skladu</Button>
             <Button size="sm" variant="outline" onClick={addServiceRow}><Plus className="size-3.5 mr-1" />Služba</Button>
+            <Button size="sm" variant="outline" onClick={addOtherRow}><Plus className="size-3.5 mr-1" />Iné</Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -644,6 +657,11 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
                 <div className="md:col-span-4 space-y-1">
                   <Label className="text-xs">Nábytok mimo skladu</Label>
                   <Input value={l.name} onChange={(e) => updateLine(l.id, { name: e.target.value })} placeholder="napr. Špeciálny stôl (dopožičaný)" />
+                </div>
+              ) : l.kind === "other" ? (
+                <div className="md:col-span-4 space-y-1">
+                  <Label className="text-xs">Iné</Label>
+                  <Input value={l.name} onChange={(e) => updateLine(l.id, { name: e.target.value })} placeholder="napr. Poplatok, materiál…" />
                 </div>
               ) : (
                 <div className="md:col-span-4 space-y-1">
@@ -762,13 +780,14 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           <Row label="Medzisúčet – nábytok" value={formatEur(totals.furnitureSubtotal)} />
           {totals.discount > 0 && <Row label="Zľava (len nábytok)" value={`− ${formatEur(totals.discount)}`} tone="emerald" />}
           {totals.servicesSubtotal > 0 && <Row label="Medzisúčet – služby / doprava" value={formatEur(totals.servicesSubtotal)} />}
+          {totals.otherSubtotal > 0 && <Row label="Medzisúčet – iné" value={formatEur(totals.otherSubtotal)} />}
           {totals.surcharge > 0 && <Row label={form.surcharge_label || "Príplatok"} value={`+ ${formatEur(totals.surcharge)}`} />}
           <Row label="Spolu bez DPH" value={formatEur(totals.totalWithoutVat)} bold />
           <Row label={`DPH ${form.vat_rate}%`} value={formatEur(totals.vatAmount)} />
           <div className="border-t pt-2 mt-2">
             <Row label="Spolu s DPH" value={formatEur(totals.totalWithVat)} bold big />
           </div>
-          <p className="text-xs text-muted-foreground pt-1">Zľava sa vzťahuje výhradne na položky typu nábytok; služby a doprava sa nezľavňujú.</p>
+          <p className="text-xs text-muted-foreground pt-1">Zľava sa vzťahuje výhradne na položky typu nábytok; služby, doprava a položky „Iné“ sa nezľavňujú.</p>
         </CardContent>
       </Card>
 

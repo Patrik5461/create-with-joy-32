@@ -4,7 +4,7 @@ export type FurnitureQuoteItem = {
   furniture_item_id: string | null;
   name: string;
   qty: number;
-  kind: "furniture" | "service";
+  kind: "furniture" | "service" | "other";
 };
 
 export type ReservationItem = {

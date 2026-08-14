@@ -1,0 +1,1 @@
+ALTER TYPE public.quote_item_kind ADD VALUE IF NOT EXISTS 'other';
