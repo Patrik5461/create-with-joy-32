@@ -1,6 +1,6 @@
 export type AdjustType = "none" | "percent" | "fixed";
 export type PriceMode = "per_day" | "fixed" | "service";
-export type ItemKind = "furniture" | "service";
+export type ItemKind = "furniture" | "service" | "other";
 
 export interface QuoteLine {
   id: string;
@@ -22,6 +22,7 @@ export interface QuoteTotals {
   subtotal: number;
   furnitureSubtotal: number;
   servicesSubtotal: number;
+  otherSubtotal: number;
   discount: number;
   surcharge: number;
   totalWithoutVat: number;
@@ -43,21 +44,24 @@ export function computeTotals(opts: {
   const servicesSubtotal = opts.lines
     .filter((l) => l.kind === "service")
     .reduce((s, l) => s + lineTotal(l), 0);
-  const subtotal = furnitureSubtotal + servicesSubtotal;
-  // Zľava sa vzťahuje LEN na nábytok, NIE na služby/dopravu.
+  const otherSubtotal = opts.lines
+    .filter((l) => l.kind === "other")
+    .reduce((s, l) => s + lineTotal(l), 0);
+  const subtotal = furnitureSubtotal + servicesSubtotal + otherSubtotal;
+  // Zľava sa vzťahuje LEN na nábytok, NIE na služby/dopravu ani položky "Iné".
   const rawDiscount =
     opts.discountType === "percent" ? (furnitureSubtotal * opts.discountValue) / 100 :
     opts.discountType === "fixed" ? opts.discountValue : 0;
   const discount = Math.min(Math.max(0, rawDiscount), furnitureSubtotal);
   const furnitureAfterDiscount = Math.max(0, furnitureSubtotal - discount);
-  const baseForSurcharge = furnitureAfterDiscount + servicesSubtotal;
+  const baseForSurcharge = furnitureAfterDiscount + servicesSubtotal + otherSubtotal;
   const surcharge =
     opts.surchargeType === "percent" ? (baseForSurcharge * opts.surchargeValue) / 100 :
     opts.surchargeType === "fixed" ? opts.surchargeValue : 0;
   const totalWithoutVat = Math.max(0, baseForSurcharge + surcharge);
   const vatAmount = (totalWithoutVat * opts.vatRate) / 100;
   const totalWithVat = totalWithoutVat + vatAmount;
-  return { subtotal, furnitureSubtotal, servicesSubtotal, discount, surcharge, totalWithoutVat, vatAmount, totalWithVat };
+  return { subtotal, furnitureSubtotal, servicesSubtotal, otherSubtotal, discount, surcharge, totalWithoutVat, vatAmount, totalWithVat };
 }
 
 export function formatEur(n: number): string {
