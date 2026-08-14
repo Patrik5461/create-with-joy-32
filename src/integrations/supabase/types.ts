@@ -2202,7 +2202,7 @@ export type Database = {
       protocol_item_condition: "ok" | "damaged" | "missing"
       protocol_type: "handover" | "return"
       quote_adjust_type: "none" | "percent" | "fixed"
-      quote_item_kind: "furniture" | "service"
+      quote_item_kind: "furniture" | "service" | "other"
       quote_price_mode: "per_day" | "fixed" | "service"
       quote_status: "draft" | "sent" | "approved" | "rejected"
       reservation_status:
@@ -2367,7 +2367,7 @@ export const Constants = {
       protocol_item_condition: ["ok", "damaged", "missing"],
       protocol_type: ["handover", "return"],
       quote_adjust_type: ["none", "percent", "fixed"],
-      quote_item_kind: ["furniture", "service"],
+      quote_item_kind: ["furniture", "service", "other"],
       quote_price_mode: ["per_day", "fixed", "service"],
       quote_status: ["draft", "sent", "approved", "rejected"],
       reservation_status: [
