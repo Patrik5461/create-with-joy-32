@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LogIn, LogOut, Coffee, Play, Download, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { LogIn, LogOut, Coffee, Play, Download, ChevronDown, ChevronRight, Trash2, Plus } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
@@ -317,6 +318,109 @@ function computeSummary(
   });
 }
 
+function ManualEntryDialog({
+  isAdmin,
+  currentUserId,
+  profiles,
+  helpers,
+}: {
+  isAdmin: boolean;
+  currentUserId: string;
+  profiles: { id: string; full_name: string | null; email: string | null }[];
+  helpers: { id: string; name: string }[];
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [person, setPerson] = useState<string>(currentUserId);
+  const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [start, setStart] = useState("08:00");
+  const [end, setEnd] = useState("16:00");
+  const [note, setNote] = useState("");
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!date || !start || !end) throw new Error("Vyplň dátum aj časy.");
+      const clockIn = new Date(`${date}T${start}`);
+      let clockOut = new Date(`${date}T${end}`);
+      if (clockOut <= clockIn) clockOut = new Date(clockOut.getTime() + 24 * 3600 * 1000);
+      const isHelper = person.startsWith("helper:");
+      const payload: any = {
+        work_date: date,
+        clock_in: clockIn.toISOString(),
+        clock_out: clockOut.toISOString(),
+        source: "manual",
+        note: note || null,
+        edited_by: currentUserId,
+      };
+      if (isHelper) {
+        payload.helper_id = person.slice(7);
+        payload.is_helper = true;
+        payload.user_id = null;
+      } else {
+        payload.user_id = person;
+        payload.is_helper = false;
+      }
+      const { error } = await (supabase.from as any)("attendance").insert(payload);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["attendance-list"] });
+      qc.invalidateQueries({ queryKey: ["attendance-day"] });
+      toast.success("Záznam pridaný");
+      setOpen(false);
+      setNote("");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline"><Plus className="size-4 mr-1" />Pridať čas</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Manuálne pridať odpracovaný čas</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Osoba</Label>
+            <Select value={person} onValueChange={setPerson} disabled={!isAdmin}>
+              <SelectTrigger><SelectValue placeholder="Vyber osobu" /></SelectTrigger>
+              <SelectContent>
+                {(isAdmin ? profiles : profiles.filter((p) => p.id === currentUserId)).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
+                ))}
+                {isAdmin && helpers.map((h) => (
+                  <SelectItem key={`helper-${h.id}`} value={`helper:${h.id}`}>{h.name} (helper)</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <Label className="text-xs">Dátum</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Príchod</Label>
+              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Odchod</Label>
+              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Poznámka</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="napr. zabudnuté odpichnutie" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Zrušiť</Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>Uložiť</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentUserId: string }) {
   const qc = useQueryClient();
   const [range, setRange] = useState<Range>("week");
@@ -473,7 +577,15 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">Súhrn odpracovaných hodín</CardTitle>
-        <Button size="sm" variant="outline" onClick={exportCsv}><Download className="size-4 mr-1" />Export CSV</Button>
+        <div className="flex items-center gap-2">
+          <ManualEntryDialog
+            isAdmin={isAdmin}
+            currentUserId={currentUserId}
+            profiles={profiles.data ?? []}
+            helpers={helpersQ.data ?? []}
+          />
+          <Button size="sm" variant="outline" onClick={exportCsv}><Download className="size-4 mr-1" />Export CSV</Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-end gap-3">
