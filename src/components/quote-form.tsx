@@ -160,7 +160,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
   const furniture = useQuery({
     queryKey: ["furniture-pricing"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("furniture_items").select("id, name, internal_code, price_per_day, price_fixed, category_id, total_qty, damaged_qty, retired_qty").eq("active", true).order("name");
+      const { data, error } = await supabase.from("furniture_items").select("id, name, internal_code, price_per_day, price_fixed, category_id, total_qty, damaged_qty, retired_qty, availability_warning").eq("active", true).order("name");
       if (error) throw error;
       return data;
     },
@@ -344,6 +344,9 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
   const onPickFurniture = (lineId: string, furnitureId: string) => {
     const f = furniture.data?.find((x: any) => x.id === furnitureId);
     if (!f) return;
+    if ((f as any).availability_warning) {
+      toast.warning("Pozor, skontroluj si dostupnosť", { description: f.name });
+    }
     const useDay = (f as any).price_per_day != null;
     updateLine(lineId, {
       furniture_item_id: furnitureId,
@@ -606,6 +609,15 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         </CardHeader>
         <CardContent className="space-y-2">
           {lines.length === 0 && <p className="text-sm text-muted-foreground">Pridajte položky nábytku alebo služby.</p>}
+          {warnItems.length > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 text-red-900 p-3 text-sm">
+              <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-medium">Pozor, skontroluj si dostupnosť</div>
+                <div className="text-xs">{warnItems.join(", ")}</div>
+              </div>
+            </div>
+          )}
           {hasOverbook && (
             <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 text-amber-900 p-3 text-sm">
               <AlertTriangle className="size-4 mt-0.5 shrink-0" />
@@ -620,8 +632,9 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           {lines.map((l) => {
             const a = availability[l.id];
             const over = a && l.qty > a.available;
+            const warn = !!l.furniture_item_id && warnIds.has(l.furniture_item_id);
             return (
-            <div key={l.id} className={`rounded-md border p-3 grid gap-2 md:grid-cols-12 items-end ${over ? "border-amber-300 bg-amber-50/40" : ""}`}>
+            <div key={l.id} className={`rounded-md border p-3 grid gap-2 md:grid-cols-12 items-end ${warn ? "border-red-300 bg-red-50/40" : over ? "border-amber-300 bg-amber-50/40" : ""}`}>
               {l.kind === "furniture" && l.furniture_item_id !== null ? (
                 <div className="md:col-span-4 space-y-1">
                   <Label className="text-xs">Nábytok</Label>
