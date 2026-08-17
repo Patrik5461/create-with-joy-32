@@ -238,6 +238,13 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
   });
   const hasOverbook = overbookLines.length > 0;
 
+  const warnIds = new Set(
+    (furniture.data ?? []).filter((f: any) => f.availability_warning).map((f: any) => f.id as string),
+  );
+  const warnItems = lines
+    .filter((l) => !!l.furniture_item_id && warnIds.has(l.furniture_item_id))
+    .map((l) => l.name);
+
   const totals = useMemo(() => computeTotals({
     lines,
     discountType: form.discount_type,
