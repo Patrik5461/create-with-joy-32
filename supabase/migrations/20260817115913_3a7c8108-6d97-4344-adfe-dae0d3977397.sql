@@ -1,0 +1,2 @@
+ALTER TABLE public.furniture_items ADD COLUMN IF NOT EXISTS availability_warning boolean NOT NULL DEFAULT false;
+UPDATE public.furniture_items SET availability_warning = true WHERE internal_code IN ('BARS-0007','BARS-0008');
