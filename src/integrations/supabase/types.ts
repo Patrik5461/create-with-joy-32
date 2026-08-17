@@ -580,6 +580,7 @@ export type Database = {
       furniture_items: {
         Row: {
           active: boolean
+          availability_warning: boolean
           category_id: string
           color: string | null
           created_at: string
@@ -601,6 +602,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          availability_warning?: boolean
           category_id: string
           color?: string | null
           created_at?: string
@@ -622,6 +624,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          availability_warning?: boolean
           category_id?: string
           color?: string | null
           created_at?: string
