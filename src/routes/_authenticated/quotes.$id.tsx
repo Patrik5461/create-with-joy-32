@@ -25,7 +25,7 @@ import { QuoteForm } from "@/components/quote-form";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, type QuoteLine } from "@/lib/quote-utils";
 import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow } from "@/lib/quote-reservation-link";
 import { useServerFn } from "@tanstack/react-start";
-import { sendQuoteEmail, uploadQuotePdfChunk } from "@/lib/email.functions";
+import { createQuotePdfUpload, sendQuoteEmail } from "@/lib/email.functions";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
@@ -43,7 +43,7 @@ function QuoteDetail() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [confirmSendOpen, setConfirmSendOpen] = useState(false);
   const sendQuoteFn = useServerFn(sendQuoteEmail);
-  const uploadChunkFn = useServerFn(uploadQuotePdfChunk);
+  const createPdfUploadFn = useServerFn(createQuotePdfUpload);
   const printRef = useRef<HTMLDivElement | null>(null);
 
   const quote = useQuery({
@@ -273,23 +273,19 @@ function QuoteDetail() {
       const { base64, filename } = await renderElementToPdfBase64(el, {
         filename: `ponuka-${q.quote_number}.pdf`,
       });
-      // PDF posielame vždy po malých blokoch. Aj base64 a obálka serverovej
-      // funkcie zväčšujú request, preto musí byť každý blok bezpečne pod
-      // limitom reverzného proxy servera.
-      const CHUNK = 128_000;
       const uploadId = crypto.randomUUID();
-      const chunkCount = Math.ceil(base64.length / CHUNK);
-      for (let index = 0; index < chunkCount; index++) {
-        await uploadChunkFn({
-          data: {
-            uploadId,
-            index,
-            chunkBase64: base64.slice(index * CHUNK, (index + 1) * CHUNK),
-          },
+      const upload = await createPdfUploadFn({ data: { quoteId: q.id, uploadId } });
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const { error: uploadError } = await supabase.storage
+        .from("quote-pdfs")
+        .uploadToSignedUrl(upload.path, upload.token, new Blob([bytes], { type: "application/pdf" }), {
+          contentType: "application/pdf",
         });
-      }
+      if (uploadError) throw new Error(`PDF sa nepodarilo nahrať: ${uploadError.message}`);
       await sendQuoteFn({
-        data: { quoteId: q.id, to, pdfFilename: filename, pdfUploadId: uploadId, pdfChunkCount: chunkCount },
+        data: { quoteId: q.id, to, pdfFilename: filename, pdfStoragePath: upload.path },
       });
       toast.success(`Ponuka odoslaná na ${to}`);
       qc.invalidateQueries({ queryKey: ["quote", id] });
