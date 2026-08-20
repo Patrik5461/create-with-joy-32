@@ -183,4 +183,36 @@
   .bg-sidebar {
     background-color: white !important;
   }
+
+  /* Tlač tabuliek dokumentov: hlavička sa opakuje na každej strane,
+     riadky sa nikdy nerozdelia / neprekrývajú medzi stranami. */
+  @page {
+    margin: 12mm;
+  }
+  table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  thead {
+    display: table-header-group;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+  tr,
+  th,
+  td {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  img {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

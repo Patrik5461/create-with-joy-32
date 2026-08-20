@@ -764,8 +764,8 @@ function PrintView({ quote: q, company, innerRef }: { quote: any; company?: any;
         </tbody>
       </table>
 
-      <div className="flex justify-end">
-        <div className="w-72 space-y-1">
+      <div className="flex justify-end print-avoid-break">
+        <div className="w-72 space-y-1 print-avoid-break">
           {renderPrintBreakdown(q)}
           <div className="flex justify-between"><span>DPH {q.vat_rate}%</span><span>{formatEur(Number(q.vat_amount))}</span></div>
           <div className="flex justify-between border-t-2 border-black pt-2 text-lg font-bold">
