@@ -128,6 +128,29 @@ export const sendTestEmail = createServerFn({ method: "POST" })
     return { ok: true, id: result.id };
   });
 
+/**
+ * Nahrá jeden kúsok PDF prílohy do súkromného úložiska.
+ * Vďaka tomu nie je odosielanie limitované veľkosťou jednej HTTP požiadavky.
+ */
+export const uploadQuotePdfChunk = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { uploadId: string; index: number; chunkBase64: string }) => {
+    if (!d?.uploadId || !UUID_RE.test(d.uploadId)) throw new Error("Neplatné ID nahrávania");
+    if (!Number.isInteger(d.index) || d.index < 0 || d.index > 5000) throw new Error("Neplatný index");
+    if (typeof d.chunkBase64 !== "string" || !d.chunkBase64.length) throw new Error("Prázdny blok");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    await requireAdminOrManager(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const path = `tmp/${data.uploadId}/${String(data.index).padStart(5, "0")}.part`;
+    const { error } = await supabaseAdmin.storage
+      .from("quote-pdfs")
+      .upload(path, new Blob([data.chunkBase64], { type: "text/plain" }), { upsert: true });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 /** Send quote email to client, optionally with PDF attachment (base64). */
 export const sendQuoteEmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -138,6 +161,8 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
     pdfBase64?: string | null;
     pdfFilename?: string | null;
     publicUrl?: string | null;
+    pdfUploadId?: string | null;
+    pdfChunkCount?: number | null;
   }) => {
     if (!d?.quoteId || !UUID_RE.test(d.quoteId)) throw new Error("Neplatné ID kalkulácie");
     return d;
@@ -214,10 +239,26 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
       ${signatureHtml}
     </div>`;
 
-    const attachments = data.pdfBase64
+    // Ak bola príloha nahraná po častiach, poskladaj ju späť.
+    let pdfBase64 = data.pdfBase64 ?? null;
+    if (!pdfBase64 && data.pdfUploadId && data.pdfChunkCount) {
+      const parts: string[] = [];
+      for (let i = 0; i < data.pdfChunkCount; i++) {
+        const path = `tmp/${data.pdfUploadId}/${String(i).padStart(5, "0")}.part`;
+        const { data: blob, error: dlErr } = await supabaseAdmin.storage.from("quote-pdfs").download(path);
+        if (dlErr || !blob) throw new Error("Prílohu sa nepodarilo načítať");
+        parts.push(await blob.text());
+      }
+      pdfBase64 = parts.join("");
+      await supabaseAdmin.storage.from("quote-pdfs").remove(
+        Array.from({ length: data.pdfChunkCount }, (_, i) => `tmp/${data.pdfUploadId}/${String(i).padStart(5, "0")}.part`),
+      );
+    }
+
+    const attachments = pdfBase64
       ? [{
           filename: data.pdfFilename || `ponuka-${(q as any).quote_number}.pdf`,
-          content: data.pdfBase64,
+          content: pdfBase64,
           content_type: "application/pdf",
         }]
       : undefined;

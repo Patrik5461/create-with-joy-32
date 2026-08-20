@@ -25,7 +25,7 @@ import { QuoteForm } from "@/components/quote-form";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, type QuoteLine } from "@/lib/quote-utils";
 import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow } from "@/lib/quote-reservation-link";
 import { useServerFn } from "@tanstack/react-start";
-import { sendQuoteEmail } from "@/lib/email.functions";
+import { sendQuoteEmail, uploadQuotePdfChunk } from "@/lib/email.functions";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
@@ -43,6 +43,7 @@ function QuoteDetail() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [confirmSendOpen, setConfirmSendOpen] = useState(false);
   const sendQuoteFn = useServerFn(sendQuoteEmail);
+  const uploadChunkFn = useServerFn(uploadQuotePdfChunk);
   const printRef = useRef<HTMLDivElement | null>(null);
 
   const quote = useQuery({
@@ -272,14 +273,21 @@ function QuoteDetail() {
       const { base64, filename } = await renderElementToPdfBase64(el, {
         filename: `ponuka-${q.quote_number}.pdf`,
       });
-      await sendQuoteFn({
-        data: {
-          quoteId: q.id,
-          to,
-          pdfBase64: base64,
-          pdfFilename: filename,
-        },
-      });
+      // Prílohu posielame po častiach, aby nebola obmedzená veľkosť PDF.
+      const CHUNK = 600_000;
+      if (base64.length <= CHUNK) {
+        await sendQuoteFn({ data: { quoteId: q.id, to, pdfBase64: base64, pdfFilename: filename } });
+      } else {
+        const uploadId = crypto.randomUUID();
+        const chunks: string[] = [];
+        for (let i = 0; i < base64.length; i += CHUNK) chunks.push(base64.slice(i, i + CHUNK));
+        for (let i = 0; i < chunks.length; i++) {
+          await uploadChunkFn({ data: { uploadId, index: i, chunkBase64: chunks[i] } });
+        }
+        await sendQuoteFn({
+          data: { quoteId: q.id, to, pdfFilename: filename, pdfUploadId: uploadId, pdfChunkCount: chunks.length },
+        });
+      }
       toast.success(`Ponuka odoslaná na ${to}`);
       qc.invalidateQueries({ queryKey: ["quote", id] });
     } catch (err: any) {

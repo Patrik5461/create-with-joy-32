@@ -84,7 +84,7 @@ export async function renderElementToPdfBase64(
   let cutOffsetsPx: number[] = [];
   try {
     canvas = await html2canvas(el, {
-      scale: 1.6,
+      scale: 2,
       backgroundColor: "#ffffff",
       useCORS: true,
       logging: false,
@@ -156,15 +156,7 @@ export async function renderElementToPdfBase64(
     return dataUri.split(",")[1] ?? "";
   };
 
-  // Príloha musí prejsť cez HTTP request limit (nginx / Resend ~ 3 MB base64).
-  const MAX_B64 = 2_600_000;
-  let base64 = "";
-  for (const quality of [0.82, 0.68, 0.55, 0.42]) {
-    base64 = build(quality);
-    if (base64.length <= MAX_B64) break;
-  }
-  if (base64.length > MAX_B64) {
-    throw new Error("PDF je príliš veľké na odoslanie emailom. Skúste skrátiť poznámky alebo počet položiek.");
-  }
+  // Bez limitu veľkosti – príloha sa odosiela po častiach.
+  const base64 = build(0.92);
   return { base64, filename: opts.filename };
 }
