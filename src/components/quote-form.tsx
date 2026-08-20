@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { checkAvailability } from "@/lib/availability";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -192,15 +193,27 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
     },
   });
 
-  const [availability, setAvailability] = useState<Record<string, { qty: number; available: number }>>({});
+  const [availability, setAvailability] = useState<Record<string, { qty: number; available: number; quoteHold?: number }>>({});
+
+  const ownQuoteGroupId: string | null =
+    (initial as any)?.quote_group_id ?? versionParent?.quote_group_id ?? null;
 
   useEffect(() => {
     const win = reservationWindow.data;
-    if (!win?.load_at || !win?.available_from_at) {
-      // Fallback: no reservation linked → check against physical stock (total − damaged − retired).
+    // Okno dostupnosti: buď z prepojenej rezervácie, alebo z dátumov kalkulácie.
+    const evStart = form.event_date ? new Date(form.event_date + "T00:00:00").toISOString() : null;
+    const evEnd = form.event_date
+      ? new Date(new Date(form.event_date + "T00:00:00").getTime() + 24 * 3600 * 1000).toISOString()
+      : null;
+    const fromIso = win?.load_at ?? form.installation_date ?? form.event_start_at ?? evStart;
+    const toIso = win?.available_from_at ?? form.dismantling_date ?? form.event_end_at ?? evEnd;
+
+    const furnitureLines = lines.filter((l) => l.kind === "furniture" && l.furniture_item_id);
+
+    if (!fromIso || !toIso) {
+      // Bez dátumov → aspoň fyzický stav skladu.
       const results: Record<string, { qty: number; available: number }> = {};
-      for (const l of lines) {
-        if (l.kind !== "furniture" || !l.furniture_item_id) continue;
+      for (const l of furnitureLines) {
         const f: any = furniture.data?.find((x: any) => x.id === l.furniture_item_id);
         if (!f) continue;
         const available = Math.max(0, (f.total_qty ?? 0) - (f.damaged_qty ?? 0) - (f.retired_qty ?? 0));
@@ -209,28 +222,24 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
       setAvailability(results);
       return;
     }
+
     let cancelled = false;
     (async () => {
-      const results: Record<string, { qty: number; available: number }> = {};
-      await Promise.all(
-        lines
-          .filter((l) => l.kind === "furniture" && l.furniture_item_id)
-          .map(async (l) => {
-            const { data, error } = await supabase.rpc("check_item_availability", {
-              _item_id: l.furniture_item_id!,
-              _from: win.load_at,
-              _to: win.available_from_at,
-              _exclude_reservation: win.id,
-            });
-            if (!error && data?.[0]) {
-              results[l.id] = { qty: l.qty, available: data[0].available };
-            }
-          }),
+      const map = await checkAvailability(
+        furnitureLines.map((l) => l.furniture_item_id!),
+        fromIso,
+        toIso,
+        { excludeReservationId: win?.id ?? null, excludeQuoteGroupId: ownQuoteGroupId },
       );
+      const results: Record<string, { qty: number; available: number; quoteHold?: number }> = {};
+      for (const l of furnitureLines) {
+        const a = map[l.furniture_item_id!];
+        if (a) results[l.id] = { qty: l.qty, available: a.available, quoteHold: a.quoteHold };
+      }
       if (!cancelled) setAvailability(results);
     })();
     return () => { cancelled = true; };
-  }, [reservationWindow.data, lines, furniture.data]);
+  }, [reservationWindow.data, lines, furniture.data, form.installation_date, form.dismantling_date, form.event_start_at, form.event_end_at, form.event_date, ownQuoteGroupId]);
 
   const overbookLines = lines.filter((l) => {
     const a = availability[l.id];
@@ -647,7 +656,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
               <div>
                 <div className="font-medium">Prekročená skladová dostupnosť</div>
                 <div className="text-xs">
-                  Niektoré položky prekračujú počet voľných kusov v termíne prepojenej rezervácie. Kalkuláciu je možné uložiť, ale kusy bude potrebné dokúpiť alebo dopožičať.
+                  Niektoré položky prekračujú počet voľných kusov v danom termíne (vrátane kusov blokovaných inými nepotvrdenými kalkuláciami). Kalkuláciu je možné uložiť, ale kusy bude potrebné dokúpiť alebo dopožičať.
                 </div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { checkAvailability } from "@/lib/availability";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -174,21 +175,21 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
     if (!form.load_at || !form.available_from_at) return;
     const fromIso = fromLocalInput(form.load_at);
     const toIso = fromLocalInput(form.available_from_at);
-    items.forEach(async (row, idx) => {
-      if (!row.furniture_item_id) return;
-      setItems((prev) => prev.map((p, i) => i === idx ? { ...p, loading: true } : p));
-      const { data, error } = await supabase.rpc("check_item_availability", {
-        _item_id: row.furniture_item_id,
-        _from: fromIso!,
-        _to: toIso!,
-        _exclude_reservation: existingId ?? undefined,
-      });
-      if (!error && data && data[0]) {
-        setItems((prev) => prev.map((p, i) => i === idx ? { ...p, loading: false, availability: { total: data[0].total, available: data[0].available, reserved: data[0].reserved } } : p));
-      } else {
-        setItems((prev) => prev.map((p, i) => i === idx ? { ...p, loading: false } : p));
-      }
-    });
+    (async () => {
+      const ids = items.map((i) => i.furniture_item_id).filter(Boolean) as string[];
+      if (ids.length === 0) return;
+      setItems((prev) => prev.map((p) => (p.furniture_item_id ? { ...p, loading: true } : p)));
+      const map = await checkAvailability(ids, fromIso!, toIso!, { excludeReservationId: existingId ?? null });
+      setItems((prev) =>
+        prev.map((p) => {
+          if (!p.furniture_item_id) return p;
+          const a = map[p.furniture_item_id];
+          return a
+            ? { ...p, loading: false, availability: { total: a.total, available: a.available, reserved: a.reserved } }
+            : { ...p, loading: false };
+        }),
+      );
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.load_at, form.available_from_at, items.map((i) => i.furniture_item_id).join(",")]);
 
