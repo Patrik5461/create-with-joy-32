@@ -416,9 +416,25 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         if (error) throw error;
         id = data.id;
       } else {
+        // Číslovanie bez preskakovania: použije sa najbližšie voľné číslo v roku
+        // (vymazané kalkulácie svoje číslo uvoľnia).
+        const yr = new Date().getFullYear().toString();
+        const { data: existing } = await supabase
+          .from("quotes")
+          .select("quote_number")
+          .is("deleted_at", null)
+          .like("quote_number", `Q${yr}-%`);
+        const used = new Set<number>(
+          (existing ?? [])
+            .map((r: any) => parseInt(String(r.quote_number).slice(yr.length + 2), 10))
+            .filter((n: number) => Number.isFinite(n)),
+        );
+        let next = 1;
+        while (used.has(next)) next++;
+        const nextNumber = `Q${yr}-${String(next).padStart(4, "0")}`;
         const { data, error } = await supabase.from("quotes").insert({
           ...basePayload,
-          quote_number: "",
+          quote_number: nextNumber,
           is_current: true,
           version_number: 1,
           created_by: createdBy,
