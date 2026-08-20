@@ -418,6 +418,7 @@ function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet, staf
   const days: Date[] = [];
   let d = gridStart;
   while (d <= gridEnd) { days.push(d); d = addDays(d, 1); }
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="grid grid-cols-7 bg-muted text-xs font-medium">
@@ -427,6 +428,9 @@ function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet, staf
         {days.map((day) => {
           const list = occurrences.filter((o) => isSameDay(o.date, day));
           const isOtherMonth = !isSameMonth(day, cursor);
+          const dayKey = format(day, "yyyy-MM-dd");
+          const expanded = !!expandedDays[dayKey];
+          const visible = expanded ? list : list.slice(0, 3);
           return (
             <div
               key={day.toISOString()}
@@ -438,7 +442,7 @@ function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet, staf
               className={`min-h-24 p-1.5 border-b border-r text-[11px] ${isOtherMonth ? "bg-muted/30 text-muted-foreground" : ""} ${canCreate ? "cursor-pointer hover:bg-muted/40" : ""}`}
             >
               <div className="font-semibold mb-1">{format(day, "d")}</div>
-              {list.slice(0, 3).map((o) => {
+              {visible.map((o) => {
                 const staff = staffByRes.get(o.r.id) ?? [];
                 const hasConflict = conflictResIds.has(o.r.id);
                 return (
@@ -467,7 +471,15 @@ function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet, staf
                   </div>
                 );
               })}
-              {list.length > 3 && <div className="text-muted-foreground">+{list.length - 3}</div>}
+              {list.length > 3 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedDays((p) => ({ ...p, [dayKey]: !expanded })); }}
+                  className="text-muted-foreground underline hover:text-foreground"
+                >
+                  {expanded ? "− menej" : `+${list.length - 3} ďalších`}
+                </button>
+              )}
             </div>
           );
         })}
