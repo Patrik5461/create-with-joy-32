@@ -243,17 +243,21 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
 
     // Ak bola príloha nahraná po častiach, poskladaj ju späť.
     let pdfBase64 = data.pdfBase64 ?? null;
+    let pdfRemoteUrl: string | null = null;
+    let uploadedPdfPath: string | null = null;
     if (!pdfBase64 && data.pdfStoragePath) {
       const expectedPrefix = `tmp/${data.quoteId}/`;
       if (!data.pdfStoragePath.startsWith(expectedPrefix) || !data.pdfStoragePath.endsWith(".pdf")) {
         throw new Error("Neplatná cesta PDF prílohy");
       }
-      const { data: blob, error: downloadError } = await supabaseAdmin.storage
+      const { data: signedDownload, error: signedDownloadError } = await supabaseAdmin.storage
         .from("quote-pdfs")
-        .download(data.pdfStoragePath);
-      if (downloadError || !blob) throw new Error(downloadError?.message || "Prílohu sa nepodarilo načítať");
-      pdfBase64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
-      await supabaseAdmin.storage.from("quote-pdfs").remove([data.pdfStoragePath]);
+        .createSignedUrl(data.pdfStoragePath, 600);
+      if (signedDownloadError || !signedDownload?.signedUrl) {
+        throw new Error(signedDownloadError?.message || "Prílohu sa nepodarilo sprístupniť");
+      }
+      pdfRemoteUrl = signedDownload.signedUrl;
+      uploadedPdfPath = data.pdfStoragePath;
     }
     if (!pdfBase64 && data.pdfUploadId && data.pdfChunkCount) {
       const parts: string[] = [];
@@ -269,7 +273,12 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
       );
     }
 
-    const attachments = pdfBase64
+    const attachments = pdfRemoteUrl
+      ? [{
+          filename: data.pdfFilename || `ponuka-${(q as any).quote_number}.pdf`,
+          path: pdfRemoteUrl,
+        }]
+      : pdfBase64
       ? [{
           filename: data.pdfFilename || `ponuka-${(q as any).quote_number}.pdf`,
           content: pdfBase64,
@@ -286,6 +295,11 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
       attachments,
       tags: [{ name: "kind", value: "quote" }, { name: "quote_id", value: (q as any).id }],
     });
+
+    if (uploadedPdfPath) {
+      const { error: cleanupError } = await supabaseAdmin.storage.from("quote-pdfs").remove([uploadedPdfPath]);
+      if (cleanupError) console.error("[quote-email] PDF cleanup failed", cleanupError.message);
+    }
 
     await supabaseAdmin.from("email_send_log").insert({
       kind: "quote",
