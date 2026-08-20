@@ -133,6 +133,25 @@ export const uploadQuotePdfChunk = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Create a short-lived direct upload target so the PDF never crosses the app proxy. */
+export const createQuotePdfUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { quoteId: string; uploadId: string }) => {
+    if (!d?.quoteId || !UUID_RE.test(d.quoteId)) throw new Error("Neplatné ID kalkulácie");
+    if (!d?.uploadId || !UUID_RE.test(d.uploadId)) throw new Error("Neplatné ID nahrávania");
+    return d;
+  })
+  .handler(async ({ data, context }) => {
+    await requireAdminOrManager(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const path = `tmp/${data.quoteId}/${data.uploadId}.pdf`;
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from("quote-pdfs")
+      .createSignedUploadUrl(path, { upsert: true });
+    if (error || !signed) throw new Error(error?.message || "Nepodarilo sa pripraviť nahrávanie PDF");
+    return { path, token: signed.token };
+  });
+
 /** Send quote email to client, optionally with PDF attachment (base64). */
 export const sendQuoteEmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -145,6 +164,7 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
     publicUrl?: string | null;
     pdfUploadId?: string | null;
     pdfChunkCount?: number | null;
+    pdfStoragePath?: string | null;
   }) => {
     if (!d?.quoteId || !UUID_RE.test(d.quoteId)) throw new Error("Neplatné ID kalkulácie");
     return d;
@@ -223,6 +243,18 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
 
     // Ak bola príloha nahraná po častiach, poskladaj ju späť.
     let pdfBase64 = data.pdfBase64 ?? null;
+    if (!pdfBase64 && data.pdfStoragePath) {
+      const expectedPrefix = `tmp/${data.quoteId}/`;
+      if (!data.pdfStoragePath.startsWith(expectedPrefix) || !data.pdfStoragePath.endsWith(".pdf")) {
+        throw new Error("Neplatná cesta PDF prílohy");
+      }
+      const { data: blob, error: downloadError } = await supabaseAdmin.storage
+        .from("quote-pdfs")
+        .download(data.pdfStoragePath);
+      if (downloadError || !blob) throw new Error(downloadError?.message || "Prílohu sa nepodarilo načítať");
+      pdfBase64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
+      await supabaseAdmin.storage.from("quote-pdfs").remove([data.pdfStoragePath]);
+    }
     if (!pdfBase64 && data.pdfUploadId && data.pdfChunkCount) {
       const parts: string[] = [];
       for (let i = 0; i < data.pdfChunkCount; i++) {
