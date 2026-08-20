@@ -365,27 +365,39 @@ function ReservationCard({ o, overbooked, staff, conflict, onOpenStaff }: { o: O
 }
 
 function DayList({ day, occurrences, onSlot, canCreate, overbookedSet, staffByRes, conflictResIds, onOpenStaff }: { day: Date; occurrences: Occurrence[]; onSlot: (d: Date, h?: number) => void; canCreate: boolean; overbookedSet: Set<string>; staffByRes: Map<string, StaffLite[]>; conflictResIds: Set<string>; onOpenStaff: (id: string) => void }) {
-  const list = occurrences.filter((o) => isSameDay(o.date, day));
-  const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 7..20
+  const list = useMemo(
+    () => occurrences.filter((o) => isSameDay(o.date, day)).sort((a, b) => a.date.getTime() - b.date.getTime()),
+    [occurrences, day]
+  );
   return (
-    <div className="rounded-lg border bg-card divide-y">
-      {hours.map((h) => {
-        const slotItems = list.filter((o) => o.date.getHours() === h);
-        return (
-          <div key={h} className="grid grid-cols-[60px_1fr] min-h-14">
-            <div className="text-xs text-muted-foreground p-2 border-r">{String(h).padStart(2, "0")}:00</div>
-            <button
-              type="button"
-              onClick={() => canCreate && slotItems.length === 0 && onSlot(day, h)}
-              className={`text-left p-1.5 space-y-1 ${canCreate && slotItems.length === 0 ? "hover:bg-muted/40 cursor-pointer" : ""}`}
-            >
-              {slotItems.length === 0 ? (
-                canCreate && <span className="text-[11px] text-muted-foreground/50">+ Nová rezervácia</span>
-              ) : slotItems.map((o) => <ReservationCard key={o.key} o={o} overbooked={overbookedSet.has(o.r.id)} staff={staffByRes.get(o.r.id) ?? []} conflict={conflictResIds.has(o.r.id)} onOpenStaff={onOpenStaff} />)}
-            </button>
-          </div>
-        );
-      })}
+    <div className="rounded-lg border bg-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium text-muted-foreground uppercase">
+          {format(day, "EEEE d. MMMM yyyy", { locale: sk })}
+        </div>
+        {canCreate && (
+          <Button variant="outline" size="sm" onClick={() => onSlot(day)}>
+            <Plus className="size-4 mr-1" />
+            Nová rezervácia
+          </Button>
+        )}
+      </div>
+      {list.length === 0 ? (
+        <div className="text-sm text-muted-foreground py-8 text-center">Tento deň nemá žiadne rezervácie.</div>
+      ) : (
+        <div className="space-y-3">
+          {list.map((o) => (
+            <ReservationCard
+              key={o.key}
+              o={o}
+              overbooked={overbookedSet.has(o.r.id)}
+              staff={staffByRes.get(o.r.id) ?? []}
+              conflict={conflictResIds.has(o.r.id)}
+              onOpenStaff={onOpenStaff}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
