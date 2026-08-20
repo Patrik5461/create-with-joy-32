@@ -656,7 +656,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
               <div>
                 <div className="font-medium">Prekročená skladová dostupnosť</div>
                 <div className="text-xs">
-                  Niektoré položky prekračujú počet voľných kusov v termíne prepojenej rezervácie. Kalkuláciu je možné uložiť, ale kusy bude potrebné dokúpiť alebo dopožičať.
+                  Niektoré položky prekračujú počet voľných kusov v danom termíne (vrátane kusov blokovaných inými nepotvrdenými kalkuláciami). Kalkuláciu je možné uložiť, ale kusy bude potrebné dokúpiť alebo dopožičať.
                 </div>
               </div>
             </div>
