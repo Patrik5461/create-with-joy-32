@@ -66,20 +66,19 @@ function ReservationDetail() {
     queryFn: async () => {
       const r = reservation.data;
       const results: Record<string, { qty: number; available: number }> = {};
-      await Promise.all(
-        (r.reservation_items ?? []).map(async (ri: any) => {
-          const { data } = await supabase.rpc("check_item_availability", {
-            _item_id: ri.furniture_item_id,
-            _from: r.load_at,
-            _to: r.available_from_at,
-            _exclude_reservation: r.id,
-          });
-          const row = data?.[0];
-          if (row && ri.qty > row.available) {
-            results[ri.id] = { qty: ri.qty, available: row.available };
-          }
-        }),
+      const rows = (r.reservation_items ?? []) as any[];
+      const map = await checkAvailability(
+        rows.map((ri) => ri.furniture_item_id),
+        r.load_at,
+        r.available_from_at,
+        { excludeReservationId: r.id },
       );
+      for (const ri of rows) {
+        const row = map[ri.furniture_item_id];
+        if (row && ri.qty > row.available) {
+          results[ri.id] = { qty: ri.qty, available: row.available };
+        }
+      }
       return results;
     },
   });
