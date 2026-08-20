@@ -10,7 +10,9 @@
 export type EmailAttachment = {
   filename: string;
   /** base64-encoded súbor (bez data: prefixu) */
-  content: string;
+  content?: string;
+  /** Remote file URL. Resend fetches the attachment without a large JSON body. */
+  path?: string;
   content_type?: string;
 };
 
