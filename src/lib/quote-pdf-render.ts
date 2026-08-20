@@ -84,7 +84,7 @@ export async function renderElementToPdfBase64(
   let cutOffsetsPx: number[] = [];
   try {
     canvas = await html2canvas(el, {
-      scale: 1.6,
+      scale: 2,
       backgroundColor: "#ffffff",
       useCORS: true,
       logging: false,
