@@ -283,7 +283,12 @@ function QuoteDetail() {
       toast.success(`Ponuka odoslaná na ${to}`);
       qc.invalidateQueries({ queryKey: ["quote", id] });
     } catch (err: any) {
-      toast.error(err.message ?? "Odoslanie zlyhalo");
+      const msg = String(err?.message ?? "");
+      toast.error(
+        /500 Internal Server Error|<html|Unexpected token/i.test(msg)
+          ? "Odoslanie zlyhalo – príloha PDF bola pravdepodobne príliš veľká. Skúste to znova."
+          : msg || "Odoslanie zlyhalo",
+      );
     } finally {
       setSendingEmail(false);
     }
