@@ -84,7 +84,7 @@ export async function renderElementToPdfBase64(
   let cutOffsetsPx: number[] = [];
   try {
     canvas = await html2canvas(el, {
-      scale: 2,
+      scale: 1.6,
       backgroundColor: "#ffffff",
       useCORS: true,
       logging: false,
@@ -111,54 +111,60 @@ export async function renderElementToPdfBase64(
     el.className = prev.className;
   }
 
-  // A4 v mm
-  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  const pageWmm = pdf.internal.pageSize.getWidth();
-  const pageHmm = pdf.internal.pageSize.getHeight();
+  const build = (quality: number): string => {
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    const pageWmm = pdf.internal.pageSize.getWidth();
+    const pageHmm = pdf.internal.pageSize.getHeight();
+    const imgWmm = pageWmm;
+    const imgHmm = (canvas.height * imgWmm) / canvas.width;
 
-  const imgWmm = pageWmm;
-  const imgHmm = (canvas.height * imgWmm) / canvas.width;
-
-  // Ak sa obsah zmestí na 1 stránku, urob jednoduchý addImage.
-  if (imgHmm <= pageHmm) {
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-    pdf.addImage(dataUrl, "JPEG", 0, 0, imgWmm, imgHmm, undefined, "FAST");
-  } else {
-    // Rozdeľ canvas na A4 stránky.
-    const pageHpx = Math.floor((pageHmm * canvas.width) / pageWmm);
-    let offsetY = 0;
-    let pageIndex = 0;
-    while (offsetY < canvas.height) {
-      let sliceH = Math.min(pageHpx, canvas.height - offsetY);
-      // Ak nejde o poslednú stránku, posuň rez na najbližšiu bezpečnú hranicu.
-      if (offsetY + sliceH < canvas.height) {
-        const limit = offsetY + sliceH;
-        const minH = pageHpx * 0.55; // nedovoľ príliš krátku stranu
-        let best = 0;
-        for (const c of cutOffsetsPx) {
-          if (c > offsetY + minH && c <= limit) best = c;
-          if (c > limit) break;
+    if (imgHmm <= pageHmm) {
+      pdf.addImage(canvas.toDataURL("image/jpeg", quality), "JPEG", 0, 0, imgWmm, imgHmm, undefined, "FAST");
+    } else {
+      const pageHpx = Math.floor((pageHmm * canvas.width) / pageWmm);
+      let offsetY = 0;
+      let pageIndex = 0;
+      while (offsetY < canvas.height) {
+        let sliceH = Math.min(pageHpx, canvas.height - offsetY);
+        // Ak nejde o poslednú stránku, posuň rez na najbližšiu bezpečnú hranicu.
+        if (offsetY + sliceH < canvas.height) {
+          const limit = offsetY + sliceH;
+          const minH = pageHpx * 0.55;
+          let best = 0;
+          for (const c of cutOffsetsPx) {
+            if (c > offsetY + minH && c <= limit) best = c;
+            if (c > limit) break;
+          }
+          if (best > 0) sliceH = best - offsetY;
         }
-        if (best > 0) sliceH = best - offsetY;
+        const slice = document.createElement("canvas");
+        slice.width = canvas.width;
+        slice.height = sliceH;
+        const ctx = slice.getContext("2d");
+        if (!ctx) throw new Error("Canvas 2D kontext nedostupný");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, slice.width, slice.height);
+        ctx.drawImage(canvas, 0, offsetY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+        const sliceHmm = (sliceH * imgWmm) / canvas.width;
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(slice.toDataURL("image/jpeg", quality), "JPEG", 0, 0, imgWmm, sliceHmm, undefined, "FAST");
+        offsetY += sliceH;
+        pageIndex += 1;
       }
-      const slice = document.createElement("canvas");
-      slice.width = canvas.width;
-      slice.height = sliceH;
-      const ctx = slice.getContext("2d");
-      if (!ctx) throw new Error("Canvas 2D kontext nedostupný");
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, slice.width, slice.height);
-      ctx.drawImage(canvas, 0, offsetY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      const sliceHmm = (sliceH * imgWmm) / canvas.width;
-      const dataUrl = slice.toDataURL("image/jpeg", 0.92);
-      if (pageIndex > 0) pdf.addPage();
-      pdf.addImage(dataUrl, "JPEG", 0, 0, imgWmm, sliceHmm, undefined, "FAST");
-      offsetY += sliceH;
-      pageIndex += 1;
     }
-  }
+    const dataUri = pdf.output("datauristring");
+    return dataUri.split(",")[1] ?? "";
+  };
 
-  const dataUri = pdf.output("datauristring");
-  const base64 = dataUri.split(",")[1] ?? "";
+  // Príloha musí prejsť cez HTTP request limit (nginx / Resend ~ 3 MB base64).
+  const MAX_B64 = 2_600_000;
+  let base64 = "";
+  for (const quality of [0.82, 0.68, 0.55, 0.42]) {
+    base64 = build(quality);
+    if (base64.length <= MAX_B64) break;
+  }
+  if (base64.length > MAX_B64) {
+    throw new Error("PDF je príliš veľké na odoslanie emailom. Skúste skrátiť poznámky alebo počet položiek.");
+  }
   return { base64, filename: opts.filename };
 }
