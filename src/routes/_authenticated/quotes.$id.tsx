@@ -273,28 +273,31 @@ function QuoteDetail() {
       const { base64, filename } = await renderElementToPdfBase64(el, {
         filename: `ponuka-${q.quote_number}.pdf`,
       });
-      // Prílohu posielame po častiach, aby nebola obmedzená veľkosť PDF.
-      const CHUNK = 600_000;
-      if (base64.length <= CHUNK) {
-        await sendQuoteFn({ data: { quoteId: q.id, to, pdfBase64: base64, pdfFilename: filename } });
-      } else {
-        const uploadId = crypto.randomUUID();
-        const chunks: string[] = [];
-        for (let i = 0; i < base64.length; i += CHUNK) chunks.push(base64.slice(i, i + CHUNK));
-        for (let i = 0; i < chunks.length; i++) {
-          await uploadChunkFn({ data: { uploadId, index: i, chunkBase64: chunks[i] } });
-        }
-        await sendQuoteFn({
-          data: { quoteId: q.id, to, pdfFilename: filename, pdfUploadId: uploadId, pdfChunkCount: chunks.length },
+      // PDF posielame vždy po malých blokoch. Aj base64 a obálka serverovej
+      // funkcie zväčšujú request, preto musí byť každý blok bezpečne pod
+      // limitom reverzného proxy servera.
+      const CHUNK = 128_000;
+      const uploadId = crypto.randomUUID();
+      const chunkCount = Math.ceil(base64.length / CHUNK);
+      for (let index = 0; index < chunkCount; index++) {
+        await uploadChunkFn({
+          data: {
+            uploadId,
+            index,
+            chunkBase64: base64.slice(index * CHUNK, (index + 1) * CHUNK),
+          },
         });
       }
+      await sendQuoteFn({
+        data: { quoteId: q.id, to, pdfFilename: filename, pdfUploadId: uploadId, pdfChunkCount: chunkCount },
+      });
       toast.success(`Ponuka odoslaná na ${to}`);
       qc.invalidateQueries({ queryKey: ["quote", id] });
     } catch (err: any) {
       const msg = String(err?.message ?? "");
       toast.error(
         /500 Internal Server Error|<html|Unexpected token/i.test(msg)
-          ? "Odoslanie zlyhalo – príloha PDF bola pravdepodobne príliš veľká. Skúste to znova."
+          ? "Odoslanie zlyhalo na serveri. Skúste to znova; ak problém pretrváva, kontaktujte správcu."
           : msg || "Odoslanie zlyhalo",
       );
     } finally {
