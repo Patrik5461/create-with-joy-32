@@ -1,24 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function cleanEmail(v: unknown): string | null {
-  if (typeof v !== "string") return null;
-  const t = v.trim().toLowerCase();
-  return EMAIL_RE.test(t) ? t : null;
-}
-
-async function requireAdminOrManager(context: any): Promise<string[]> {
-  const { supabase, userId } = context;
-  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-  const roles = ((data ?? []) as any[]).map((r) => r.role as string);
-  if (!roles.some((r) => r === "admin" || r === "manager")) {
-    throw new Error("Forbidden");
-  }
-  return roles;
-}
+import { cleanEmail, requireAdminOrManager, UUID_RE } from "./email-functions-support";
 
 /** Get email settings (admin only). */
 export const getEmailSettings = createServerFn({ method: "GET" })
