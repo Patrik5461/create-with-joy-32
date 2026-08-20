@@ -81,6 +81,7 @@ export async function renderElementToPdfBase64(
   );
 
   let canvas: HTMLCanvasElement;
+  let cutOffsetsPx: number[] = [];
   try {
     canvas = await html2canvas(el, {
       scale: 2,
@@ -89,6 +90,22 @@ export async function renderElementToPdfBase64(
       logging: false,
       windowWidth: pageWidthPx,
     });
+
+    // Zbieraj bezpečné miesta na zalomenie strany (spodné hrany riadkov
+    // tabuliek a blokov), aby sa PDF nerozrezalo v strede riadku – rovnako
+    // ako pri tlači cez prehliadač.
+    const rootTop = el.getBoundingClientRect().top;
+    const scale = canvas.width / el.getBoundingClientRect().width;
+    const nodes = el.querySelectorAll<HTMLElement>(
+      "tr, thead, .print-avoid-break, p, h1, h2, h3, div > img",
+    );
+    const offsets = new Set<number>();
+    nodes.forEach((n) => {
+      const r = n.getBoundingClientRect();
+      if (r.height <= 0) return;
+      offsets.add(Math.round((r.bottom - rootTop) * scale));
+    });
+    cutOffsetsPx = Array.from(offsets).sort((a, b) => a - b);
   } finally {
     el.style.cssText = prev.cssText;
     el.className = prev.className;
@@ -112,7 +129,18 @@ export async function renderElementToPdfBase64(
     let offsetY = 0;
     let pageIndex = 0;
     while (offsetY < canvas.height) {
-      const sliceH = Math.min(pageHpx, canvas.height - offsetY);
+      let sliceH = Math.min(pageHpx, canvas.height - offsetY);
+      // Ak nejde o poslednú stránku, posuň rez na najbližšiu bezpečnú hranicu.
+      if (offsetY + sliceH < canvas.height) {
+        const limit = offsetY + sliceH;
+        const minH = pageHpx * 0.55; // nedovoľ príliš krátku stranu
+        let best = 0;
+        for (const c of cutOffsetsPx) {
+          if (c > offsetY + minH && c <= limit) best = c;
+          if (c > limit) break;
+        }
+        if (best > 0) sliceH = best - offsetY;
+      }
       const slice = document.createElement("canvas");
       slice.width = canvas.width;
       slice.height = sliceH;
