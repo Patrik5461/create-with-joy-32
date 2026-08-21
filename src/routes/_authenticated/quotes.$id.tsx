@@ -367,13 +367,13 @@ function QuoteDetail() {
       <div className="p-4 md:p-6 max-w-5xl space-y-4 print:hidden">
         <QuoteEditingWarning quoteId={q.quote_group_id} editing={false} />
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <QuotePresenceBadges quoteId={q.quote_group_id} editing={false} />
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-semibold tracking-tight">{q.quote_number}</h2>
             <Badge variant={q.is_current ? "default" : "outline"} className="font-mono">
               v{q.version_number}{q.is_current ? " · aktuálna" : " · staršia"}
             </Badge>
             <Badge variant={QUOTE_STATUS_VARIANT[q.status as keyof typeof QUOTE_STATUS_VARIANT]}>{QUOTE_STATUS_LABEL[q.status as keyof typeof QUOTE_STATUS_LABEL]}</Badge>
+            <QuotePresenceBadges quoteId={q.quote_group_id} editing={false} />
             {res && (
               isMismatched ? (
                 <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-800">
