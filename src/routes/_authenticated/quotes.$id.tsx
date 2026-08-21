@@ -27,6 +27,7 @@ import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote,
 import { useServerFn } from "@tanstack/react-start";
 import { createQuotePdfUpload, sendQuoteEmail } from "@/lib/email.functions";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
+import { QuoteEditingWarning, QuotePresenceBadges } from "@/components/quote-presence";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
   head: () => ({ meta: [{ title: "Kalkulácia · mima production CRM" }] }),
@@ -337,10 +338,13 @@ function QuoteDetail() {
       <>
         <AppHeader title={`Upraviť ${q.quote_number} → v${nextVersion}`} />
         <div className="p-4 md:p-6 max-w-5xl">
-          <div className="mb-3 flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Zrušiť úpravu</Button>
-            <div className="text-xs text-muted-foreground">
-              Úpravou sa vytvorí nová verzia <span className="font-semibold">v{nextVersion}</span>; verzia v{q.version_number} zostane zachovaná.
+          <div className="mb-3 space-y-2">
+            <QuoteEditingWarning quoteId={q.quote_group_id} editing />
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Zrušiť úpravu</Button>
+              <div className="text-xs text-muted-foreground">
+                Úpravou sa vytvorí nová verzia <span className="font-semibold">v{nextVersion}</span>; verzia v{q.version_number} zostane zachovaná.
+              </div>
             </div>
           </div>
           <QuoteForm
@@ -361,13 +365,15 @@ function QuoteDetail() {
     <>
       <AppHeader title={`Kalkulácia ${q.quote_number}`} />
       <div className="p-4 md:p-6 max-w-5xl space-y-4 print:hidden">
+        <QuoteEditingWarning quoteId={q.quote_group_id} editing={false} />
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-semibold tracking-tight">{q.quote_number}</h2>
             <Badge variant={q.is_current ? "default" : "outline"} className="font-mono">
               v{q.version_number}{q.is_current ? " · aktuálna" : " · staršia"}
             </Badge>
             <Badge variant={QUOTE_STATUS_VARIANT[q.status as keyof typeof QUOTE_STATUS_VARIANT]}>{QUOTE_STATUS_LABEL[q.status as keyof typeof QUOTE_STATUS_LABEL]}</Badge>
+            <QuotePresenceBadges quoteId={q.quote_group_id} editing={false} />
             {res && (
               isMismatched ? (
                 <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-800">
