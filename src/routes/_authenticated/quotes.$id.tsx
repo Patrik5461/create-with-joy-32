@@ -27,6 +27,7 @@ import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote,
 import { useServerFn } from "@tanstack/react-start";
 import { createQuotePdfUpload, sendQuoteEmail } from "@/lib/email.functions";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
+import { QuoteEditingWarning, QuotePresenceBadges } from "@/components/quote-presence";
 
 export const Route = createFileRoute("/_authenticated/quotes/$id")({
   head: () => ({ meta: [{ title: "Kalkulácia · mima production CRM" }] }),
