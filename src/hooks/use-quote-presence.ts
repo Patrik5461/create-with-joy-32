@@ -20,8 +20,10 @@ interface Entry {
   refs: number;
   viewers: QuoteViewer[];
   editing: boolean;
+  status: "connecting" | "connected" | "error";
   meta: { user_id: string; name: string };
   listeners: Set<(v: QuoteViewer[]) => void>;
+  statusListeners: Set<(status: Entry["status"]) => void>;
 }
 
 const registry = new Map<string, Entry>();
@@ -50,7 +52,16 @@ function acquire(quoteId: string, meta: { user_id: string; name: string }, editi
     const channel = supabase.channel(`quote-presence:${quoteId}`, {
       config: { presence: { key: meta.user_id } },
     });
-    entry = { channel, refs: 0, viewers: [], editing, meta, listeners: new Set() };
+    entry = {
+      channel,
+      refs: 0,
+      viewers: [],
+      editing,
+      status: "connecting",
+      meta,
+      listeners: new Set(),
+      statusListeners: new Set(),
+    };
     registry.set(quoteId, entry);
     const e = entry;
     channel
@@ -59,12 +70,17 @@ function acquire(quoteId: string, meta: { user_id: string; name: string }, editi
       .on("presence", { event: "leave" }, () => readState(e))
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
+          e.status = "connected";
+          e.statusListeners.forEach((fn) => fn(e.status));
           void channel.track({
             user_id: e.meta.user_id,
             name: e.meta.name,
             editing: e.editing,
             online_at: new Date().toISOString(),
           });
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          e.status = "error";
+          e.statusListeners.forEach((fn) => fn(e.status));
         }
       });
   }
@@ -85,16 +101,21 @@ function release(quoteId: string) {
 export function useQuotePresence(quoteId: string | undefined, editing: boolean) {
   const { data: user } = useCurrentUser();
   const [viewers, setViewers] = useState<QuoteViewer[]>([]);
+  const [connectionState, setConnectionState] = useState<"connecting" | "connected" | "error">("connecting");
   const name = user?.full_name ?? user?.email ?? "";
 
   useEffect(() => {
     if (!quoteId || !user?.id) return;
     const entry = acquire(quoteId, { user_id: user.id, name }, editing);
     const listener = (v: QuoteViewer[]) => setViewers(v);
+    const statusListener = (status: Entry["status"]) => setConnectionState(status);
     entry.listeners.add(listener);
+    entry.statusListeners.add(statusListener);
     setViewers(entry.viewers);
+    setConnectionState(entry.status);
     return () => {
       entry.listeners.delete(listener);
+      entry.statusListeners.delete(statusListener);
       release(quoteId);
     };
   }, [quoteId, user?.id, name]);
@@ -125,5 +146,6 @@ export function useQuotePresence(quoteId: string | undefined, editing: boolean) 
     others,
     othersEditing: others.filter((v) => v.editing),
     me: user,
+    connectionState,
   };
 }

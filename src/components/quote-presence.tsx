@@ -1,4 +1,4 @@
-import { Eye, Pencil } from "lucide-react";
+import { Eye, Loader2, Pencil, WifiOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuotePresence } from "@/hooks/use-quote-presence";
@@ -14,8 +14,25 @@ function initials(name: string) {
 
 /** Small badges showing everyone who currently has this quote open (incl. you). */
 export function QuotePresenceBadges({ quoteId, editing }: { quoteId?: string; editing: boolean }) {
-  const { viewers, me } = useQuotePresence(quoteId, editing);
-  if (viewers.length === 0) return null;
+  const { viewers, me, connectionState } = useQuotePresence(quoteId, editing);
+  if (!quoteId) return null;
+
+  if (viewers.length === 0) {
+    return (
+      <Badge variant="outline" className="gap-1.5 border-border bg-muted text-muted-foreground">
+        {connectionState === "error" ? (
+          <WifiOff className="size-3" />
+        ) : (
+          <Loader2 className={connectionState === "connecting" ? "size-3 animate-spin" : "size-3"} />
+        )}
+        {connectionState === "error"
+          ? "Sledovanie úprav nie je pripojené"
+          : editing
+            ? "Vy práve upravujete"
+            : "Sledovanie používateľov aktívne"}
+      </Badge>
+    );
+  }
 
   const sorted = [...viewers].sort((a, b) => (a.user_id === me?.id ? -1 : b.user_id === me?.id ? 1 : 0));
 

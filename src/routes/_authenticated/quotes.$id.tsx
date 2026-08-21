@@ -306,6 +306,7 @@ function QuoteDetail() {
   if (!quote.data) return <><AppHeader title="Kalkulácia" /><div className="p-6">Nenájdené.</div></>;
 
   const q = quote.data as any;
+  const presenceId = q.quote_group_id ?? q.id;
   const maxVersion = Math.max(q.version_number ?? 1, ...(versions.data?.map((v) => v.version_number) ?? [1]));
   const nextVersion = maxVersion + 1;
 
@@ -339,8 +340,8 @@ function QuoteDetail() {
         <AppHeader title={`Upraviť ${q.quote_number} → v${nextVersion}`} />
         <div className="p-4 md:p-6 max-w-5xl">
           <div className="mb-3 space-y-2">
-            <QuoteEditingWarning quoteId={q.quote_group_id} editing />
-            <QuotePresenceBadges quoteId={q.quote_group_id} editing />
+            <QuoteEditingWarning quoteId={presenceId} editing />
+            <QuotePresenceBadges quoteId={presenceId} editing />
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Zrušiť úpravu</Button>
               <div className="text-xs text-muted-foreground">
@@ -366,7 +367,7 @@ function QuoteDetail() {
     <>
       <AppHeader title={`Kalkulácia ${q.quote_number}`} />
       <div className="p-4 md:p-6 max-w-5xl space-y-4 print:hidden">
-        <QuoteEditingWarning quoteId={q.quote_group_id} editing={false} />
+        <QuoteEditingWarning quoteId={presenceId} editing={false} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-2xl font-semibold tracking-tight">{q.quote_number}</h2>
@@ -374,7 +375,7 @@ function QuoteDetail() {
               v{q.version_number}{q.is_current ? " · aktuálna" : " · staršia"}
             </Badge>
             <Badge variant={QUOTE_STATUS_VARIANT[q.status as keyof typeof QUOTE_STATUS_VARIANT]}>{QUOTE_STATUS_LABEL[q.status as keyof typeof QUOTE_STATUS_LABEL]}</Badge>
-            <QuotePresenceBadges quoteId={q.quote_group_id} editing={false} />
+            <QuotePresenceBadges quoteId={presenceId} editing={false} />
             {res && (
               isMismatched ? (
                 <Badge variant="outline" className="border-amber-400 bg-amber-50 text-amber-800">
