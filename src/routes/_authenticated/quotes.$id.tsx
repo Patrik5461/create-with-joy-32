@@ -365,7 +365,9 @@ function QuoteDetail() {
     <>
       <AppHeader title={`Kalkulácia ${q.quote_number}`} />
       <div className="p-4 md:p-6 max-w-5xl space-y-4 print:hidden">
+        <QuoteEditingWarning quoteId={q.quote_group_id} editing={false} />
         <div className="flex flex-wrap items-center justify-between gap-3">
+          <QuotePresenceBadges quoteId={q.quote_group_id} editing={false} />
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-semibold tracking-tight">{q.quote_number}</h2>
             <Badge variant={q.is_current ? "default" : "outline"} className="font-mono">
