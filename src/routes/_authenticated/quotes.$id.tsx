@@ -340,6 +340,7 @@ function QuoteDetail() {
         <div className="p-4 md:p-6 max-w-5xl">
           <div className="mb-3 space-y-2">
             <QuoteEditingWarning quoteId={q.quote_group_id} editing />
+            <QuotePresenceBadges quoteId={q.quote_group_id} editing />
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Zrušiť úpravu</Button>
               <div className="text-xs text-muted-foreground">

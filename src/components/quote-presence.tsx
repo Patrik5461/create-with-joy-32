@@ -12,29 +12,37 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-/** Small badges showing other users who currently have this quote open. */
+/** Small badges showing everyone who currently has this quote open (incl. you). */
 export function QuotePresenceBadges({ quoteId, editing }: { quoteId?: string; editing: boolean }) {
-  const { others } = useQuotePresence(quoteId, editing);
-  if (others.length === 0) return null;
+  const { viewers, me } = useQuotePresence(quoteId, editing);
+  if (viewers.length === 0) return null;
+
+  const sorted = [...viewers].sort((a, b) => (a.user_id === me?.id ? -1 : b.user_id === me?.id ? 1 : 0));
 
   return (
     <div className="flex flex-wrap items-center gap-1">
-      {others.map((v) => (
-        <Badge
-          key={v.key}
-          variant="outline"
-          className={
-            v.editing
-              ? "border-amber-400 bg-amber-50 text-amber-800 gap-1"
-              : "border-sky-400 bg-sky-50 text-sky-800 gap-1"
-          }
-          title={`${v.name} · ${v.editing ? "upravuje" : "pozerá"}`}
-        >
-          {v.editing ? <Pencil className="size-3" /> : <Eye className="size-3" />}
-          <span className="font-medium">{initials(v.name)}</span>
-          <span className="hidden sm:inline">{v.name}</span>
-        </Badge>
-      ))}
+      {sorted.map((v) => {
+        const isMe = v.user_id === me?.id;
+        const label = isMe ? "vy" : v.name;
+        return (
+          <Badge
+            key={v.key}
+            variant="outline"
+            className={
+              isMe
+                ? "border-muted-foreground/30 bg-muted text-muted-foreground gap-1"
+                : v.editing
+                  ? "border-amber-400 bg-amber-50 text-amber-800 gap-1"
+                  : "border-sky-400 bg-sky-50 text-sky-800 gap-1"
+            }
+            title={`${label} · ${v.editing ? "upravuje" : "pozerá"}`}
+          >
+            {v.editing ? <Pencil className="size-3" /> : <Eye className="size-3" />}
+            <span className="font-medium">{isMe ? "Vy" : initials(v.name)}</span>
+            {!isMe && <span className="hidden sm:inline">{v.name}</span>}
+          </Badge>
+        );
+      })}
     </div>
   );
 }
