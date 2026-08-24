@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
@@ -117,6 +117,34 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
     };
   })());
   const [lines, setLines] = useState<QuoteLine[]>(initial?.items ?? []);
+
+  // Predvolená poznámka pre klienta z Nastavenia → Firemné údaje. Dopĺňa sa
+  // iba do novej kalkulácie a iba raz — pri úprave alebo novej verzii sa
+  // preberá text uložený v kalkulácii, takže ručné zmeny sa neprepíšu.
+  const defaultNote = useQuery({
+    queryKey: ["default-quote-note"],
+    enabled: !initial,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_settings")
+        .select("default_quote_note")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.default_quote_note ?? null;
+    },
+  });
+
+  const defaultNoteApplied = useRef(false);
+  useEffect(() => {
+    if (initial || defaultNoteApplied.current) return;
+    const preset = defaultNote.data?.trim();
+    if (!preset) return;
+    defaultNoteApplied.current = true;
+    setForm((f) => (f.notes?.trim() ? f : { ...f, notes: preset }));
+  }, [initial, defaultNote.data]);
 
   const clients = useQuery({
     queryKey: ["clients-min"],
@@ -425,25 +453,13 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         if (error) throw error;
         id = data.id;
       } else {
-        // Číslovanie bez preskakovania: použije sa najbližšie voľné číslo v roku
-        // (vymazané kalkulácie svoje číslo uvoľnia).
-        const yr = new Date().getFullYear().toString();
-        const { data: existing } = await supabase
-          .from("quotes")
-          .select("quote_number")
-          .is("deleted_at", null)
-          .like("quote_number", `Q${yr}-%`);
-        const used = new Set<number>(
-          (existing ?? [])
-            .map((r: any) => parseInt(String(r.quote_number).slice(yr.length + 2), 10))
-            .filter((n: number) => Number.isFinite(n)),
-        );
-        let next = 1;
-        while (used.has(next)) next++;
-        const nextNumber = `Q${yr}-${String(next).padStart(4, "0")}`;
+        // Číslo prideľuje databáza (trigger assign_quote_number + sekvencia
+        // quotes_number_seq). Číslovanie tak vždy pokračuje ďalej a nikdy
+        // nepridelí rovnaké číslo dvakrát, ani keď dvaja ľudia vytvárajú
+        // kalkuláciu súčasne. Zmazané čísla sa zámerne NErecyklujú.
         const { data, error } = await supabase.from("quotes").insert({
           ...basePayload,
-          quote_number: nextNumber,
+          quote_number: "",
           is_current: true,
           version_number: 1,
           created_by: createdBy,
@@ -837,9 +853,20 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Poznámka</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Poznámka pre klienta</CardTitle>
+          <CardDescription>
+            Vytlačí sa do PDF ponuky pod položkami a klient ju uvidí. Predvyplní sa text
+            z Nastavenia → Firemné údaje — tu ho pokojne uprav alebo doplň pre konkrétnu akciu.
+          </CardDescription>
+        </CardHeader>
         <CardContent>
-          <Textarea rows={3} value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value || null })} placeholder="Interná alebo verejná poznámka ku kalkulácii" />
+          <Textarea
+            rows={12}
+            value={form.notes ?? ""}
+            onChange={(e) => setForm({ ...form, notes: e.target.value || null })}
+            placeholder="Napr. termín montáže dohodneme podľa harmonogramu miesta. Cena zahŕňa dopravu do 30 km."
+          />
         </CardContent>
       </Card>
 

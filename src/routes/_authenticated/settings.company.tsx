@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Building2 } from "lucide-react";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
@@ -25,6 +26,7 @@ type Form = {
   dic: string;
   ic_dph: string;
   iban: string;
+  default_quote_note: string;
 };
 
 const EMPTY: Form = {
@@ -37,6 +39,7 @@ const EMPTY: Form = {
   dic: "",
   ic_dph: "",
   iban: "",
+  default_quote_note: "",
 };
 
 function CompanySettings() {
@@ -67,6 +70,7 @@ function CompanySettings() {
           dic: data.dic ?? "",
           ic_dph: data.ic_dph ?? "",
           iban: data.iban ?? "",
+          default_quote_note: data.default_quote_note ?? "",
         });
       }
       setLoading(false);
@@ -88,6 +92,7 @@ function CompanySettings() {
         dic: form.dic || null,
         ic_dph: form.ic_dph || null,
         iban: form.iban || null,
+        default_quote_note: form.default_quote_note.trim() || null,
       };
       if (form.id) {
         const { error } = await supabase.from("company_settings").update(payload).eq("id", form.id);
@@ -135,6 +140,21 @@ function CompanySettings() {
           <div className="space-y-1.5"><Label>Telefón</Label><Input value={form.phone} disabled={!canEdit} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} disabled={!canEdit} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div className="space-y-1.5 sm:col-span-2"><Label>IBAN</Label><Input value={form.iban} disabled={!canEdit} onChange={(e) => setForm({ ...form, iban: e.target.value })} /></div>
+          <div className="space-y-1.5 sm:col-span-2 border-t pt-4">
+            <Label>Predvolená poznámka v kalkulácii</Label>
+            <p className="text-xs text-muted-foreground">
+              Predvyplní sa do každej novej kalkulácie a vytlačí sa do PDF ponuky pod položkami — klient ju uvidí.
+              Pri konkrétnej ponuke sa dá prepísať; zmena tu ovplyvní len novo vytvorené kalkulácie, staré zostanú, ako boli.
+            </p>
+            <Textarea
+              rows={12}
+              className="font-mono text-xs leading-relaxed"
+              value={form.default_quote_note}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, default_quote_note: e.target.value })}
+              placeholder="Napr. platobné a storno podmienky."
+            />
+          </div>
           <div className="sm:col-span-2">
             <Button type="submit" disabled={!canEdit || saving}>
               {saving && <Loader2 className="size-4 animate-spin mr-1" />}Uložiť

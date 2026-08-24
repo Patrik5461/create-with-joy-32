@@ -30,3 +30,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Zálohy databázy — obsahujú osobné údaje klientov, ics_token a pin_hash
+mima-backups/
+*.dump
+*-schema.sql
+*-data.sql
+
+# Supabase CLI
+supabase/.temp/
+
+# Tajomstva - NIKDY necommitovat (nahrada je .env.example)
+.env
+.env.local
+
+# Zaloha buildu z rucneho deployu
+.output.bak/

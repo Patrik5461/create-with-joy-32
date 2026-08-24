@@ -66,6 +66,15 @@ function ReservationDetail() {
     queryFn: async () => {
       const r = reservation.data;
       const results: Record<string, { qty: number; available: number }> = {};
+
+      // Skladovú kontrolu robíme len na akciách, ktoré ešte len budú alebo práve
+      // bežia. Na skončených hlásila nedostatok spätne: check_item_availability
+      // berie dnešný počet poškodených a vyradených kusov aj na okno v minulosti,
+      // takže poškodenie dopísané po akcii vyrobilo upozornenie na hotovej
+      // rezervácii, s ktorým sa už nedalo nič urobiť.
+      const endsAt = r.available_from_at ? new Date(r.available_from_at).getTime() : NaN;
+      if (!Number.isNaN(endsAt) && endsAt < Date.now()) return results;
+
       const rows = (r.reservation_items ?? []) as any[];
       const map = await checkAvailability(
         rows.map((ri) => ri.furniture_item_id),

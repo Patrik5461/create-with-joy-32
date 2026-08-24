@@ -21,29 +21,19 @@ function CalendarSettings() {
   const { data, isLoading } = useQuery({
     queryKey: ["my-ics-token"],
     queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw new Error("Nie ste prihlásený");
-      const { data: p, error } = await supabase
-        .from("profiles")
-        .select("ics_token")
-        .eq("id", u.user.id)
-        .maybeSingle();
+      // ics_token nie je pre `authenticated` čitateľný stĺpcovým grantom —
+      // vlastný token vydáva iba táto SECURITY DEFINER funkcia.
+      const { data, error } = await supabase.rpc("get_my_ics_token");
       if (error) throw error;
-      return { token: (p as { ics_token: string } | null)?.ics_token ?? null };
+      return { token: data ?? null };
     },
   });
 
   const rotate = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw new Error("Nie ste prihlásený");
-      const newToken = crypto.randomUUID();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ ics_token: newToken } as never)
-        .eq("id", u.user.id);
+      const { data, error } = await supabase.rpc("rotate_my_ics_token");
       if (error) throw error;
-      return newToken;
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-ics-token"] });
