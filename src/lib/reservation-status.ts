@@ -42,7 +42,7 @@ export const STATUS_BADGE_VARIANT: Record<ReservationStatus, "default" | "second
 // Tailwind utility classes for calendar event blocks (bg + text + border).
 export const STATUS_COLOR: Record<ReservationStatus, string> = {
   inquiry: "bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200",
-  quote: "bg-sky-100 text-sky-900 border-sky-300 hover:bg-sky-200",
+  quote: "bg-orange-100 text-orange-900 border-orange-300 hover:bg-orange-200",
   confirmed: "bg-emerald-100 text-emerald-900 border-emerald-300 hover:bg-emerald-200",
   in_progress: "bg-blue-100 text-blue-900 border-blue-300 hover:bg-blue-200",
   returned: "bg-violet-100 text-violet-900 border-violet-300 hover:bg-violet-200",
@@ -53,13 +53,25 @@ export const STATUS_COLOR: Record<ReservationStatus, string> = {
 // Solid color tokens for stepper dots / progress bars.
 export const STATUS_DOT: Record<ReservationStatus, string> = {
   inquiry: "bg-amber-500",
-  quote: "bg-sky-500",
+  quote: "bg-orange-500",
   confirmed: "bg-emerald-500",
   in_progress: "bg-blue-500",
   returned: "bg-violet-500",
   invoiced: "bg-emerald-600",
   cancelled: "bg-rose-500",
 };
+
+/** Vysvetlivky farieb pre legendu pod kalendárom. Poradie kopíruje priebeh
+ *  eventu; `cancelled` je nakoniec, lebo nie je súčasťou toku. */
+export const STATUS_LEGEND: { status: ReservationStatus; hint: string }[] = [
+  { status: "inquiry", hint: "ešte nie je cenová ponuka" },
+  { status: "quote", hint: "čaká na schválenie klientom" },
+  { status: "confirmed", hint: "klient schválil, termín je istý" },
+  { status: "in_progress", hint: "nábytok je vyvezený" },
+  { status: "returned", hint: "nábytok sa vrátil" },
+  { status: "invoiced", hint: "vystavená faktúra" },
+  { status: "cancelled", hint: "rezervácia zrušená" },
+];
 
 export function nextStatus(s: ReservationStatus): ReservationStatus | null {
   if (s === "cancelled") return null;
