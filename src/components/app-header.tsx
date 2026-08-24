@@ -50,7 +50,7 @@ export function AppHeader({ title, backTo }: { title: string; backTo?: string })
           size="icon"
           className="size-9 shrink-0"
           aria-label="Naspäť"
-          onClick={() => navigate({ to: backTo })}
+          onClick={() => navigate({ to: backTo as any })}
         >
           <ArrowLeft className="size-5" />
         </Button>
