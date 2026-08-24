@@ -122,12 +122,12 @@ export async function syncReservationFromQuote(
   //    the CRM calendar and the ICS feed reflect edits made on the quote.
   const { data: q, error: eQ } = await supabase
     .from("quotes")
-    .select("event_start_at, event_end_at, event_date, installation_date, dismantling_date")
+    .select("event_start_at, event_end_at, event_date, installation_date, dismantling_date, venue, address")
     .eq("id", quoteId)
     .maybeSingle();
   if (eQ) throw eQ;
   if (q) {
-    const patch = buildReservationDatesPatch(q as any);
+    const patch = buildReservationPatch(q as QuoteSyncSource);
     if (Object.keys(patch).length > 0) {
       const { error: eUpd } = await supabase
         .from("reservations")
@@ -146,15 +146,23 @@ function dateAt(date: string, hh: number, mm = 0): string {
   return new Date(y, (m ?? 1) - 1, d ?? 1, hh, mm, 0, 0).toISOString();
 }
 
-/** Compute reservation date fields from a quote row. Only fields the quote
- *  actually specifies are returned so we never blank out manual overrides. */
-export function buildReservationDatesPatch(q: {
+export type QuoteSyncSource = {
   event_start_at: string | null;
   event_end_at: string | null;
   event_date: string | null;
   installation_date: string | null;
   dismantling_date: string | null;
-}): Record<string, string> {
+  venue?: string | null;
+  address?: string | null;
+};
+
+/** Compute reservation fields from a quote row. Only fields the quote
+ *  actually specifies are returned so we never blank out manual overrides.
+ *
+ *  Toto je jediný zdroj pravdy pre mapovanie kalkulácia → rezervácia. Číta z
+ *  neho `syncReservationFromQuote` (čo zapíše) aj `computeFieldsDiff` (čo
+ *  indikátor ohlási) — inak sa tie dve vetvy rozídu, ako sa už raz stalo. */
+export function buildReservationPatch(q: QuoteSyncSource): Record<string, string> {
   const patch: Record<string, string> = {};
 
   // event window
@@ -176,7 +184,65 @@ export function buildReservationDatesPatch(q: {
     patch.available_from_at = nextDay.toISOString();
   }
 
+  // Miesto konania — doteraz sa neprenášalo vôbec, takže rezervácie vznikali
+  // bez lokality a ICS feed mal prázdne LOCATION.
+  const venue = q.venue?.trim();
+  if (venue) patch.venue = venue;
+  const address = q.address?.trim();
+  if (address) patch.address = address;
+
   return patch;
+}
+
+export type FieldDiff = { field: string; label: string; from: string | null; to: string };
+
+const FIELD_LABELS: Record<string, string> = {
+  load_at: "Nakládka",
+  event_start_at: "Začiatok eventu",
+  event_end_at: "Koniec eventu",
+  return_at: "Návrat",
+  available_from_at: "Dostupné od",
+  venue: "Miesto",
+  address: "Adresa",
+};
+
+const INSTANT_FIELDS = new Set([
+  "load_at",
+  "event_start_at",
+  "event_end_at",
+  "return_at",
+  "available_from_at",
+]);
+
+function isUnchanged(field: string, current: unknown, next: string): boolean {
+  if (current == null) return false;
+  if (INSTANT_FIELDS.has(field)) {
+    const a = new Date(current as string).getTime();
+    const b = new Date(next).getTime();
+    return !Number.isNaN(a) && !Number.isNaN(b) && a === b;
+  }
+  return String(current).trim() === next.trim();
+}
+
+/** Fields the reservation would change by if it were synced right now.
+ *  Derived from `buildReservationPatch`, so the "zosúladené" badge can never
+ *  again claim agreement on a field that sync would actually rewrite. */
+export function computeFieldsDiff(
+  quote: QuoteSyncSource,
+  reservation: Record<string, unknown>,
+): FieldDiff[] {
+  const patch = buildReservationPatch(quote);
+  const diffs: FieldDiff[] = [];
+  for (const [field, next] of Object.entries(patch)) {
+    if (isUnchanged(field, reservation[field], next)) continue;
+    diffs.push({
+      field,
+      label: FIELD_LABELS[field] ?? field,
+      from: (reservation[field] as string | null) ?? null,
+      to: next,
+    });
+  }
+  return diffs;
 }
 
 /** Create a reservation from a quote (and link both sides). Returns new reservation id. */
@@ -185,14 +251,14 @@ export async function createReservationFromQuote(
 ): Promise<{ id: string; skipped: SkippedItem[] }> {
   const { data: q, error } = await supabase
     .from("quotes")
-    .select("id, quote_number, quote_group_id, client_id, contact_id, issue_date, event_start_at, event_end_at, event_date, installation_date, dismantling_date, notes, valid_until, client_contacts(full_name, phone, email)")
+    .select("id, quote_number, quote_group_id, client_id, contact_id, issue_date, event_start_at, event_end_at, event_date, installation_date, dismantling_date, venue, address, notes, valid_until, client_contacts(full_name, phone, email)")
     .eq("id", quoteId)
     .maybeSingle();
   if (error) throw error;
   if (!q) throw new Error("Kalkulácia sa nenašla.");
 
-  // Zjednotená mapa dátumov kalkulácia → rezervácia (rovnaká ako pri sync).
-  const datesPatch = buildReservationDatesPatch(q as any);
+  // Zjednotená mapa kalkulácia → rezervácia (rovnaká ako pri sync).
+  const datesPatch = buildReservationPatch(q as QuoteSyncSource);
   const now = new Date();
   const fallbackBase = q.issue_date ? new Date(q.issue_date + "T08:00:00") : now;
   const loadAt = datesPatch.load_at ?? fallbackBase.toISOString();
@@ -210,6 +276,8 @@ export async function createReservationFromQuote(
     phone: contact?.phone ?? null,
     email: contact?.email ?? null,
     event_name: q.quote_number,
+    venue: datesPatch.venue ?? null,
+    address: datesPatch.address ?? null,
     note: q.notes,
     status: "confirmed",
     load_at: loadAt,

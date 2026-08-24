@@ -230,6 +230,7 @@ export type Database = {
           company_name: string
           contact_person: string | null
           created_at: string
+          default_quote_note: string | null
           dic: string | null
           email: string | null
           iban: string | null
@@ -244,6 +245,7 @@ export type Database = {
           company_name?: string
           contact_person?: string | null
           created_at?: string
+          default_quote_note?: string | null
           dic?: string | null
           email?: string | null
           iban?: string | null
@@ -258,6 +260,7 @@ export type Database = {
           company_name?: string
           contact_person?: string | null
           created_at?: string
+          default_quote_note?: string | null
           dic?: string | null
           email?: string | null
           iban?: string | null
@@ -2136,6 +2139,10 @@ export type Database = {
           total: number
         }[]
       }
+      get_my_ics_token: {
+        Args: Record<string, never>
+        Returns: string | null
+      }
       get_or_create_direct_conversation: {
         Args: { _other: string }
         Returns: string
@@ -2172,6 +2179,10 @@ export type Database = {
         Returns: {
           reservation_id: string
         }[]
+      }
+      rotate_my_ics_token: {
+        Args: Record<string, never>
+        Returns: string
       }
       verify_helper_pin: {
         Args: { _helper_id: string; _pin: string }

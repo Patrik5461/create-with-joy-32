@@ -250,13 +250,17 @@ export const sendQuoteEmail = createServerFn({ method: "POST" })
       if (!data.pdfStoragePath.startsWith(expectedPrefix) || !data.pdfStoragePath.endsWith(".pdf")) {
         throw new Error("Neplatná cesta PDF prílohy");
       }
-      const { data: signedDownload, error: signedDownloadError } = await supabaseAdmin.storage
+      // POZOR: Resend si prílohu zadanú cez `path` sťahuje asynchrónne, až po
+      // tom, čo request prijme. Keďže súbor mažeme hneď po odoslaní, Resend
+      // by našiel 404 a mail by tichuško zlyhal (status Failed).
+      // Preto PDF stiahneme tu a pošleme ho ako base64 obsah.
+      const { data: pdfBlob, error: downloadError } = await supabaseAdmin.storage
         .from("quote-pdfs")
-        .createSignedUrl(data.pdfStoragePath, 600);
-      if (signedDownloadError || !signedDownload?.signedUrl) {
-        throw new Error(signedDownloadError?.message || "Prílohu sa nepodarilo sprístupniť");
+        .download(data.pdfStoragePath);
+      if (downloadError || !pdfBlob) {
+        throw new Error(downloadError?.message || "Prílohu sa nepodarilo načítať");
       }
-      pdfRemoteUrl = signedDownload.signedUrl;
+      pdfBase64 = Buffer.from(await pdfBlob.arrayBuffer()).toString("base64");
       uploadedPdfPath = data.pdfStoragePath;
     }
     if (!pdfBase64 && data.pdfUploadId && data.pdfChunkCount) {

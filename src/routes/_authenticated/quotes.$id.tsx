@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { QuoteForm } from "@/components/quote-form";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, type QuoteLine } from "@/lib/quote-utils";
-import { computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow } from "@/lib/quote-reservation-link";
+import { computeFieldsDiff, computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow, type FieldDiff } from "@/lib/quote-reservation-link";
 import { useServerFn } from "@tanstack/react-start";
 import { createQuotePdfUpload, sendQuoteEmail } from "@/lib/email.functions";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
@@ -33,6 +33,24 @@ export const Route = createFileRoute("/_authenticated/quotes/$id")({
   head: () => ({ meta: [{ title: "Kalkulácia · mima production CRM" }] }),
   component: QuoteDetail,
 });
+
+const TEXT_DIFF_FIELDS = new Set(["venue", "address"]);
+
+/** Rozdiely v termínoch zobraz ako čitateľný dátum, miesto a adresu ako text. */
+function formatDiffValue(field: string, value: string | null): string {
+  if (!value) return "—";
+  if (TEXT_DIFF_FIELDS.has(field)) return value;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString("sk-SK", {
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Bratislava",
+  });
+}
 
 function QuoteDetail() {
   const { id } = Route.useParams();
@@ -97,7 +115,7 @@ function QuoteDetail() {
       const gid = (quote.data as any).quote_group_id as string;
       const { data, error } = await supabase
         .from("reservations")
-        .select("id, event_name, status, load_at, available_from_at, reservation_items(id, qty, furniture_item_id, furniture_items(name))")
+        .select("id, event_name, status, load_at, available_from_at, event_start_at, event_end_at, return_at, venue, address, reservation_items(id, qty, furniture_item_id, furniture_items(name))")
         .eq("quote_group_id", gid)
         .maybeSingle();
       if (error) throw error;
@@ -268,11 +286,13 @@ function QuoteDetail() {
     if (!to) return toast.error("Klient nemá email");
     setSendingEmail(true);
     try {
-      const el = printRef.current;
-      if (!el) throw new Error("Tlačová verzia nie je pripravená");
-      const { renderElementToPdfBase64 } = await import("@/lib/quote-pdf-render");
-      const { base64, filename } = await renderElementToPdfBase64(el, {
+      const { renderQuotePdfBase64 } = await import("@/lib/quote-pdf-render");
+      const { base64, filename } = await renderQuotePdfBase64(q, {
         filename: `ponuka-${q.quote_number}.pdf`,
+        supplierLines: buildCompanyLines(companyQ.data),
+        clientLines: buildClientLines(q.clients, q.client_contacts),
+        breakdown: deriveBreakdown(q),
+        logoUrl: "/mima-logo.png",
       });
       const uploadId = crypto.randomUUID();
       const upload = await createPdfUploadFn({ data: { quoteId: q.id, uploadId } });
@@ -322,7 +342,11 @@ function QuoteDetail() {
         (res.reservation_items ?? []) as any,
       )
     : [];
-  const isMismatched = diffs.length > 0;
+  // Termíny a miesto — doteraz sa nekontrolovali vôbec, takže zmena termínu
+  // v kalkulácii nechala rezerváciu v kalendári na starom dátume a štítok
+  // pritom hlásil „zosúladené".
+  const fieldDiffs: FieldDiff[] = res && q.is_current ? computeFieldsDiff(q, res) : [];
+  const isMismatched = diffs.length > 0 || fieldDiffs.length > 0;
 
   if (editing) {
     const items: QuoteLine[] = (q.quote_items ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order).map((it: any) => ({
@@ -592,12 +616,25 @@ function QuoteDetail() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="max-h-72 overflow-auto rounded-md border bg-muted/30 p-3 text-sm space-y-1">
-            {diffs.length === 0 && <div className="text-muted-foreground">Žiadne rozdiely.</div>}
+            {diffs.length === 0 && fieldDiffs.length === 0 && (
+              <div className="text-muted-foreground">Žiadne rozdiely.</div>
+            )}
+            {diffs.length > 0 && (
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Položky</div>
+            )}
             {diffs.map((d, i) => {
               if (d.type === "added") return <div key={i} className="text-emerald-800">+ Pridané: <b>{d.name}</b> {d.qty} ks</div>;
               if (d.type === "removed") return <div key={i} className="text-rose-800">− Odobrané: <b>{d.name}</b> {d.qty} ks</div>;
               return <div key={i} className="text-amber-800">↻ <b>{d.name}</b>: {d.from} → {d.to} ks</div>;
             })}
+            {fieldDiffs.length > 0 && (
+              <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Termíny a miesto</div>
+            )}
+            {fieldDiffs.map((d) => (
+              <div key={d.field} className="text-amber-800">
+                ↻ <b>{d.label}</b>: {formatDiffValue(d.field, d.from)} → {formatDiffValue(d.field, d.to)}
+              </div>
+            ))}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Ponechať rezerváciu</AlertDialogCancel>
