@@ -12,15 +12,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ReservationStaffSection } from "@/components/reservation-staff-section";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
+import { addDays, addMonths, addWeeks, endOfDay, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, parseISO, startOfDay, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
-import { RESERVATION_STATUSES, STATUS_LABEL, STATUS_COLOR, STATUS_DOT, type ReservationStatus } from "@/lib/reservation-status";
+import { RESERVATION_STATUSES, STATUS_LABEL, STATUS_COLOR, STATUS_DOT, STATUS_LEGEND, type ReservationStatus } from "@/lib/reservation-status";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/reservations/")({
   head: () => ({ meta: [{ title: "Rezervácie · Mima Production CRM" }] }),
+  // `view` a `date` su v adrese zamerne: bez toho sa kalendar po navrate
+  // z detailu rezervacie prekreslil na dnesok a stratil vybrane obdobie.
   validateSearch: (s: Record<string, unknown>) => ({
     status: typeof s.status === "string" ? (s.status as ReservationStatus | "all") : undefined,
+    view: s.view === "day" || s.view === "week" || s.view === "month" ? (s.view as View) : undefined,
+    date: typeof s.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.date) ? s.date : undefined,
   }),
   component: Reservations,
 });
@@ -33,11 +37,24 @@ function Reservations() {
   const navigate = useNavigate();
   const search = Route.useSearch();
   const statusFilter = (search.status ?? "all") as ReservationStatus | "all";
-  const [view, setView] = useState<View>("week");
-  const [cursor, setCursor] = useState<Date>(new Date());
+  const view: View = search.view ?? "week";
+  const cursor = useMemo(() => (search.date ? parseISO(search.date) : startOfDay(new Date())), [search.date]);
+
+  const setView = (v: View) =>
+    navigate({ to: "/reservations", search: (prev: any) => ({ ...prev, view: v }), replace: true });
+
+  const setCursor = (next: Date | ((d: Date) => Date)) => {
+    const d = typeof next === "function" ? next(cursor) : next;
+    navigate({
+      to: "/reservations",
+      search: (prev: any) => ({ ...prev, date: format(d, "yyyy-MM-dd") }),
+      replace: true,
+    });
+  };
 
   const range = useMemo(() => {
-    if (view === "day") return { from: new Date(cursor.setHours(0,0,0,0)), to: new Date(new Date(cursor).setHours(23,59,59,999)) };
+    // Pozor na mutaciu: setHours() by prepisal samotny `cursor`.
+    if (view === "day") return { from: startOfDay(cursor), to: endOfDay(cursor) };
     if (view === "week") return { from: startOfWeek(cursor, { weekStartsOn: 1 }), to: endOfWeek(cursor, { weekStartsOn: 1 }) };
     return { from: startOfMonth(cursor), to: endOfMonth(cursor) };
   }, [view, cursor]);
@@ -179,7 +196,13 @@ function Reservations() {
           <div className="flex items-center gap-2 flex-wrap">
             <Select
               value={statusFilter}
-              onValueChange={(v) => navigate({ to: "/reservations", search: { status: v === "all" ? undefined : v } as any })}
+              onValueChange={(v) =>
+                navigate({
+                  to: "/reservations",
+                  search: (prev: any) => ({ ...prev, status: v === "all" ? undefined : v }),
+                  replace: true,
+                })
+              }
             >
               <SelectTrigger className="h-9 w-44 text-xs">
                 <SelectValue placeholder="Všetky stavy" />
@@ -213,6 +236,8 @@ function Reservations() {
         ) : (
           <DayList day={cursor} occurrences={occurrences} onSlot={openNewAt} canCreate={canCreate} overbookedSet={overbookedSet} staffByRes={staffByRes} conflictResIds={conflictResIds} onOpenStaff={setStaffDialogResId} />
         )}
+
+        <StatusLegend />
       </div>
 
       <Dialog open={!!staffDialogResId} onOpenChange={(o) => !o && setStaffDialogResId(null)}>
@@ -398,6 +423,30 @@ function DayList({ day, occurrences, onSlot, canCreate, overbookedSet, staffByRe
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function StatusLegend() {
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+        Čo znamenajú farby
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {STATUS_LEGEND.map(({ status, hint }) => (
+          <div key={status} className="flex items-center gap-1.5 text-[11px]">
+            <span className={`size-3 shrink-0 rounded-sm border ${STATUS_COLOR[status]}`} />
+            <span className="font-medium">{STATUS_LABEL[status]}</span>
+            <span className="text-muted-foreground">— {hint}</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground mt-2 pt-2 border-t">
+        <span className="inline-block align-middle mr-1">⚠</span>
+        pri názve znamená, že rezervácia presahuje sklad — koľko kusov chýba, uvidíš v jej detaile.
+        Rezervácii sa dá nastaviť aj vlastná farba; tá potom stavovú farbu prekryje.
+      </p>
     </div>
   );
 }

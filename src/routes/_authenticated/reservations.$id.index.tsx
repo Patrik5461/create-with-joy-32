@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +29,7 @@ function ReservationDetail() {
   const { data: user } = useCurrentUser();
   const canEdit = hasRole(user, "admin", "manager");
   const canDelete = hasRole(user, "admin");
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
 
   const reservation = useQuery({
@@ -111,7 +112,19 @@ function ReservationDetail() {
       <AppHeader title={r?.event_name ?? "Rezervácia"} />
       <div className="p-4 md:p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" asChild><Link to="/reservations" search={{ status: undefined } as any}><ArrowLeft className="size-4 mr-1" />Späť</Link></Button>
+          {/* Krok spat v historii, nie natvrdo /reservations: kalendar si tak
+              udrzi vybrany mesiac aj zobrazenie. Ak sa sem prislo priamym
+              odkazom (nie je kam sa vratit), skoncime na kalendari. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) router.history.back();
+              else router.navigate({ to: "/reservations", search: {} as any });
+            }}
+          >
+            <ArrowLeft className="size-4 mr-1" />Späť
+          </Button>
           <div className="flex gap-2">
             {!editing && (
               <Button variant="outline" size="sm" asChild>
