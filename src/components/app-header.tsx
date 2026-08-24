@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { LogOut, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -22,7 +22,7 @@ const ROLE_LABEL: Record<string, string> = {
   warehouse: "Skladník",
 };
 
-export function AppHeader({ title }: { title: string }) {
+export function AppHeader({ title, backTo }: { title: string; backTo?: string }) {
   const { data: user } = useCurrentUser();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -44,6 +44,17 @@ export function AppHeader({ title }: { title: string }) {
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur print:hidden">
       <SidebarTrigger />
+      {backTo && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-9 shrink-0"
+          aria-label="Naspäť"
+          onClick={() => navigate({ to: backTo as any })}
+        >
+          <ArrowLeft className="size-5" />
+        </Button>
+      )}
       <Separator orientation="vertical" className="h-5" />
       <div className="flex-1 min-w-0">
         <h1 className="text-sm font-semibold tracking-tight truncate">{title}</h1>
