@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { AppHeader } from "@/components/app-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -393,7 +394,7 @@ function ManualEntryDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <Label className="text-xs">Dátum</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -575,9 +576,9 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0">
         <CardTitle className="text-base">Súhrn odpracovaných hodín</CardTitle>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ManualEntryDialog
             isAdmin={isAdmin}
             currentUserId={currentUserId}
@@ -588,11 +589,11 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3">
           <div>
             <Label className="text-xs">Obdobie</Label>
             <Select value={range} onValueChange={(v) => setRange(v as Range)}>
-              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="day">Deň</SelectItem>
                 <SelectItem value="week">Tento týždeň</SelectItem>
@@ -629,7 +630,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
             <div>
               <Label className="text-xs">Kategória</Label>
               <Select value={category} onValueChange={(v) => { setCategory(v as any); setSelectedUser("all"); }}>
-                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Všetci</SelectItem>
                   <SelectItem value="employees">Zamestnanci</SelectItem>
@@ -642,7 +643,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
             <div>
               <Label className="text-xs">Osoba</Label>
               <Select value={selectedUser} onValueChange={setSelectedUser}>
-                <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[240px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Všetci</SelectItem>
                   {category !== "helpers" && (profiles.data ?? []).map((p) => (
@@ -703,7 +704,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                     </TableRow>
                     {isOpen && (
                       <TableRow>
-                        <TableCell colSpan={6} className="bg-muted/20 p-3">
+                        <TableCell colSpan={6} className="bg-muted/20 p-2 sm:p-3">
                           {userRows.length === 0 && (
                             <div className="text-xs text-muted-foreground">Žiadne pichnutia v tomto období.</div>
                           )}
@@ -715,7 +716,7 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                               const eventLabels = directEvent ? [directEvent] : eventsForDay;
                               const worked = a.clock_out ? differenceInMinutes(new Date(a.clock_out), new Date(a.clock_in)) : null;
                               return (
-                                <div key={a.id} className="rounded-md border bg-background p-2 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] items-end">
+                                <div key={a.id} className="rounded-md border bg-background p-2 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
                                   <div className="text-xs space-y-1">
                                     <div className="font-medium">
                                       {format(new Date(a.clock_in), "EEEE d.M.yyyy", { locale: sk })}
@@ -736,13 +737,13 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                                   </div>
                                   <div>
                                     <Label className="text-[10px] text-muted-foreground">Príchod</Label>
-                                    <Input type="datetime-local" className="h-8 w-[180px] text-xs"
+                                    <Input type="datetime-local" className="h-8 w-full sm:w-[180px] text-xs"
                                       defaultValue={toLocal(a.clock_in)}
                                       onBlur={(e) => e.target.value && saveTime.mutate({ id: a.id, field: "clock_in", value: e.target.value })} />
                                   </div>
                                   <div>
                                     <Label className="text-[10px] text-muted-foreground">Odchod</Label>
-                                    <Input type="datetime-local" className="h-8 w-[180px] text-xs"
+                                    <Input type="datetime-local" className="h-8 w-full sm:w-[180px] text-xs"
                                       defaultValue={toLocal(a.clock_out)}
                                       onBlur={(e) => saveTime.mutate({ id: a.id, field: "clock_out", value: e.target.value })} />
                                   </div>
@@ -957,17 +958,17 @@ function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0">
         <CardTitle className="text-base">Denný záznam</CardTitle>
-        <Input type="date" className="w-[180px]" value={date} onChange={(e) => setDate(e.target.value)} />
+        <Input type="date" className="w-full sm:w-[180px]" value={date} onChange={(e) => setDate(e.target.value)} />
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3">
           {isAdmin && (
             <div>
               <Label className="text-xs">Osoba</Label>
               <Select value={selectedPerson} onValueChange={setSelectedPerson}>
-                <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[240px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {peopleOptions.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -1076,17 +1077,19 @@ function AttendancePage() {
   if (!user) return <div className="p-6">Načítavam…</div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-6xl mx-auto w-full">
+    <>
+    <AppHeader title="Dochádzka" backTo="/dashboard" />
+    <div className="p-3 md:p-6 space-y-4 max-w-6xl mx-auto w-full">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dochádzka</h1>
+        <h1 className="text-xl md:text-2xl font-bold tracking-tight">Dochádzka</h1>
         <p className="text-sm text-muted-foreground">Pichnite si príchod, prestávky a odchod. Hodiny na akciách sa započítajú automaticky.</p>
       </div>
 
       <Tabs defaultValue="clock">
-        <TabsList>
-          <TabsTrigger value="clock">Dochádzka</TabsTrigger>
-          <TabsTrigger value="summary">Súhrn</TabsTrigger>
-          <TabsTrigger value="daily">Denný záznam</TabsTrigger>
+        <TabsList className="w-full grid grid-cols-3 sm:inline-flex sm:w-auto">
+          <TabsTrigger value="clock" className="text-xs sm:text-sm">Dochádzka</TabsTrigger>
+          <TabsTrigger value="summary" className="text-xs sm:text-sm">Súhrn</TabsTrigger>
+          <TabsTrigger value="daily" className="text-xs sm:text-sm">Denný záznam</TabsTrigger>
         </TabsList>
         <TabsContent value="clock" className="mt-4">
           <div className="max-w-md mx-auto"><ClockPanel userId={user.id} /></div>
@@ -1099,6 +1102,7 @@ function AttendancePage() {
         </TabsContent>
       </Tabs>
     </div>
+    </>
   );
 }
 
