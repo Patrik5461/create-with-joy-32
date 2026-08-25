@@ -2,6 +2,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { quoteClientName } from "@/lib/quote-utils";
 import { checkAvailability } from "@/lib/availability";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,7 @@ function ReservationDetail() {
       const gid = (reservation.data as any).quote_group_id as string;
       const { data, error } = await supabase
         .from("quotes")
-        .select("id, quote_number, version_number, is_current")
+        .select("id, quote_number, version_number, is_current, clients(company_name)")
         .eq("quote_group_id", gid)
         .is("deleted_at", null)
         .eq("is_current", true)
@@ -148,7 +149,7 @@ function ReservationDetail() {
                   <FileText className="size-4" />
                   Vytvorené z kalkulácie:&nbsp;
                   <Link to="/quotes/$id" params={{ id: sourceQuote.data.id }} className="font-semibold underline">
-                    {sourceQuote.data.quote_number} · v{sourceQuote.data.version_number}
+                    {quoteClientName(sourceQuote.data)} · v{sourceQuote.data.version_number}
                   </Link>
                 </div>
               </div>

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur } from "@/lib/quote-utils";
+import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, quoteClientName } from "@/lib/quote-utils";
 
 export const Route = createFileRoute("/_authenticated/quotes/trash")({
   head: () => ({ meta: [{ title: "Kôš kalkulácií · Mima Production CRM" }] }),
@@ -95,7 +95,6 @@ function QuotesTrash() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Číslo</TableHead>
                   <TableHead>Klient</TableHead>
                   <TableHead>Event</TableHead>
                   <TableHead>Stav</TableHead>
@@ -106,17 +105,16 @@ function QuotesTrash() {
               </TableHeader>
               <TableBody>
                 {trash.isLoading && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Načítavam…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">Načítavam…</TableCell></TableRow>
                 )}
                 {!trash.isLoading && (trash.data ?? []).length === 0 && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Kôš je prázdny.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">Kôš je prázdny.</TableCell></TableRow>
                 )}
                 {(trash.data ?? []).map((q: any) => (
                   <TableRow key={q.id}>
-                    <TableCell className="font-mono">
-                      {q.quote_number} <span className="text-xs text-muted-foreground">v{q.version_number}</span>
+                    <TableCell className="font-medium">
+                      {quoteClientName(q)} <span className="text-xs text-muted-foreground font-normal">v{q.version_number}</span>
                     </TableCell>
-                    <TableCell>{q.clients?.company_name ?? "—"}</TableCell>
                     <TableCell>{q.reservations?.event_name ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant={QUOTE_STATUS_VARIANT[q.status as keyof typeof QUOTE_STATUS_VARIANT]}>

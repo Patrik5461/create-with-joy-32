@@ -251,7 +251,7 @@ export async function createReservationFromQuote(
 ): Promise<{ id: string; skipped: SkippedItem[] }> {
   const { data: q, error } = await supabase
     .from("quotes")
-    .select("id, quote_number, quote_group_id, client_id, contact_id, issue_date, event_start_at, event_end_at, event_date, installation_date, dismantling_date, venue, address, notes, valid_until, client_contacts(full_name, phone, email)")
+    .select("id, quote_number, quote_group_id, client_id, contact_id, issue_date, event_start_at, event_end_at, event_date, installation_date, dismantling_date, venue, address, notes, valid_until, client_contacts(full_name, phone, email), clients(company_name)")
     .eq("id", quoteId)
     .maybeSingle();
   if (error) throw error;
@@ -275,7 +275,9 @@ export async function createReservationFromQuote(
     contact_person: contact?.full_name ?? null,
     phone: contact?.phone ?? null,
     email: contact?.email ?? null,
-    event_name: q.quote_number,
+    // Rezervácia sa pomenúva podľa klienta — číslo kalkulácie (Q2026-0042) je
+    // len referencia dokladu a v kalendári nikomu nič nepovie.
+    event_name: ((q as any).clients?.company_name ?? "").trim() || q.quote_number,
     venue: datesPatch.venue ?? null,
     address: datesPatch.address ?? null,
     note: q.notes,
