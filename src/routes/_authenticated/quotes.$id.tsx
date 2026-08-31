@@ -5,7 +5,7 @@ import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Printer, Copy, Trash2, Mail, Loader2, History } from "lucide-react";
+import { Printer, Copy, Trash2, Mail, Loader2, History, Check, Undo2 } from "lucide-react";
 import { CalendarPlus, ExternalLink, RefreshCw, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { QuoteForm } from "@/components/quote-form";
-import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, type QuoteLine } from "@/lib/quote-utils";
+import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, quoteClientName, type QuoteLine } from "@/lib/quote-utils";
 import { computeFieldsDiff, computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow, type FieldDiff } from "@/lib/quote-reservation-link";
 import { useServerFn } from "@tanstack/react-start";
 import { createQuotePdfUpload, sendQuoteEmail } from "@/lib/email.functions";
@@ -175,6 +175,22 @@ function QuoteDetail() {
       setSyncOpen(false);
     },
     onError: (e: any) => toast.error(e.message ?? "Zosúladenie zlyhalo"),
+  });
+
+  // Stav sa dá prepnúť priamo, bez úpravy kalkulácie — úprava by inak
+  // založila novú verziu len preto, že klient ponuku odklikol.
+  const setStatus = useMutation({
+    mutationFn: async (next: "draft" | "sent" | "approved" | "rejected") => {
+      const { error } = await supabase.from("quotes").update({ status: next }).eq("id", id);
+      if (error) throw error;
+      return next;
+    },
+    onSuccess: (next) => {
+      qc.invalidateQueries({ queryKey: ["quote", id] });
+      qc.invalidateQueries({ queryKey: ["quotes"] });
+      toast.success(next === "approved" ? "Kalkulácia označená ako schválená" : `Stav zmenený na „${QUOTE_STATUS_LABEL[next]}“`);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Stav sa nepodarilo zmeniť"),
   });
 
   const remove = useMutation({
@@ -361,7 +377,7 @@ function QuoteDetail() {
     }));
     return (
       <>
-        <AppHeader title={`Upraviť ${q.quote_number} → v${nextVersion}`} />
+        <AppHeader title={`Upraviť ${quoteClientName(q)} → v${nextVersion}`} />
         <div className="p-4 md:p-6 max-w-5xl">
           <div className="mb-3 space-y-2">
             <QuoteEditingWarning quoteId={presenceId} editing />
@@ -389,12 +405,12 @@ function QuoteDetail() {
 
   return (
     <>
-      <AppHeader title={`Kalkulácia ${q.quote_number}`} />
+      <AppHeader title={`Kalkulácia · ${quoteClientName(q)}`} />
       <div className="p-4 md:p-6 max-w-5xl space-y-4 print:hidden">
         <QuoteEditingWarning quoteId={presenceId} editing={false} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-2xl font-semibold tracking-tight">{q.quote_number}</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">{quoteClientName(q)}</h2>
             <Badge variant={q.is_current ? "default" : "outline"} className="font-mono">
               v{q.version_number}{q.is_current ? " · aktuálna" : " · staršia"}
             </Badge>
@@ -432,6 +448,27 @@ function QuoteDetail() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
+            {q.status === "approved" ? (
+              <Button
+                variant="outline"
+                className="border-emerald-400 text-emerald-800 hover:bg-emerald-50"
+                onClick={() => setStatus.mutate("sent")}
+                disabled={setStatus.isPending}
+                title="Vrátiť späť na „Odoslaná“"
+              >
+                {setStatus.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Undo2 className="size-4 mr-1" />}
+                Zrušiť schválenie
+              </Button>
+            ) : (
+              <Button
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => setStatus.mutate("approved")}
+                disabled={setStatus.isPending}
+              >
+                {setStatus.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Check className="size-4 mr-1" />}
+                Schválená
+              </Button>
+            )}
             <Button variant="outline" onClick={() => window.print()}><Printer className="size-4 mr-1" />Tlačiť / PDF</Button>
             <Button variant="outline" onClick={() => {
               const to = (q.client_contacts?.email ?? q.clients?.email ?? "").toString();
@@ -488,7 +525,7 @@ function QuoteDetail() {
                   <AlertDialogDescription>
                     {(versions.data?.length ?? 1) > 1 ? (
                       <>
-                        Zmaže sa <span className="font-semibold">iba verzia v{q.version_number}</span> — ostatné verzie kalkulácie <span className="font-mono">{q.quote_number}</span> zostanú zachované.
+                        Zmaže sa <span className="font-semibold">iba verzia v{q.version_number}</span> — ostatné verzie kalkulácie pre klienta <span className="font-semibold">{quoteClientName(q)}</span> zostanú zachované.
                         {q.is_current && " Najnovšia zostávajúca verzia sa stane aktuálnou."}
                         {" "}Verziu nájdeš v Kalkulácie → Kôš a môžeš ju obnoviť.
                       </>
@@ -547,6 +584,7 @@ function QuoteDetail() {
             <CardHeader><CardTitle className="text-base">Detaily</CardTitle></CardHeader>
             <CardContent className="text-sm space-y-1">
               <div><span className="text-muted-foreground">Dátum vystavenia:</span> {new Date(q.issue_date).toLocaleDateString("sk-SK")}</div>
+              <div className="text-xs text-muted-foreground">Číslo na PDF a v emaile: <span className="font-mono">{q.quote_number}</span></div>
               {q.valid_until && <div><span className="text-muted-foreground">Platnosť do:</span> {new Date(q.valid_until).toLocaleDateString("sk-SK")}</div>}
               {(q.venue ?? q.reservations?.venue) && <div><span className="text-muted-foreground">Miesto konania:</span> {q.venue ?? q.reservations?.venue}</div>}
               {(q.address ?? q.reservations?.address) && <div><span className="text-muted-foreground">Adresa miesta:</span> {q.address ?? q.reservations?.address}</div>}

@@ -81,3 +81,13 @@ export const QUOTE_STATUS_VARIANT: Record<"draft" | "sent" | "approved" | "rejec
   approved: "default",
   rejected: "destructive",
 };
+
+/**
+ * Kalkulácie v CRM identifikujeme podľa klienta, nie podľa čísla — číslo
+ * (Q2026-0042) zostáva len na PDF a v emaile pre klienta, kde slúži ako
+ * referencia dokladu.
+ */
+export function quoteClientName(q: any): string {
+  const name = (q?.clients?.company_name ?? q?.client?.company_name ?? "").toString().trim();
+  return name || "Bez klienta";
+}

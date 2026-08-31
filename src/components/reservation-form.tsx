@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { checkAvailability } from "@/lib/availability";
+import { blockerClass, type Blocker } from "@/lib/quote-holds";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +30,7 @@ const EVENT_COLORS: { value: string; label: string }[] = [
 interface ItemRow {
   furniture_item_id: string;
   qty: number;
-  availability?: { total: number; available: number; reserved: number } | null;
+  availability?: { total: number; available: number; reserved: number; blockers?: Blocker[] } | null;
   loading?: boolean;
 }
 
@@ -101,7 +102,10 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
     address: initial?.address ?? "",
     note: initial?.note ?? "",
     status: (initial?.status ?? "inquiry") as ReservationStatus,
-    color: (initial?.color ?? "#3b82f6") as string,
+    // Prázdna farba = event sa v kalendári zafarbí podľa stavu. Predvolená
+    // modrá tu spôsobila, že každá rezervácia mala natvrdo vlastnú farbu
+    // a farebné odlíšenie stavov sa nikdy neprejavilo.
+    color: (initial?.color ?? "") as string,
     vehicle_id: initial?.vehicle_id ?? "",
     trip_count: initial?.trip_count ?? 1,
     load_at: seedLoad,
@@ -185,7 +189,7 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
           if (!p.furniture_item_id) return p;
           const a = map[p.furniture_item_id];
           return a
-            ? { ...p, loading: false, availability: { total: a.total, available: a.available, reserved: a.reserved } }
+            ? { ...p, loading: false, availability: { total: a.total, available: a.available, reserved: a.reserved, blockers: a.blockers } }
             : { ...p, loading: false };
         }),
       );
@@ -418,6 +422,15 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
           </div>
           <div className="space-y-1.5"><Label>Farba eventu</Label>
             <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, color: "" })}
+                title="Podľa stavu rezervácie"
+                aria-label="Podľa stavu rezervácie"
+                className={`h-7 px-2 text-xs rounded-full border-2 transition-all ${form.color ? "border-transparent bg-muted text-muted-foreground hover:scale-105" : "border-foreground bg-muted scale-105"}`}
+              >
+                Podľa stavu
+              </button>
               {EVENT_COLORS.map((c) => (
                 <button
                   type="button"
@@ -484,6 +497,23 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
                         <div className="text-[11px] text-amber-800">
                           Pozor: požadovaných {row.qty} ks, dostupných len {row.availability.available} ks
                           (chýba {row.qty - row.availability.available} ks).
+                        </div>
+                      )}
+                      {row.availability.blockers && row.availability.blockers.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 text-[11px]">
+                          <span className="text-muted-foreground shrink-0">Drží:</span>
+                          {row.availability.blockers.map((b) => (
+                            <a
+                              key={`${b.kind}-${b.id}`}
+                              href={b.kind === "quote" ? `/quotes/${b.id}` : `/reservations/${b.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 hover:brightness-95 ${blockerClass(b)}`}
+                            >
+                              <span className="font-medium">{b.label}</span>
+                              <span className="opacity-80">· {b.kind === "reservation" ? "Rezervácia" : b.statusLabel} · {b.qty} ks</span>
+                            </a>
+                          ))}
                         </div>
                       )}
                     </div>

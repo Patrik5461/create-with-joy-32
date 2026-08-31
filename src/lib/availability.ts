@@ -1,77 +1,88 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  HOLDING_QUOTE_STATUSES,
+  collectQuoteBlockers,
+  collectReservationBlockers,
+  mergeBlockers,
+  quoteHoldQty,
+  type Blocker,
+  type HoldQuoteRow,
+  type HoldReservationRow,
+} from "@/lib/quote-holds";
+
+export type { Blocker } from "@/lib/quote-holds";
 
 export type AvailabilityRow = {
   total: number;
   damaged: number;
   retired: number;
   reserved: number;
-  /** Množstvo blokované nepotvrdenými kalkuláciami (soft hold). */
+  /** Množstvo blokované kalkuláciami bez rezervácie (soft hold). */
   quoteHold: number;
   available: number;
+  /** Kde presne tie kusy visia — kalkulácie aj rezervácie, na zobrazenie. */
+  blockers: Blocker[];
 };
 
-type QuoteHoldQuote = {
-  quote_group_id: string | null;
-  installation_date: string | null;
-  dismantling_date: string | null;
-  event_start_at: string | null;
-  event_end_at: string | null;
-  event_date: string | null;
-  quote_items: { furniture_item_id: string | null; qty: number; kind: string }[] | null;
-};
-
-function ts(v: string | null): number | null {
-  if (!v) return null;
-  const t = new Date(v).getTime();
-  return Number.isNaN(t) ? null : t;
-}
-
-/** Množstvá blokované nepotvrdenými kalkuláciami (draft/sent, bez rezervácie),
- *  ktoré sa časovo prekrývajú s daným oknom. */
-export async function getQuoteHolds(
+/**
+ * Kto v danom okne drží dané položky. Kalkulácie držia tovar od rozpracovanej
+ * až po schválenú — kým z nej nevznikne rezervácia, je to jediné, čo tovar
+ * blokuje. Kalkulácia v koši (`deleted_at`) ani zamietnutá nedržia nič, takže
+ * zmazaním kalkulácie sa tovar automaticky uvoľní.
+ */
+export async function getBlockers(
   itemIds: string[],
   fromIso: string,
   toIso: string,
-  excludeQuoteGroupId?: string | null,
-): Promise<Record<string, number>> {
-  const holds: Record<string, number> = {};
-  if (itemIds.length === 0) return holds;
-
-  const { data, error } = await supabase
-    .from("quotes")
-    .select(
-      "quote_group_id, installation_date, dismantling_date, event_start_at, event_end_at, event_date, quote_items(furniture_item_id, qty, kind)",
-    )
-    .is("reservation_id", null)
-    .is("deleted_at", null)
-    .eq("is_current", true)
-    .in("status", ["draft", "sent"]);
-  if (error || !data) return holds;
+  opts?: { excludeReservationId?: string | null; excludeQuoteGroupId?: string | null },
+): Promise<Record<string, Blocker[]>> {
+  const unique = Array.from(new Set(itemIds.filter(Boolean)));
+  if (unique.length === 0) return {};
 
   const from = new Date(fromIso).getTime();
   const to = new Date(toIso).getTime();
-  const wanted = new Set(itemIds);
+  if (Number.isNaN(from) || Number.isNaN(to)) return {};
 
-  for (const q of data as unknown as QuoteHoldQuote[]) {
-    if (excludeQuoteGroupId && q.quote_group_id === excludeQuoteGroupId) continue;
-    const start =
-      ts(q.installation_date) ?? ts(q.event_start_at) ?? (q.event_date ? ts(q.event_date + "T00:00:00") : null);
-    const end =
-      ts(q.dismantling_date) ??
-      ts(q.event_end_at) ??
-      (q.event_date ? (ts(q.event_date + "T00:00:00") ?? 0) + 24 * 3600 * 1000 : null);
-    if (start == null || end == null) continue;
-    if (!(start < to && end > from)) continue;
-    for (const it of q.quote_items ?? []) {
-      if (it.kind !== "furniture" || !it.furniture_item_id) continue;
-      if (!wanted.has(it.furniture_item_id)) continue;
-      holds[it.furniture_item_id] = (holds[it.furniture_item_id] ?? 0) + Math.max(0, Math.round(Number(it.qty) || 0));
-    }
-  }
-  return holds;
+  const [resRows, quoteRows] = await Promise.all([
+    supabase
+      .from("reservation_items")
+      .select(
+        "furniture_item_id, qty, reservations!inner(id, event_name, status, load_at, available_from_at, quote_group_id)",
+      )
+      .in("furniture_item_id", unique)
+      .neq("reservations.status", "cancelled")
+      .lt("reservations.load_at", toIso)
+      .gt("reservations.available_from_at", fromIso),
+    supabase
+      .from("quotes")
+      .select(
+        "id, quote_number, status, quote_group_id, reservation_id, installation_date, dismantling_date, event_start_at, event_end_at, event_date, clients(company_name), quote_items(furniture_item_id, qty, kind)",
+      )
+      .is("reservation_id", null)
+      .is("deleted_at", null)
+      .eq("is_current", true)
+      .in("status", [...HOLDING_QUOTE_STATUSES]),
+  ]);
+
+  const reservations = collectReservationBlockers(
+    (resRows.error ? [] : ((resRows.data ?? []) as unknown as HoldReservationRow[])),
+    { itemIds: unique, from, to, excludeReservationId: opts?.excludeReservationId ?? null },
+  );
+  const quotes = collectQuoteBlockers(
+    (quoteRows.error ? [] : ((quoteRows.data ?? []) as unknown as HoldQuoteRow[])),
+    {
+      itemIds: unique,
+      from,
+      to,
+      excludeQuoteGroupId: opts?.excludeQuoteGroupId ?? null,
+      reservedGroups: reservations.reservedGroups,
+    },
+  );
+
+  return mergeBlockers(reservations.byItem, quotes);
 }
 
-/** Dostupnosť položiek v okne vrátane soft-holdu z nepotvrdených kalkulácií. */
+/** Dostupnosť položiek v okne vrátane soft-holdu z kalkulácií. */
 export async function checkAvailability(
   itemIds: string[],
   fromIso: string,
@@ -82,7 +93,7 @@ export async function checkAvailability(
   const out: Record<string, AvailabilityRow> = {};
   if (unique.length === 0) return out;
 
-  const holds = await getQuoteHolds(unique, fromIso, toIso, opts?.excludeQuoteGroupId ?? null);
+  const blockers = await getBlockers(unique, fromIso, toIso, opts);
 
   await Promise.all(
     unique.map(async (id) => {
@@ -94,7 +105,8 @@ export async function checkAvailability(
       });
       const row = !error ? data?.[0] : null;
       if (!row) return;
-      const hold = holds[id] ?? 0;
+      // RPC už ráta rezervácie; z blokácií pripočítame len kalkulácie.
+      const hold = quoteHoldQty(blockers[id]);
       out[id] = {
         total: row.total,
         damaged: row.damaged,
@@ -102,6 +114,7 @@ export async function checkAvailability(
         reserved: row.reserved + hold,
         quoteHold: hold,
         available: row.available - hold,
+        blockers: blockers[id] ?? [],
       };
     }),
   );
