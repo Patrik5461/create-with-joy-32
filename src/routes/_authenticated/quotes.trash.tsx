@@ -33,28 +33,46 @@ function QuotesTrash() {
 
   const restore = useMutation({
     mutationFn: async (q: any) => {
-      // If restoring a non-current version, make sure no other current exists in group.
-      // Simplest: mark this row as current only if no other current row exists in the group; otherwise keep is_current=false.
-      if (q.is_current) {
-        const { data: existing } = await supabase
-          .from("quotes")
-          .select("id")
-          .eq("quote_group_id", q.quote_group_id ?? q.id)
-          .is("deleted_at", null)
-          .eq("is_current", true)
-          .maybeSingle();
-        if (existing) {
-          const { error } = await supabase.from("quotes")
-            .update({ deleted_at: null, deleted_by: null, is_current: false })
-            .eq("id", q.id);
-          if (error) throw error;
-          return;
-        }
+      const gid = (q.quote_group_id ?? null) as string | null;
+      if (!gid) {
+        const { error } = await supabase.from("quotes")
+          .update({ deleted_at: null, deleted_by: null, is_current: true })
+          .eq("id", q.id);
+        if (error) throw error;
+        return;
       }
+
+      // Obnovíme vždy ako neaktuálnu verziu — príznak „aktuálna" smie mať len
+      // jedna verzia v skupine a prepnutie rieši databáza jedným volaním.
       const { error } = await supabase.from("quotes")
-        .update({ deleted_at: null, deleted_by: null })
+        .update({ deleted_at: null, deleted_by: null, is_current: false })
         .eq("id", q.id);
       if (error) throw error;
+
+      const { data: existing, error: eCur } = await supabase
+        .from("quotes")
+        .select("id")
+        .eq("quote_group_id", gid)
+        .is("deleted_at", null)
+        .eq("is_current", true)
+        .maybeSingle();
+      if (eCur) throw eCur;
+      if (existing) return;
+
+      // V skupine nezostala aktuálna verzia — povýš najnovšiu, inak by sa
+      // obnovená kalkulácia v zozname vôbec neukázala.
+      const { data: newest } = await supabase
+        .from("quotes")
+        .select("id")
+        .eq("quote_group_id", gid)
+        .is("deleted_at", null)
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (newest) {
+        const { error: ePromote } = await supabase.rpc("set_current_quote_version", { _quote_id: newest.id });
+        if (ePromote) throw ePromote;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
@@ -65,9 +83,23 @@ function QuotesTrash() {
   });
 
   const purge = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("quotes").delete().eq("id", id);
+    mutationFn: async (q: any) => {
+      const { error } = await supabase.from("quotes").delete().eq("id", q.id);
       if (error) throw error;
+
+      // Ak sa natrvalo zmazala aktuálna verzia, skupina by ostala bez nej a
+      // zvyšné verzie by sa v zozname nezobrazili.
+      const gid = (q.quote_group_id ?? null) as string | null;
+      if (!gid) return;
+      const { data: existing } = await supabase
+        .from("quotes").select("id")
+        .eq("quote_group_id", gid).is("deleted_at", null).eq("is_current", true).maybeSingle();
+      if (existing) return;
+      const { data: newest } = await supabase
+        .from("quotes").select("id")
+        .eq("quote_group_id", gid).is("deleted_at", null)
+        .order("version_number", { ascending: false }).limit(1).maybeSingle();
+      if (newest) await supabase.rpc("set_current_quote_version", { _quote_id: newest.id });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["quotes-trash"] });
@@ -132,7 +164,7 @@ function QuotesTrash() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => { if (confirm("Vymazať natrvalo? Túto akciu nie je možné vrátiť späť.")) purge.mutate(q.id); }}
+                        onClick={() => { if (confirm("Vymazať natrvalo? Túto akciu nie je možné vrátiť späť.")) purge.mutate(q); }}
                         disabled={purge.isPending}
                       >
                         <Trash2 className="size-4 mr-1" />Vymazať natrvalo

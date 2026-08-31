@@ -195,29 +195,12 @@ function QuoteDetail() {
 
   const remove = useMutation({
     mutationFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from("quotes")
-        .update({ deleted_at: new Date().toISOString(), deleted_by: userData?.user?.id ?? null })
-        .eq("id", id);
+      // Presun do koša aj povýšenie najnovšej zostávajúcej verzie robí databáza
+      // v jednej transakcii. Keď to prehliadač robil na dvakrát, povýšenie ticho
+      // zlyhalo na unique indexe (zmazaná verzia si držala príznak „aktuálna")
+      // a celá kalkulácia zmizla zo zoznamu.
+      const { error } = await supabase.rpc("soft_delete_quote", { _quote_id: id });
       if (error) throw error;
-
-      // Ak sme zmazali aktuálnu verziu, povýš najvyššiu zostávajúcu verziu skupiny na aktuálnu,
-      // aby sa kalkulácia nestratila zo zoznamu (zoznam filtruje is_current=true).
-      const q = quote.data as any;
-      if (q?.is_current && q?.quote_group_id) {
-        const { data: remaining } = await supabase
-          .from("quotes")
-          .select("id, version_number")
-          .eq("quote_group_id", q.quote_group_id)
-          .is("deleted_at", null)
-          .order("version_number", { ascending: false })
-          .limit(1);
-        const next = (remaining ?? [])[0];
-        if (next) {
-          await supabase.from("quotes").update({ is_current: true }).eq("id", next.id);
-        }
-      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
@@ -284,7 +267,15 @@ function QuoteDetail() {
         line_total: it.line_total,
         sort_order: idx,
       }));
-      if (rows.length) await supabase.from("quote_items").insert(rows);
+      if (rows.length) {
+        const { error: eItems } = await supabase.from("quote_items").insert(rows);
+        if (eItems) {
+          // Duplikát bez položiek je len mätúca prázdna kalkulácia — vrátime
+          // späť riadok, ktorý sme pred chvíľou sami vytvorili, a ohlásime chybu.
+          await supabase.from("quotes").delete().eq("id", ins.id);
+          throw eItems;
+        }
+      }
       return ins.id;
     },
     onSuccess: (newId) => {

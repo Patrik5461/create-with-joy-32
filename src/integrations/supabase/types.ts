@@ -2180,9 +2180,21 @@ export type Database = {
           reservation_id: string
         }[]
       }
+      replace_reservation_items: {
+        Args: { _items: Json; _reservation_id: string }
+        Returns: number
+      }
       rotate_my_ics_token: {
         Args: Record<string, never>
         Returns: string
+      }
+      set_current_quote_version: {
+        Args: { _quote_id: string }
+        Returns: undefined
+      }
+      soft_delete_quote: {
+        Args: { _quote_id: string }
+        Returns: string | null
       }
       verify_helper_pin: {
         Args: { _helper_id: string; _pin: string }

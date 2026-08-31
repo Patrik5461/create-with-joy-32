@@ -437,19 +437,16 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
       const createdBy = userData?.user?.id ?? null;
       let id: string;
       if (versionParent) {
-        // Označ všetky staršie verzie skupiny ako neaktuálne PRED vložením novej,
-        // aby partial-unique index (jedna aktuálna na skupinu) neblokoval insert.
-        const { error: eOff } = await supabase
-          .from("quotes")
-          .update({ is_current: false })
-          .eq("quote_group_id", versionParent.quote_group_id);
-        if (eOff) throw eOff;
+        // Novú verziu vložíme ako neaktuálnu a prepneme ju až na konci, jedným
+        // volaním v transakcii. Predtým sa najprv zhodil príznak „aktuálna" na
+        // celej skupine a až potom sa vkladalo — keď insert zlyhal, kalkulácia
+        // zostala bez aktuálnej verzie a zmizla zo zoznamu aj z koša.
         const { data, error } = await supabase.from("quotes").insert({
           ...basePayload,
           quote_number: versionParent.quote_number,
           quote_group_id: versionParent.quote_group_id,
           version_number: versionParent.next_version,
-          is_current: true,
+          is_current: false,
           parent_version_id: versionParent.prev_id,
           created_by: createdBy,
         }).select("id").single();
@@ -484,6 +481,16 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
       }));
       if (rows.length) {
         const { error } = await supabase.from("quote_items").insert(rows);
+        if (error) {
+          // Kalkulácia bez položiek nemá zmysel a pri novej verzii by navyše
+          // obsadila číslo verzie, takže by ďalší pokus o uloženie zlyhal.
+          // Vrátime späť riadok, ktorý sme pred chvíľou sami vytvorili.
+          await supabase.from("quotes").delete().eq("id", id!);
+          throw error;
+        }
+      }
+      if (versionParent) {
+        const { error } = await supabase.rpc("set_current_quote_version", { _quote_id: id! });
         if (error) throw error;
       }
       return id!;

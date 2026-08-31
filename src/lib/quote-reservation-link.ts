@@ -77,14 +77,9 @@ export async function syncReservationFromQuote(
     .eq("quote_id", quoteId)
     .order("sort_order");
   if (e1) throw e1;
-  const { error: eDel } = await supabase
-    .from("reservation_items")
-    .delete()
-    .eq("reservation_id", reservationId);
-  if (eDel) throw eDel;
-
   const skipped: SkippedItem[] = [];
   const furniture = (items ?? []).filter((it: any) => it.kind === "furniture" && Number(it.qty) > 0);
+  const rows: { furniture_item_id: string; qty: number }[] = [];
 
   for (const it of furniture as any[]) {
     const qty = Math.max(1, Math.round(Number(it.qty)));
@@ -93,13 +88,16 @@ export async function syncReservationFromQuote(
       skipped.push({ name: it.name || "Položka", qty, reason: "nie je v sklade" });
       continue;
     }
-    const { error: eIns } = await supabase
-      .from("reservation_items")
-      .insert({ reservation_id: reservationId, furniture_item_id: it.furniture_item_id, qty });
-    if (eIns) {
-      skipped.push({ name: it.name || "Položka", qty, reason: eIns.message });
-    }
+    rows.push({ furniture_item_id: it.furniture_item_id, qty });
   }
+
+  // Prepis položiek beží v databáze ako jedna transakcia — keď zlyhá, rezervácii
+  // ostanú pôvodné položky. Predtým sa najprv zmazali a mohla ostať prázdna.
+  const { error: eItems } = await supabase.rpc("replace_reservation_items", {
+    _reservation_id: reservationId,
+    _items: rows as any,
+  });
+  if (eItems) throw eItems;
 
   // 1b) Zapíš neuložiteľné položky do poznámky rezervácie (aby boli vidieť).
   {

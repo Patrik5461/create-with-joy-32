@@ -236,23 +236,22 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
       if (existingId) {
         const { error } = await supabase.from("reservations").update(payload as any).eq("id", existingId);
         if (error) throw error;
-        await supabase.from("reservation_items").delete().eq("reservation_id", existingId);
       } else {
         const { data, error } = await supabase.from("reservations").insert(payload as any).select("id").single();
         if (error) throw error;
         reservationId = data.id;
       }
 
-      if (items.length > 0) {
-        const { error: riError } = await supabase.from("reservation_items").insert(
-          items.filter((i) => i.furniture_item_id && i.qty > 0).map((i) => ({
-            reservation_id: reservationId!,
-            furniture_item_id: i.furniture_item_id,
-            qty: i.qty,
-          })),
-        );
-        if (riError) throw riError;
-      }
+      // Položky prepisuje databáza v jednej transakcii. Predtým sa najprv zmazali
+      // a až potom vkladali nové — pri zlyhaní vloženia ostala rezervácia prázdna
+      // a tovar sa ticho uvoľnil.
+      const { error: riError } = await supabase.rpc("replace_reservation_items", {
+        _reservation_id: reservationId!,
+        _items: items
+          .filter((i) => i.furniture_item_id && i.qty > 0)
+          .map((i) => ({ furniture_item_id: i.furniture_item_id, qty: i.qty })) as any,
+      });
+      if (riError) throw riError;
 
       // Uloženie draftov personálu iba pri vytvorení novej rezervácie.
       if (!existingId && staffDrafts.length > 0) {
