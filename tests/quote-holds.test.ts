@@ -282,4 +282,12 @@ describe("scenár: 20 stoličiek na jeden víkend", () => {
     const held = collectQuoteBlockers([], opts);
     expect(quoteHoldQty(held[CHAIR])).toBe(0);
   });
+
+  it("zrušená kalkulácia ostáva v zozname, ale tovar pustí", () => {
+    // Tlačidlo „Zrušiť" prepne stav na „Zamietnutá" — riadok nikam nezmizne,
+    // len prestane držať kusy. Obnovenie ich zase začne držať.
+    const zrusena = { ...schvalena, status: "rejected" };
+    expect(quoteHoldQty(collectQuoteBlockers([zrusena, caka], opts)[CHAIR])).toBe(6);
+    expect(quoteHoldQty(collectQuoteBlockers([schvalena, caka], opts)[CHAIR])).toBe(14);
+  });
 });

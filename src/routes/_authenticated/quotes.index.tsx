@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, ChevronLeft, ChevronRight, Trash2, Check, Loader2 } from "lucide-react";
+import { Plus, Search, ChevronLeft, ChevronRight, Trash2, Check, Loader2, Ban, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, quoteClientName } from "@/lib/quote-utils";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
@@ -94,6 +94,24 @@ function QuotesList() {
       qc.invalidateQueries({ queryKey: ["quotes"] });
       qc.invalidateQueries({ queryKey: ["quote"] });
       toast.success("Kalkulácia označená ako schválená");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Stav sa nepodarilo zmeniť"),
+  });
+
+  // Zrušenie kalkuláciu nemaže — ostáva v zozname ako „Zamietnutá“ kvôli histórii,
+  // len prestane držať tovar. Obnovenie ju vráti medzi aktívne.
+  const cancelQuote = useMutation({
+    mutationFn: async ({ id, next }: { id: string; next: "sent" | "rejected" }) => {
+      const { error } = await supabase.from("quotes").update({ status: next }).eq("id", id);
+      if (error) throw error;
+      return next;
+    },
+    onSuccess: (next) => {
+      qc.invalidateQueries({ queryKey: ["quotes"] });
+      qc.invalidateQueries({ queryKey: ["quote"] });
+      toast.success(next === "rejected"
+        ? "Kalkulácia zrušená — tovar, ktorý držala, je opäť voľný"
+        : "Kalkulácia obnovená medzi aktívne");
     },
     onError: (e: any) => toast.error(e.message ?? "Stav sa nepodarilo zmeniť"),
   });
@@ -264,13 +282,18 @@ function QuotesList() {
                   <TableHead>Stav</TableHead>
                   <TableHead className="text-right">Suma s DPH</TableHead>
                   <TableHead className="text-right">Schválenie</TableHead>
+                  <TableHead className="text-right w-24">Zrušiť</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quotes.isLoading && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">Načítavam…</TableCell></TableRow>}
-                {!quotes.isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">Žiadne kalkulácie.</TableCell></TableRow>}
+                {quotes.isLoading && <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Načítavam…</TableCell></TableRow>}
+                {!quotes.isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Žiadne kalkulácie.</TableCell></TableRow>}
                 {filtered.map((q: any) => (
-                  <TableRow key={q.id} className="cursor-pointer" onClick={() => navigate({ to: "/quotes/$id", params: { id: q.id } })}>
+                  <TableRow
+                    key={q.id}
+                    className={`cursor-pointer ${q.status === "rejected" ? "opacity-60" : ""}`}
+                    onClick={() => navigate({ to: "/quotes/$id", params: { id: q.id } })}
+                  >
                     <TableCell className="font-medium">{quoteClientName(q)}</TableCell>
                     <TableCell><Badge variant={q.version_number > 1 ? "secondary" : "outline"} className="font-mono">v{q.version_number}</Badge></TableCell>
                     <TableCell className="text-muted-foreground">{q.reservations?.event_name ?? "—"}</TableCell>
@@ -281,7 +304,9 @@ function QuotesList() {
                     <TableCell><Badge variant={QUOTE_STATUS_VARIANT[q.status as keyof typeof QUOTE_STATUS_VARIANT]}>{QUOTE_STATUS_LABEL[q.status as keyof typeof QUOTE_STATUS_LABEL]}</Badge></TableCell>
                     <TableCell className="text-right font-semibold">{formatEur(Number(q.total_with_vat))}</TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      {q.status === "approved" ? (
+                      {q.status === "rejected" ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : q.status === "approved" ? (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
                           <Check className="size-3.5" />Schválená
                         </span>
@@ -296,6 +321,44 @@ function QuotesList() {
                             ? <Loader2 className="size-3.5 mr-1 animate-spin" />
                             : <Check className="size-3.5 mr-1" />}
                           Schváliť
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      {q.status === "rejected" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                          onClick={() => cancelQuote.mutate({ id: q.id, next: "sent" })}
+                          disabled={cancelQuote.isPending}
+                          title="Vrátiť medzi aktívne kalkulácie"
+                        >
+                          {cancelQuote.isPending && cancelQuote.variables?.id === q.id
+                            ? <Loader2 className="size-3.5 mr-1 animate-spin" />
+                            : <Undo2 className="size-3.5 mr-1" />}
+                          Obnoviť
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-rose-300 text-rose-700 hover:bg-rose-50"
+                          disabled={cancelQuote.isPending}
+                          title="Kalkulácia ostane v zozname, len prestane držať tovar"
+                          onClick={() => {
+                            const ok = window.confirm(
+                              `Zrušiť kalkuláciu pre ${quoteClientName(q)}?\n\n` +
+                              "Zostane v zozname ako „Zamietnutá“ — nemaže sa nič a vieš ju kedykoľvek obnoviť. " +
+                              "Tovar, ktorý držala, sa uvoľní pre ostatné kalkulácie.",
+                            );
+                            if (ok) cancelQuote.mutate({ id: q.id, next: "rejected" });
+                          }}
+                        >
+                          {cancelQuote.isPending && cancelQuote.variables?.id === q.id
+                            ? <Loader2 className="size-3.5 mr-1 animate-spin" />
+                            : <Ban className="size-3.5 mr-1" />}
+                          Zrušiť
                         </Button>
                       )}
                     </TableCell>

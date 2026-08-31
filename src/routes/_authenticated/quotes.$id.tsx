@@ -5,7 +5,7 @@ import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Printer, Copy, Trash2, Mail, Loader2, History, Check, Undo2 } from "lucide-react";
+import { Printer, Copy, Trash2, Mail, Loader2, History, Check, Undo2, Ban } from "lucide-react";
 import { CalendarPlus, ExternalLink, RefreshCw, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -188,7 +188,11 @@ function QuoteDetail() {
     onSuccess: (next) => {
       qc.invalidateQueries({ queryKey: ["quote", id] });
       qc.invalidateQueries({ queryKey: ["quotes"] });
-      toast.success(next === "approved" ? "Kalkulácia označená ako schválená" : `Stav zmenený na „${QUOTE_STATUS_LABEL[next]}“`);
+      toast.success(
+        next === "approved" ? "Kalkulácia označená ako schválená"
+        : next === "rejected" ? "Kalkulácia zrušená — tovar, ktorý držala, je opäť voľný"
+        : `Stav zmenený na „${QUOTE_STATUS_LABEL[next]}“`,
+      );
     },
     onError: (e: any) => toast.error(e.message ?? "Stav sa nepodarilo zmeniť"),
   });
@@ -439,26 +443,71 @@ function QuoteDetail() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {q.status === "approved" ? (
+            {q.status === "rejected" ? (
               <Button
                 variant="outline"
                 className="border-emerald-400 text-emerald-800 hover:bg-emerald-50"
                 onClick={() => setStatus.mutate("sent")}
                 disabled={setStatus.isPending}
-                title="Vrátiť späť na „Odoslaná“"
+                title="Vrátiť medzi aktívne kalkulácie"
               >
                 {setStatus.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Undo2 className="size-4 mr-1" />}
-                Zrušiť schválenie
+                Obnoviť kalkuláciu
               </Button>
             ) : (
-              <Button
-                className="bg-emerald-600 text-white hover:bg-emerald-700"
-                onClick={() => setStatus.mutate("approved")}
-                disabled={setStatus.isPending}
-              >
-                {setStatus.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Check className="size-4 mr-1" />}
-                Schválená
-              </Button>
+              <>
+                {q.status === "approved" ? (
+                  <Button
+                    variant="outline"
+                    className="border-emerald-400 text-emerald-800 hover:bg-emerald-50"
+                    onClick={() => setStatus.mutate("sent")}
+                    disabled={setStatus.isPending}
+                    title="Vrátiť späť na „Odoslaná“"
+                  >
+                    {setStatus.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Undo2 className="size-4 mr-1" />}
+                    Zrušiť schválenie
+                  </Button>
+                ) : (
+                  <Button
+                    className="bg-emerald-600 text-white hover:bg-emerald-700"
+                    onClick={() => setStatus.mutate("approved")}
+                    disabled={setStatus.isPending}
+                  >
+                    {setStatus.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : <Check className="size-4 mr-1" />}
+                    Schválená
+                  </Button>
+                )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50" disabled={setStatus.isPending}>
+                      <Ban className="size-4 mr-1" />Zrušiť
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Zrušiť kalkuláciu pre {quoteClientName(q)}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Kalkulácia <span className="font-semibold">zostane v zozname</span> so stavom „Zamietnutá“, aj so všetkými verziami — nemaže sa nič a kedykoľvek ju vieš obnoviť.
+                        {" "}Tovar, ktorý držala, sa uvoľní pre ostatné kalkulácie.
+                        {res && (
+                          <>
+                            {" "}<span className="font-semibold">Pozor:</span> táto kalkulácia má rezerváciu „{res.event_name}“ a tá tovar drží ďalej. Ak ho chceš uvoľniť celý, zruš aj rezerváciu v jej detaile.
+                          </>
+                        )}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Späť</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-rose-600 text-white hover:bg-rose-700"
+                        onClick={() => setStatus.mutate("rejected")}
+                      >
+                        Zrušiť kalkuláciu
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
             )}
             <Button variant="outline" onClick={() => window.print()}><Printer className="size-4 mr-1" />Tlačiť / PDF</Button>
             <Button variant="outline" onClick={() => {
