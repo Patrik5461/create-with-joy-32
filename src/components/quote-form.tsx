@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { checkAvailability } from "@/lib/availability";
+import { blockerClass, type Blocker } from "@/lib/quote-holds";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -221,7 +222,9 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
     },
   });
 
-  const [availability, setAvailability] = useState<Record<string, { qty: number; available: number; quoteHold?: number }>>({});
+  const [availability, setAvailability] = useState<
+    Record<string, { qty: number; available: number; quoteHold?: number; blockers?: Blocker[] }>
+  >({});
 
   const ownQuoteGroupId: string | null =
     (initial as any)?.quote_group_id ?? versionParent?.quote_group_id ?? null;
@@ -259,10 +262,10 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         toIso,
         { excludeReservationId: win?.id ?? null, excludeQuoteGroupId: ownQuoteGroupId },
       );
-      const results: Record<string, { qty: number; available: number; quoteHold?: number }> = {};
+      const results: Record<string, { qty: number; available: number; quoteHold?: number; blockers?: Blocker[] }> = {};
       for (const l of furnitureLines) {
         const a = map[l.furniture_item_id!];
-        if (a) results[l.id] = { qty: l.qty, available: a.available, quoteHold: a.quoteHold };
+        if (a) results[l.id] = { qty: l.qty, available: a.available, quoteHold: a.quoteHold, blockers: a.blockers };
       }
       if (!cancelled) setAvailability(results);
     })();
@@ -672,7 +675,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
               <div>
                 <div className="font-medium">Prekročená skladová dostupnosť</div>
                 <div className="text-xs">
-                  Niektoré položky prekračujú počet voľných kusov v danom termíne (vrátane kusov blokovaných inými nepotvrdenými kalkuláciami). Kalkuláciu je možné uložiť, ale kusy bude potrebné dokúpiť alebo dopožičať.
+                  Niektoré položky prekračujú počet voľných kusov v danom termíne — vrátane kusov, ktoré držia iné kalkulácie (aj schválené) a rezervácie. Pri položke je vidieť, kto ich drží. Kalkuláciu je možné uložiť, ale kusy bude potrebné dokúpiť alebo dopožičať.
                 </div>
               </div>
             </div>
@@ -768,6 +771,24 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
                 <div className="md:col-span-12 text-[11px] text-amber-800 flex items-center gap-1">
                   <AlertTriangle className="size-3" />
                   Pozor: požadovaných {l.qty} ks, na sklade dostupných len {a.available} ks{form.reservation_id ? " v termíne rezervácie" : ""} (chýba {l.qty - a.available} ks).
+                </div>
+              )}
+              {a?.blockers && a.blockers.length > 0 && (
+                <div className="md:col-span-12 flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className="text-muted-foreground shrink-0">V tomto termíne tovar drží:</span>
+                  {a.blockers.map((b) => (
+                    <a
+                      key={`${b.kind}-${b.id}`}
+                      href={b.kind === "quote" ? `/quotes/${b.id}` : `/reservations/${b.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={b.kind === "quote" ? "Otvoriť kalkuláciu v novej karte" : "Otvoriť rezerváciu v novej karte"}
+                      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 hover:brightness-95 ${blockerClass(b)}`}
+                    >
+                      <span className="font-medium">{b.label}</span>
+                      <span className="opacity-80">· {b.kind === "reservation" ? "Rezervácia" : b.statusLabel} · {b.qty} ks</span>
+                    </a>
+                  ))}
                 </div>
               )}
             </div>
