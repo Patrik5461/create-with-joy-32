@@ -11,11 +11,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Users, Plus, Trash2, Pencil, Clock, Phone, Mail, AlertTriangle } from "lucide-react";
+import { Users, Plus, Trash2, Pencil, Clock, Phone, Mail, AlertTriangle, HandHeart, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
+
+/** Prihláška brigádnika z `/helper` — ešte nie je nasadenie. */
+type SignupRow = {
+  id: string;
+  helper_id: string;
+  status: "pending" | "accepted" | "declined";
+  note: string | null;
+  created_at: string;
+};
 
 type StaffRow = {
   id: string;
@@ -255,6 +264,50 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
     onError: (e: any) => toast.error(e.message),
   });
 
+  // Prihlášky brigádnikov z `/helper`. Sú oddelené od nasadenia — až prijatím
+  // sa z „chcel by som" stane riadok v personáli.
+  const signups = useQuery({
+    queryKey: ["reservation-signups", reservationId],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from as any)("reservation_signups")
+        .select("id, helper_id, status, note, created_at")
+        .eq("reservation_id", reservationId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      const rows = (data ?? []) as SignupRow[];
+      const ids = Array.from(new Set(rows.map((r) => r.helper_id)));
+      const names = new Map<string, string>();
+      if (ids.length) {
+        const { data: hs } = await supabase.from("helpers").select("id, name").in("id", ids);
+        for (const h of (hs ?? []) as any[]) names.set(h.id, h.name);
+      }
+      return rows.map((r) => ({ ...r, helperName: names.get(r.helper_id) ?? "Brigádnik" }));
+    },
+  });
+
+  const decideSignup = useMutation({
+    mutationFn: async ({ id, accept }: { id: string; accept: boolean }) => {
+      if (accept) {
+        // Prijatie zapíše nasadenie aj rozhodnutie v jednej transakcii.
+        const { error } = await supabase.rpc("accept_reservation_signup", { _signup_id: id });
+        if (error) throw error;
+        return;
+      }
+      const { error } = await (supabase.from as any)("reservation_signups")
+        .update({ status: "declined", decided_by: currentUser?.id ?? null, decided_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["reservation-signups", reservationId] });
+      qc.invalidateQueries({ queryKey: ["reservation-staff", reservationId] });
+      toast.success(v.accept ? "Brigádnik nasadený na akciu" : "Prihláška odmietnutá");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Nepodarilo sa"),
+  });
+
+  const pendingSignups = (signups.data ?? []).filter((r) => r.status === "pending");
+
   const summary = useMemo(() => {
     const list = staff.data ?? [];
     const present = list.filter((r) => r.arrived && !r.departed).length;
@@ -291,6 +344,42 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
       </CardHeader>
       <CardContent className="space-y-2">
         {staff.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
+        {pendingSignups.length > 0 && (
+          <div className="rounded-md border border-sky-300 bg-sky-50 p-3 space-y-2">
+            <div className="text-xs font-semibold text-sky-900 flex items-center gap-1.5">
+              <HandHeart className="size-4" />
+              Prihlásili sa brigádnici ({pendingSignups.length})
+            </div>
+            {pendingSignups.map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-2 rounded border bg-background px-2 py-1.5">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{r.helperName}</div>
+                  {r.note && <div className="text-[11px] text-muted-foreground truncate">{r.note}</div>}
+                </div>
+                {canManage ? (
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      size="sm" className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
+                      disabled={decideSignup.isPending}
+                      onClick={() => decideSignup.mutate({ id: r.id, accept: true })}
+                    >
+                      <Check className="size-3.5 mr-1" />Prijať
+                    </Button>
+                    <Button
+                      size="sm" variant="outline" className="h-8 border-rose-300 text-rose-700 hover:bg-rose-50"
+                      disabled={decideSignup.isPending}
+                      onClick={() => decideSignup.mutate({ id: r.id, accept: false })}
+                    >
+                      <X className="size-3.5 mr-1" />Odmietnuť
+                    </Button>
+                  </div>
+                ) : (
+                  <Badge variant="secondary" className="shrink-0">Čaká na schválenie</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {overdue.length > 0 && (
           <div className="rounded-md border border-red-300 bg-red-50 text-red-900 p-3 flex items-start gap-2">
             <AlertTriangle className="size-4 mt-0.5 shrink-0" />

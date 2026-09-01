@@ -1641,6 +1641,67 @@ export type Database = {
           },
         ]
       }
+      reservation_signups: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          helper_id: string
+          id: string
+          note: string | null
+          reservation_id: string
+          staff_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          helper_id: string
+          id?: string
+          note?: string | null
+          reservation_id: string
+          staff_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          helper_id?: string
+          id?: string
+          note?: string | null
+          reservation_id?: string
+          staff_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservation_signups_helper_id_fkey"
+            columns: ["helper_id"]
+            isOneToOne: false
+            referencedRelation: "helpers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservation_signups_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservation_signups_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "reservation_staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reservation_staff: {
         Row: {
           actual_arrival: string | null
@@ -2124,6 +2185,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_reservation_signup: {
+        Args: { _signup_id: string }
+        Returns: string
+      }
       check_item_availability: {
         Args: {
           _exclude_reservation?: string

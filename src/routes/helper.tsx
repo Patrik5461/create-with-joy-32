@@ -10,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Clock, Delete, HardHat, LogOut, Play, Square, Loader2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock, Delete, HardHat, LogOut, Play, Square, Loader2 } from "lucide-react";
+import { HelperEvents } from "@/components/helper-events";
 
 export const Route = createFileRoute("/helper")({
   ssr: false,
@@ -42,6 +43,8 @@ function HelperScreen() {
     setToken(tk);
     setName(nm);
   };
+  const [tab, setTab] = useState<"punch" | "events">("punch");
+
   const onSignOut = () => {
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(NAME_KEY);
@@ -60,7 +63,36 @@ function HelperScreen() {
         {!token ? (
           <HelperLogin onSignedIn={onSignedIn} />
         ) : (
-          <HelperPunch token={token} name={name} onSignOut={onSignOut} />
+          <>
+            <div className="inline-flex w-full rounded-md border p-0.5 bg-muted/40 mt-4">
+              {([
+                { key: "punch", label: "Dochádzka", icon: Clock },
+                { key: "events", label: "Akcie", icon: CalendarDays },
+              ] as const).map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded ${
+                    tab === t.key ? "bg-background shadow-sm font-medium" : "text-muted-foreground"
+                  }`}
+                >
+                  <t.icon className="size-4" />{t.label}
+                </button>
+              ))}
+            </div>
+            {tab === "punch" ? (
+              <HelperPunch token={token} name={name} onSignOut={onSignOut} />
+            ) : (
+              <div className="pt-4 space-y-4">
+                <HelperEvents token={token} onExpired={onSignOut} />
+                <div className="pt-2 text-center">
+                  <Button variant="ghost" size="sm" onClick={onSignOut}>
+                    <LogOut className="size-4 mr-1" />Odhlásiť
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
