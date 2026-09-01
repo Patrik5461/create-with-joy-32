@@ -8,6 +8,7 @@ import { CalendarRange, Package, Truck, AlertTriangle, TrendingUp, Boxes, Wrench
 import { format } from "date-fns";
 import { sk } from "date-fns/locale";
 import { RESERVATION_FLOW, STATUS_LABEL, STATUS_BADGE_VARIANT, STATUS_DOT, type ReservationStatus } from "@/lib/reservation-status";
+import { HelperSignupsCard } from "@/components/helper-signups-card";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard · Mima Production CRM" }] }),
@@ -118,6 +119,8 @@ function Dashboard() {
           <Stat icon={CalendarRange} label="Aktívne rezervácie" value={data?.active ?? "—"} />
           <Stat icon={TrendingUp} label="Eventy tento mesiac" value={data?.monthCount ?? "—"} />
         </div>
+
+        <HelperSignupsCard />
 
         <Card>
           <CardHeader>
