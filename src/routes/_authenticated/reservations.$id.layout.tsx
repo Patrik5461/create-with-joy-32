@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { BACKGROUND_ACCEPT, BACKGROUND_FORMATS_LABEL, prepareBackground } from "@/lib/layout-background";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,6 +118,7 @@ function LayoutEditor() {
   const [loaded, setLoaded] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const [bgUrl, setBgUrl] = useState<string | null>(null);
+  const [uploadingBg, setUploadingBg] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -223,15 +225,29 @@ function LayoutEditor() {
   }, [layout.backgroundImage?.path]);
 
   async function onUploadBackground(file: File) {
-    if (!file.type.startsWith("image/")) { toast.error("Nahrajte prosím obrázok."); return; }
-    const ext = file.name.split(".").pop() ?? "png";
-    const path = `${id}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("layout-backgrounds").upload(path, file, { upsert: true, contentType: file.type });
-    if (error) { toast.error(error.message); return; }
-    const prev = layout.backgroundImage?.path;
-    if (prev && prev !== path) supabase.storage.from("layout-backgrounds").remove([prev]).catch(() => {});
-    commit({ ...layout, backgroundImage: { path, opacity: layout.backgroundImage?.opacity ?? 0.5 } });
-    toast.success("Pôdorys nahraný");
+    setUploadingBg(true);
+    const toastId = toast.loading(
+      file.type === "application/pdf" ? "Prevádzam PDF na pôdorys…" : "Spracúvam pôdorys…",
+    );
+    try {
+      // PDF sa prevedie na obrázok a formát, ktorý prehliadač nezobrazí, sa
+      // odmietne hneď — nahrať sa smie len to, čo sa naozaj vykreslí.
+      const prepared = await prepareBackground(file);
+      const path = `${id}/${Date.now()}.${prepared.ext}`;
+      const { error } = await supabase.storage
+        .from("layout-backgrounds")
+        .upload(path, prepared.blob, { upsert: true, contentType: prepared.contentType });
+      if (error) throw new Error(error.message);
+
+      const prev = layout.backgroundImage?.path;
+      if (prev && prev !== path) supabase.storage.from("layout-backgrounds").remove([prev]).catch(() => {});
+      commit({ ...layout, backgroundImage: { path, opacity: layout.backgroundImage?.opacity ?? 0.5 } });
+      toast.success("Pôdorys nahraný", { id: toastId, description: prepared.note });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Pôdorys sa nepodarilo nahrať", { id: toastId });
+    } finally {
+      setUploadingBg(false);
+    }
   }
   function removeBackground() {
     const prev = layout.backgroundImage?.path;
@@ -845,23 +861,30 @@ function LayoutEditor() {
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <label className="text-xs">
-                          <Input type="file" accept="image/*" className="hidden"
+                          <Input type="file" accept={BACKGROUND_ACCEPT} className="hidden" disabled={uploadingBg}
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadBackground(f); e.target.value = ""; }} />
                           <span className="flex items-center justify-center gap-1 h-8 rounded border cursor-pointer hover:bg-muted/60">
-                            <ImageIcon className="size-3" />Vymeniť
+                            {uploadingBg ? <Loader2 className="size-3 animate-spin" /> : <ImageIcon className="size-3" />}
+                            {uploadingBg ? "Spracúvam…" : "Vymeniť"}
                           </span>
                         </label>
                         <Button variant="destructive" size="sm" onClick={removeBackground}><X className="size-3 mr-1" />Odstrániť</Button>
                       </div>
                     </div>
                   ) : (
-                    <label className="block text-xs">
-                      <Input type="file" accept="image/*" className="hidden"
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadBackground(f); e.target.value = ""; }} />
-                      <span className="flex items-center justify-center gap-1 h-9 rounded border cursor-pointer hover:bg-muted/60">
-                        <ImageIcon className="size-3" />Nahrať pôdorys
-                      </span>
-                    </label>
+                    <div className="space-y-1.5">
+                      <label className="block text-xs">
+                        <Input type="file" accept={BACKGROUND_ACCEPT} className="hidden" disabled={uploadingBg}
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadBackground(f); e.target.value = ""; }} />
+                        <span className="flex items-center justify-center gap-1 h-9 rounded border cursor-pointer hover:bg-muted/60">
+                          {uploadingBg ? <Loader2 className="size-3 animate-spin" /> : <ImageIcon className="size-3" />}
+                          {uploadingBg ? "Spracúvam…" : "Nahrať pôdorys"}
+                        </span>
+                      </label>
+                      <p className="text-[10px] text-muted-foreground leading-snug">
+                        {BACKGROUND_FORMATS_LABEL}. Z PDF sa použije prvá strana.
+                      </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
