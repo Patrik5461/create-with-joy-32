@@ -1,4 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
+import {
+  canWithdraw,
+  visibleSignupStatus,
+  type HelperSignupStatus,
+} from "@/lib/helper-signup-status";
+
+export type { HelperSignupStatus } from "@/lib/helper-signup-status";
 
 /**
  * Kalendár akcií pre brigádnikov na `/helper`.
@@ -15,8 +22,6 @@ import { createServerFn } from "@tanstack/react-start";
 
 /** Ako ďaleko dopredu brigádnik vidí. */
 const HORIZON_DAYS = 120;
-
-export type HelperSignupStatus = "none" | "pending" | "accepted" | "declined";
 
 export interface HelperEvent {
   id: string;
@@ -93,16 +98,20 @@ export const helperUpcomingEvents = createServerFn({ method: "POST" })
     }
     const assigned = new Set((staff.data ?? []).map((s: { reservation_id: string }) => s.reservation_id));
 
-    return list.map((r) => ({
-      id: r.id,
-      name: (r.event_name ?? "").trim() || "Akcia",
-      venue: r.venue,
-      startAt: r.load_at,
-      endAt: r.return_at,
-      eventStartAt: r.event_start_at,
-      signup: signupBy.get(r.id) ?? "none",
-      assigned: assigned.has(r.id),
-    }));
+    return list.map((r) => {
+      const isAssigned = assigned.has(r.id);
+      return {
+        id: r.id,
+        name: (r.event_name ?? "").trim() || "Akcia",
+        venue: r.venue,
+        startAt: r.load_at,
+        endAt: r.return_at,
+        eventStartAt: r.event_start_at,
+        // Potvrdené je len to, čo naozaj stojí v personáli na akcii.
+        signup: visibleSignupStatus(signupBy.get(r.id) ?? "none", isAssigned),
+        assigned: isAssigned,
+      };
+    });
   });
 
 // -------- Prihlásenie sa na akciu --------
@@ -135,14 +144,24 @@ export const helperSignUp = createServerFn({ method: "POST" })
       throw new Error("Táto akcia už prebehla.");
     }
 
-    const { data: existing } = await supabaseAdmin
-      .from("reservation_signups")
-      .select("id, status")
-      .eq("reservation_id", data.reservationId)
-      .eq("helper_id", helperId)
-      .maybeSingle();
+    const [{ data: existing }, { data: staffRow }] = await Promise.all([
+      supabaseAdmin
+        .from("reservation_signups")
+        .select("id, status")
+        .eq("reservation_id", data.reservationId)
+        .eq("helper_id", helperId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("reservation_staff")
+        .select("id")
+        .eq("reservation_id", data.reservationId)
+        .eq("helper_id", helperId)
+        .maybeSingle(),
+    ]);
 
-    if (existing?.status === "accepted") return { status: "accepted" as const };
+    // Už nasadený nemá čo prihlasovať. Prihláška, ktorá hlási „prijaté" bez
+    // nasadenia, je zvyšok po vymazaní z akcie — tá sa smie poslať znova.
+    if (staffRow) return { status: "accepted" as const };
 
     if (existing) {
       // Aj odmietnutú prihlášku sa dá poslať znova — rozhodnutie sa vynuluje.
@@ -180,14 +199,22 @@ export const helperWithdrawSignup = createServerFn({ method: "POST" })
 
     // Prijaté nasadenie brigádnik zrušiť nemôže — to je už dohoda, rieši sa
     // s vedením. Stiahnuť sa dá len prihláška, ktorá ešte čaká.
-    const { data: row } = await supabaseAdmin
-      .from("reservation_signups")
-      .select("id, status")
-      .eq("reservation_id", data.reservationId)
-      .eq("helper_id", helperId)
-      .maybeSingle();
+    const [{ data: row }, { data: staffRow }] = await Promise.all([
+      supabaseAdmin
+        .from("reservation_signups")
+        .select("id, status")
+        .eq("reservation_id", data.reservationId)
+        .eq("helper_id", helperId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("reservation_staff")
+        .select("id")
+        .eq("reservation_id", data.reservationId)
+        .eq("helper_id", helperId)
+        .maybeSingle(),
+    ]);
     if (!row) return { status: "none" as const };
-    if (row.status === "accepted") {
+    if (!canWithdraw(row.status as HelperSignupStatus, !!staffRow)) {
       throw new Error("Si už nasadený na akciu — zmenu dohodni s vedením.");
     }
     const { error } = await supabaseAdmin.from("reservation_signups").delete().eq("id", row.id);

@@ -4,6 +4,7 @@
  * cudzím človekom a dátami — musí sedieť.
  */
 import { beforeAll, describe, expect, it } from "bun:test";
+import { canSignUp, canWithdraw, visibleSignupStatus } from "../src/lib/helper-signup-status";
 
 const SECRET = "test-secret-nech-je-dost-dlhy-123456";
 
@@ -99,5 +100,42 @@ describe("brzda na opakované pokusy", () => {
     for (let i = 0; i < 9; i++) checkRateLimit(a);
     expect(checkRateLimit(a)).toBe(false);
     expect(checkRateLimit(b)).toBe(true);
+  });
+});
+
+describe("stav prihlášky, ktorý brigádnik vidí", () => {
+  it("potvrdené je len to, čo stojí v personáli na akcii", () => {
+    expect(visibleSignupStatus("accepted", true)).toBe("accepted");
+    expect(visibleSignupStatus("pending", true)).toBe("accepted");
+  });
+
+  it("po vymazaní z akcie sa potvrdenie stratí", () => {
+    // Presne to hlásil Patrik: prihláška ostala „prijatá" a brigádnik ďalej
+    // videl „Potvrdené", hoci ho z rezervácie vymazal.
+    expect(visibleSignupStatus("accepted", false)).toBe("declined");
+  });
+
+  it("čakajúca a žiadna prihláška ostávajú, ako sú", () => {
+    expect(visibleSignupStatus("pending", false)).toBe("pending");
+    expect(visibleSignupStatus("none", false)).toBe("none");
+    expect(visibleSignupStatus("declined", false)).toBe("declined");
+  });
+
+  it("po vymazaní z akcie sa smie prihlásiť znova", () => {
+    expect(canSignUp("accepted", false)).toBe(true);
+    expect(canSignUp("declined", false)).toBe(true);
+    expect(canSignUp("none", false)).toBe(true);
+  });
+
+  it("nasadený ani čakajúci sa druhýkrát neprihlasuje", () => {
+    expect(canSignUp("accepted", true)).toBe(false);
+    expect(canSignUp("pending", false)).toBe(false);
+  });
+
+  it("stiahnuť sa dá len čakajúca prihláška, nie dohodnuté nasadenie", () => {
+    expect(canWithdraw("pending", false)).toBe(true);
+    expect(canWithdraw("pending", true)).toBe(false);
+    expect(canWithdraw("accepted", true)).toBe(false);
+    expect(canWithdraw("none", false)).toBe(false);
   });
 });
