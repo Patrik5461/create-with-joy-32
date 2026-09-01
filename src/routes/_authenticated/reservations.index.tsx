@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
@@ -31,13 +31,34 @@ export const Route = createFileRoute("/_authenticated/reservations/")({
 
 type View = "day" | "week" | "month";
 
+/**
+ * Je displej úzky (telefón)? Mesačná mriežka má sedem stĺpcov a na telefóne sa
+ * do šírky nezmestí, preto sa podľa toho volí predvolený pohľad.
+ */
+function useIsNarrow(breakpoint = 640): boolean {
+  const [narrow, setNarrow] = useState(() =>
+    typeof window === "undefined" ? false : window.innerWidth < breakpoint,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const onChange = () => setNarrow(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [breakpoint]);
+  return narrow;
+}
+
 function Reservations() {
   const { data: user } = useCurrentUser();
   const canCreate = hasRole(user, "admin", "manager");
   const navigate = useNavigate();
   const search = Route.useSearch();
   const statusFilter = (search.status ?? "all") as ReservationStatus | "all";
-  const view: View = search.view ?? "week";
+  // Bez voľby v adrese sa pohľad prispôsobí displeju — na telefóne mesiac
+  // nedáva zmysel. Ručná voľba ide do adresy, takže vždy prebije predvoľbu.
+  const isNarrow = useIsNarrow();
+  const view: View = search.view ?? (isNarrow ? "day" : "week");
   const cursor = useMemo(() => (search.date ? parseISO(search.date) : startOfDay(new Date())), [search.date]);
 
   const setView = (v: View) =>
@@ -187,11 +208,11 @@ function Reservations() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => move(-1)}><ChevronLeft className="size-4" /></Button>
-            <Button variant="outline" size="sm" onClick={() => setCursor(new Date())}>Dnes</Button>
-            <Button variant="outline" size="icon" onClick={() => move(1)}><ChevronRight className="size-4" /></Button>
-            <span className="font-medium text-sm ml-2 capitalize">{headerLabel}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <Button variant="outline" size="icon" className="shrink-0" onClick={() => move(-1)}><ChevronLeft className="size-4" /></Button>
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => setCursor(new Date())}>Dnes</Button>
+            <Button variant="outline" size="icon" className="shrink-0" onClick={() => move(1)}><ChevronRight className="size-4" /></Button>
+            <span className="font-medium text-sm ml-2 capitalize truncate">{headerLabel}</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Select
@@ -204,7 +225,7 @@ function Reservations() {
                 })
               }
             >
-              <SelectTrigger className="h-9 w-44 text-xs">
+              <SelectTrigger className="h-9 w-full sm:w-44 text-xs">
                 <SelectValue placeholder="Všetky stavy" />
               </SelectTrigger>
               <SelectContent>
@@ -219,11 +240,11 @@ function Reservations() {
                 ))}
               </SelectContent>
             </Select>
-            <Tabs value={view} onValueChange={(v) => setView(v as View)}>
-              <TabsList>
-                <TabsTrigger value="day">Deň</TabsTrigger>
-                <TabsTrigger value="week">Týždeň</TabsTrigger>
-                <TabsTrigger value="month">Mesiac</TabsTrigger>
+            <Tabs value={view} onValueChange={(v) => setView(v as View)} className="w-full sm:w-auto">
+              <TabsList className="w-full sm:w-auto">
+                <TabsTrigger value="day" className="flex-1 sm:flex-none">Deň</TabsTrigger>
+                <TabsTrigger value="week" className="flex-1 sm:flex-none">Týždeň</TabsTrigger>
+                <TabsTrigger value="month" className="flex-1 sm:flex-none">Mesiac</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -481,7 +502,11 @@ function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet, staf
   while (d <= gridEnd) { days.push(d); d = addDays(d, 1); }
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    // Sedem stĺpcov sa na telefón nezmestí. Mriežka má preto vlastný vodorovný
+    // posuvník a na úzkom displeji siaha po okraje obrazovky — stránka samotná
+    // sa doprava neposúva.
+    <div className="-mx-4 px-4 md:mx-0 md:px-0 overflow-x-auto">
+      <div className="rounded-lg border bg-card overflow-hidden min-w-[42rem]">
       <div className="grid grid-cols-7 bg-muted text-xs font-medium">
         {["Po","Ut","St","Št","Pi","So","Ne"].map((dn) => <div key={dn} className="p-2 text-center">{dn}</div>)}
       </div>
@@ -544,6 +569,7 @@ function MonthGrid({ cursor, occurrences, onSlot, canCreate, overbookedSet, staf
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
