@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { formatReservationItems } from "@/lib/ics-items";
 
 export const Route = createFileRoute("/api/public/calendar/$token")({
   server: {
@@ -25,7 +26,9 @@ export const Route = createFileRoute("/api/public/calendar/$token")({
         const { data: reservations, error } = await supabaseAdmin
           .from("reservations")
           .select(
-            "id, event_name, venue, address, note, status, load_at, depart_at, event_start_at, event_end_at, return_at, available_from_at, contact_person, phone, email, updated_at, created_at, clients(company_name)"
+            // Nábytok patrí do popisu udalosti — bez neho sa v Apple/Google
+            // kalendári nedalo zistiť, čo sa na akciu vlastne vezie.
+            "id, event_name, venue, address, note, status, load_at, depart_at, event_start_at, event_end_at, return_at, available_from_at, contact_person, phone, email, updated_at, created_at, clients(company_name), reservation_items(qty, furniture_items(name))"
           )
           .neq("status", "cancelled")
           .order("event_start_at", { ascending: true, nullsFirst: false });
@@ -34,14 +37,15 @@ export const Route = createFileRoute("/api/public/calendar/$token")({
           return new Response(`Error: ${error.message}`, { status: 500 });
         }
 
-        const ics = buildIcs(reservations ?? [], profile.full_name ?? profile.id);
+        const ics = buildIcs((reservations ?? []) as unknown as ReservationRow[], profile.full_name ?? profile.id);
 
         return new Response(ics, {
           status: 200,
           headers: {
             "Content-Type": "text/calendar; charset=utf-8",
             "Content-Disposition": `inline; filename="mimaproduction-crm.ics"`,
-            "Cache-Control": "public, max-age=300",
+            // Krátko, aby ručné obnovenie v kalendári ukázalo zmenu hneď.
+            "Cache-Control": "public, max-age=60",
           },
         });
       },
@@ -49,14 +53,15 @@ export const Route = createFileRoute("/api/public/calendar/$token")({
   },
 });
 
+// Musí sedieť s `RESERVATION_STATUSES` — staré názvy (prepared/loaded/delivered)
+// v číselníku nikdy neboli a stav sa preto v kalendári ukazoval surový.
 const STATUS_LABEL: Record<string, string> = {
   inquiry: "Dopyt",
+  quote: "Ponuka",
   confirmed: "Potvrdené",
-  prepared: "Pripravené",
-  loaded: "Naložené",
-  delivered: "Doručené",
   in_progress: "Prebieha event",
   returned: "Vrátené",
+  invoiced: "Fakturované",
   cancelled: "Zrušené",
 };
 
@@ -120,6 +125,7 @@ type ReservationRow = {
   updated_at: string | null;
   created_at: string | null;
   clients: { company_name: string | null } | null;
+  reservation_items: { qty: number | null; furniture_items: { name: string | null } | null }[] | null;
 };
 
 function buildIcs(reservations: ReservationRow[], owner: string): string {
@@ -142,6 +148,7 @@ function buildIcs(reservations: ReservationRow[], owner: string): string {
     const title = r.event_name ?? "Rezervácia";
     const statusLabel = STATUS_LABEL[r.status ?? ""] ?? r.status ?? "";
     const location = [r.venue, r.address].filter(Boolean).join(", ");
+    const itemsBlock = formatReservationItems(r.reservation_items);
     const descParts = [
       client ? `Klient: ${client}` : null,
       statusLabel ? `Stav: ${statusLabel}` : null,
@@ -154,6 +161,8 @@ function buildIcs(reservations: ReservationRow[], owner: string): string {
       r.event_end_at ? `Koniec eventu: ${formatHuman(r.event_end_at)}` : null,
       r.return_at ? `Návrat: ${formatHuman(r.return_at)}` : null,
       r.available_from_at ? `Dostupné od: ${formatHuman(r.available_from_at)}` : null,
+      // Čo sa na akciu vezie — pri nakládke to je to hlavné, čo z kalendára treba.
+      itemsBlock ? `\n${itemsBlock}` : null,
       r.note ? `\nPoznámka: ${r.note}` : null,
     ].filter(Boolean);
     const description = descParts.join("\n");

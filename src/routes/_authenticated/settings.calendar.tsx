@@ -45,6 +45,9 @@ function CalendarSettings() {
   const origin = getPublicAppUrl();
   const icsUrl = data?.token ? `${origin}/api/public/calendar/${data.token}.ics` : "";
   const webcalUrl = data?.token ? `webcal://${origin.replace(/^https?:\/\//, "")}/api/public/calendar/${data.token}.ics` : "";
+  // Rovnaký feed, len s iným koncom adresy — Google ho vďaka tomu berie ako nový
+  // kalendár a stiahne si ho hneď, namiesto čakania na svoje obnovovanie.
+  const freshUrl = icsUrl ? `${icsUrl}?v=${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}` : "";
   const googleAddUrl = icsUrl
     ? `https://calendar.google.com/calendar/r/settings/addbyurl?cid=${encodeURIComponent(icsUrl)}`
     : "";
@@ -176,6 +179,41 @@ function CalendarSettings() {
                 </ol>
               </TabsContent>
             </Tabs>
+          </CardContent>
+        </Card>
+      )}
+
+      {data?.token && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Kedy sa zmena prejaví</CardTitle>
+            <CardDescription>
+              Kalendáre si dáta sťahujú samy — CRM ich vytlačiť nevie. Toto ich zobudí skôr.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div>
+              <p className="font-medium mb-1 flex items-center gap-1.5"><Apple className="size-4" />Apple Kalendár</p>
+              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                <li>Mac: <strong>Zobraziť → Obnoviť kalendáre</strong> (⌘R) obnoví hneď.</li>
+                <li>Mac: aby sa to dialo samo, v <strong>Kalendár → Nastavenia → Účty</strong> vyber predplatné a daj <strong>Obnoviť: každú hodinu</strong>.</li>
+                <li>iPhone: <strong>Kalendáre → ⓘ pri predplatnom → Obnoviť</strong>, alebo potiahni zoznam nadol.</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium mb-1 flex items-center gap-1.5"><Globe className="size-4" />Google Kalendár</p>
+              <p className="text-muted-foreground">
+                Google si feed sťahuje po svojom, spravidla raz za 12–24 hodín, a vynútiť sa to nedá.
+                Keď to potrebuješ vidieť hneď, pridaj kalendár znova cez odkaz nižšie — Google ho berie
+                ako nový, takže si stiahne čerstvé dáta. Starý kalendár si potom zmaž, nech to nemáš dvakrát.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Input readOnly value={freshUrl} className="font-mono text-xs" />
+              <Button variant="outline" size="icon" onClick={() => copy(freshUrl, "fresh")} title="Kopírovať">
+                {copied === "fresh" ? <Check className="size-4" /> : <Copy className="size-4" />}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
