@@ -2189,6 +2189,10 @@ export type Database = {
         Args: { _signup_id: string }
         Returns: string
       }
+      can_decide_signups: {
+        Args: { _uid: string }
+        Returns: boolean
+      }
       check_item_availability: {
         Args: {
           _exclude_reservation?: string
@@ -2203,6 +2207,10 @@ export type Database = {
           retired: number
           total: number
         }[]
+      }
+      decline_reservation_signup: {
+        Args: { _signup_id: string }
+        Returns: undefined
       }
       get_my_ics_token: {
         Args: Record<string, never>

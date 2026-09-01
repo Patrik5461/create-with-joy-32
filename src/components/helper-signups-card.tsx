@@ -72,9 +72,9 @@ export function HelperSignupsCard() {
         if (error) throw error;
         return;
       }
-      const { error } = await (supabase.from as any)("reservation_signups")
-        .update({ status: "declined", decided_by: currentUser?.id ?? null, decided_at: new Date().toISOString() })
-        .eq("id", id);
+      // Odmietnutie ide tiež cez funkciu s vlastnou kontrolou práv — schvaľovať
+      // smie manažér, aj keď rezervácie upravovať nemôže.
+      const { error } = await supabase.rpc("decline_reservation_signup", { _signup_id: id });
       if (error) throw error;
     },
     onSuccess: (_d, v) => {
