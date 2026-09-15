@@ -9,9 +9,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, ChevronLeft, ChevronRight, Trash2, Check, Loader2, Ban, Undo2 } from "lucide-react";
+import { Plus, Search, ChevronLeft, ChevronRight, Trash2, Check, Loader2, Ban, Undo2, CalendarPlus, CalendarCheck } from "lucide-react";
 import { toast } from "sonner";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, quoteClientName } from "@/lib/quote-utils";
+import { createReservationFromQuote } from "@/lib/quote-reservation-link";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
 
@@ -74,13 +75,54 @@ function QuotesList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
-        .select("id, quote_number, status, issue_date, event_date, installation_date, dismantling_date, total_with_vat, client_id, version_number, is_current, clients(company_name), reservations(event_name)")
+        .select("id, quote_number, status, issue_date, event_date, installation_date, dismantling_date, total_with_vat, client_id, version_number, is_current, quote_group_id, clients(company_name), reservations(event_name)")
       .eq("is_current", true)
       .is("deleted_at", null)
         .order("issue_date", { ascending: false });
       if (error) throw error;
       return data;
     },
+  });
+
+  // Ktorá skupina kalkulácií už má rezerváciu. Rovnaká väzba ako na detaile
+  // kalkulácie (cez `quote_group_id`), nie cez staré pole `reservation_id` —
+  // aby zoznam nikdy neponúkol vytvoriť rezerváciu, ktorá už existuje.
+  const reservationByGroup = useQuery({
+    queryKey: ["reservations-by-quote-group"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("reservations")
+        .select("id, event_name, quote_group_id")
+        .not("quote_group_id", "is", null);
+      if (error) throw error;
+      const map = new Map<string, { id: string; event_name: string | null }>();
+      for (const r of data ?? []) {
+        if (r.quote_group_id) map.set(r.quote_group_id, { id: r.id, event_name: r.event_name });
+      }
+      return map;
+    },
+  });
+
+  // Rezervácia priamo zo zoznamu — to isté, čo robí tlačidlo na detaile
+  // kalkulácie, len sa kvôli nemu nemusí kalkulácia otvárať.
+  const makeReservation = useMutation({
+    mutationFn: async (quoteId: string) => createReservationFromQuote(quoteId),
+    onSuccess: ({ id, skipped }) => {
+      qc.invalidateQueries({ queryKey: ["reservations-by-quote-group"] });
+      qc.invalidateQueries({ queryKey: ["quotes"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+      qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
+      toast.success("Rezervácia vytvorená z kalkulácie", {
+        action: { label: "Otvoriť", onClick: () => navigate({ to: "/reservations/$id", params: { id } }) },
+      });
+      if (skipped.length) {
+        toast.warning(
+          `Položky mimo skladu (${skipped.length}) sú zapísané v poznámke rezervácie: ` +
+            skipped.map((it) => `${it.name} ×${it.qty}`).join(", "),
+        );
+      }
+    },
+    onError: (e: any) => toast.error(e.message ?? "Nepodarilo sa vytvoriť rezerváciu"),
   });
 
   // Schválenie priamo zo zoznamu — nemusí sa kvôli tomu otvárať a upravovať
@@ -282,12 +324,13 @@ function QuotesList() {
                   <TableHead>Stav</TableHead>
                   <TableHead className="text-right">Suma s DPH</TableHead>
                   <TableHead className="text-right">Schválenie</TableHead>
+                  <TableHead className="text-right w-28">Rezervácia</TableHead>
                   <TableHead className="text-right w-24">Zrušiť</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quotes.isLoading && <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Načítavam…</TableCell></TableRow>}
-                {!quotes.isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Žiadne kalkulácie.</TableCell></TableRow>}
+                {quotes.isLoading && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Načítavam…</TableCell></TableRow>}
+                {!quotes.isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Žiadne kalkulácie.</TableCell></TableRow>}
                 {filtered.map((q: any) => (
                   <TableRow
                     key={q.id}
@@ -296,7 +339,7 @@ function QuotesList() {
                   >
                     <TableCell className="font-medium">{quoteClientName(q)}</TableCell>
                     <TableCell><Badge variant={q.version_number > 1 ? "secondary" : "outline"} className="font-mono">v{q.version_number}</Badge></TableCell>
-                    <TableCell className="text-muted-foreground">{q.reservations?.event_name ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{q.reservations?.event_name ?? (q.quote_group_id ? reservationByGroup.data?.get(q.quote_group_id)?.event_name : null) ?? "—"}</TableCell>
                     <TableCell>{new Date(q.issue_date).toLocaleDateString("sk-SK")}</TableCell>
                     <TableCell>{q.event_date ? new Date(q.event_date).toLocaleDateString("sk-SK") : "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{q.installation_date ? new Date(q.installation_date).toLocaleDateString("sk-SK") : "—"}</TableCell>
@@ -323,6 +366,50 @@ function QuotesList() {
                           Schváliť
                         </Button>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      {(() => {
+                        const res = q.quote_group_id ? reservationByGroup.data?.get(q.quote_group_id) : null;
+                        if (res) {
+                          return (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 text-muted-foreground hover:text-foreground"
+                              title={res.event_name ?? "Zobraziť rezerváciu"}
+                              onClick={() => navigate({ to: "/reservations/$id", params: { id: res.id } })}
+                            >
+                              <CalendarCheck className="size-3.5 mr-1" />Otvoriť
+                            </Button>
+                          );
+                        }
+                        if (q.status === "rejected") return <span className="text-xs text-muted-foreground">—</span>;
+                        const pending = makeReservation.isPending && makeReservation.variables === q.id;
+                        return (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 border-sky-300 text-sky-700 hover:bg-sky-50"
+                            disabled={makeReservation.isPending}
+                            title="Vytvorí rezerváciu z tejto kalkulácie"
+                            onClick={() => {
+                              if (q.status !== "approved") {
+                                const ok = window.confirm(
+                                  `Kalkulácia pre ${quoteClientName(q)} ešte nie je schválená.\n\n` +
+                                  "Naozaj z nej vytvoriť rezerváciu?",
+                                );
+                                if (!ok) return;
+                              }
+                              makeReservation.mutate(q.id);
+                            }}
+                          >
+                            {pending
+                              ? <Loader2 className="size-3.5 mr-1 animate-spin" />
+                              : <CalendarPlus className="size-3.5 mr-1" />}
+                            Rezervácia
+                          </Button>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       {q.status === "rejected" ? (
