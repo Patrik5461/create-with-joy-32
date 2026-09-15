@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, ChevronLeft, ChevronRight, Trash2, Check, Loader2, Ban, Undo2, CalendarPlus, CalendarCheck } from "lucide-react";
 import { toast } from "sonner";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, quoteClientName } from "@/lib/quote-utils";
-import { createReservationFromQuote } from "@/lib/quote-reservation-link";
+import { cancelReservationForQuoteGroup, createReservationFromQuote } from "@/lib/quote-reservation-link";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
 
@@ -92,12 +92,12 @@ function QuotesList() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservations")
-        .select("id, event_name, quote_group_id")
+        .select("id, event_name, status, quote_group_id")
         .not("quote_group_id", "is", null);
       if (error) throw error;
-      const map = new Map<string, { id: string; event_name: string | null }>();
+      const map = new Map<string, { id: string; event_name: string | null; status: string }>();
       for (const r of data ?? []) {
-        if (r.quote_group_id) map.set(r.quote_group_id, { id: r.id, event_name: r.event_name });
+        if (r.quote_group_id) map.set(r.quote_group_id, { id: r.id, event_name: r.event_name, status: r.status });
       }
       return map;
     },
@@ -143,17 +143,30 @@ function QuotesList() {
   // Zrušenie kalkuláciu nemaže — ostáva v zozname ako „Zamietnutá“ kvôli histórii,
   // len prestane držať tovar. Obnovenie ju vráti medzi aktívne.
   const cancelQuote = useMutation({
-    mutationFn: async ({ id, next }: { id: string; next: "sent" | "rejected" }) => {
+    mutationFn: async ({ id, next, groupId }: { id: string; next: "sent" | "rejected"; groupId?: string | null }) => {
       const { error } = await supabase.from("quotes").update({ status: next }).eq("id", id);
       if (error) throw error;
-      return next;
+      // Zamietnutá kalkulácia uvoľní len to, čo držala sama. Tovar rezervácie
+      // drží rezervácia, takže sa ruší spolu s ňou — inak ostane blokovaný.
+      const cancelled = next === "rejected" ? await cancelReservationForQuoteGroup(groupId) : [];
+      return { next, cancelled };
     },
-    onSuccess: (next) => {
+    onSuccess: ({ next, cancelled }) => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
       qc.invalidateQueries({ queryKey: ["quote"] });
-      toast.success(next === "rejected"
-        ? "Kalkulácia zrušená — tovar, ktorý držala, je opäť voľný"
-        : "Kalkulácia obnovená medzi aktívne");
+      qc.invalidateQueries({ queryKey: ["reservations-by-quote-group"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success(
+        next !== "rejected"
+          ? "Kalkulácia obnovená medzi aktívne"
+          : cancelled.length
+            ? "Kalkulácia aj rezervácia zrušené — tovar je opäť voľný"
+            : "Kalkulácia zrušená — tovar, ktorý držala, je opäť voľný",
+        next === "rejected" && cancelled.length
+          ? { description: `Rezervácia „${cancelled[0].event_name ?? "bez názvu"}" ostáva v kalendári ako Zrušená.` }
+          : undefined,
+      );
     },
     onError: (e: any) => toast.error(e.message ?? "Stav sa nepodarilo zmeniť"),
   });
@@ -371,12 +384,13 @@ function QuotesList() {
                       {(() => {
                         const res = q.quote_group_id ? reservationByGroup.data?.get(q.quote_group_id) : null;
                         if (res) {
+                          const zrusena = res.status === "cancelled";
                           return (
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-8 text-muted-foreground hover:text-foreground"
-                              title={res.event_name ?? "Zobraziť rezerváciu"}
+                              className={`h-8 ${zrusena ? "text-muted-foreground/60 line-through" : "text-muted-foreground hover:text-foreground"}`}
+                              title={zrusena ? "Rezervácia je zrušená — tovar nedrží" : (res.event_name ?? "Zobraziť rezerváciu")}
                               onClick={() => navigate({ to: "/reservations/$id", params: { id: res.id } })}
                             >
                               <CalendarCheck className="size-3.5 mr-1" />Otvoriť
@@ -417,7 +431,16 @@ function QuotesList() {
                           size="sm"
                           variant="outline"
                           className="h-8 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                          onClick={() => cancelQuote.mutate({ id: q.id, next: "sent" })}
+                          onClick={() => {
+                            const res = q.quote_group_id ? reservationByGroup.data?.get(q.quote_group_id) : null;
+                            cancelQuote.mutate({ id: q.id, next: "sent" });
+                            if (res?.status === "cancelled") {
+                              toast("Rezervácia ostáva zrušená", {
+                                description: "Ak má event znova platiť, vráť jej stav v detaile rezervácie.",
+                                action: { label: "Otvoriť", onClick: () => navigate({ to: "/reservations/$id", params: { id: res.id } }) },
+                              });
+                            }
+                          }}
                           disabled={cancelQuote.isPending}
                           title="Vrátiť medzi aktívne kalkulácie"
                         >
@@ -434,12 +457,18 @@ function QuotesList() {
                           disabled={cancelQuote.isPending}
                           title="Kalkulácia ostane v zozname, len prestane držať tovar"
                           onClick={() => {
+                            const res = q.quote_group_id ? reservationByGroup.data?.get(q.quote_group_id) : null;
+                            const withRes = res && res.status !== "cancelled";
                             const ok = window.confirm(
                               `Zrušiť kalkuláciu pre ${quoteClientName(q)}?\n\n` +
                               "Zostane v zozname ako „Zamietnutá“ — nemaže sa nič a vieš ju kedykoľvek obnoviť. " +
-                              "Tovar, ktorý držala, sa uvoľní pre ostatné kalkulácie.",
+                              "Tovar, ktorý držala, sa uvoľní pre ostatné kalkulácie." +
+                              (withRes
+                                ? `\n\nZruší sa aj rezervácia „${res!.event_name ?? "bez názvu"}“ — inak by tovar držala ďalej. ` +
+                                  "Ostane v kalendári ako „Zrušená“ aj s položkami."
+                                : ""),
                             );
-                            if (ok) cancelQuote.mutate({ id: q.id, next: "rejected" });
+                            if (ok) cancelQuote.mutate({ id: q.id, next: "rejected", groupId: q.quote_group_id });
                           }}
                         >
                           {cancelQuote.isPending && cancelQuote.variables?.id === q.id

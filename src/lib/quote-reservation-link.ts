@@ -304,3 +304,25 @@ export async function createReservationFromQuote(
   }
   return { id: ins.id, skipped };
 }
+
+/** Zrušenie rezervácie naviazanej na skupinu kalkulácií.
+ *
+ *  Rezervácia sa nemaže — ostáva v kalendári aj s položkami ako „Zrušená",
+ *  len prestane držať tovar (`check_item_availability` aj výpočet blokácií
+ *  rezervácie v stave `cancelled` preskakujú). Toto je jediný spôsob, ako sa
+ *  po zrušení kalkulácie uvoľní tovar, ktorý držala jej rezervácia.
+ *
+ *  Vracia zrušené rezervácie, aby vedel volajúci povedať, čo sa stalo. */
+export async function cancelReservationForQuoteGroup(
+  quoteGroupId: string | null | undefined,
+): Promise<{ id: string; event_name: string | null }[]> {
+  if (!quoteGroupId) return [];
+  const { data, error } = await supabase
+    .from("reservations")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("quote_group_id", quoteGroupId)
+    .neq("status", "cancelled")
+    .select("id, event_name");
+  if (error) throw error;
+  return (data ?? []) as { id: string; event_name: string | null }[];
+}

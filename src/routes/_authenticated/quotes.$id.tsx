@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Printer, Copy, Trash2, Mail, Loader2, History, Check, Undo2, Ban } from "lucide-react";
 import { CalendarPlus, ExternalLink, RefreshCw, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useRef, useState, type Ref } from "react";
 import {
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { QuoteForm } from "@/components/quote-form";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, quoteClientName, type QuoteLine } from "@/lib/quote-utils";
-import { computeFieldsDiff, computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow, type FieldDiff } from "@/lib/quote-reservation-link";
+import { cancelReservationForQuoteGroup, computeFieldsDiff, computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow, type FieldDiff } from "@/lib/quote-reservation-link";
 import { useServerFn } from "@tanstack/react-start";
 import { createQuotePdfUpload, sendQuoteEmail } from "@/lib/email.functions";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
@@ -61,6 +62,10 @@ function QuoteDetail() {
   const [syncOpen, setSyncOpen] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [confirmSendOpen, setConfirmSendOpen] = useState(false);
+  // Pri zrušení kalkulácie sa predvolene zruší aj jej rezervácia — inak by
+  // tovar ostal blokovaný a nikto by nevedel prečo.
+  const [cancelResToo, setCancelResToo] = useState(true);
+  const [deleteResToo, setDeleteResToo] = useState(true);
   const sendQuoteFn = useServerFn(sendQuoteEmail);
   const createPdfUploadFn = useServerFn(createQuotePdfUpload);
   const printRef = useRef<HTMLDivElement | null>(null);
@@ -197,6 +202,36 @@ function QuoteDetail() {
     onError: (e: any) => toast.error(e.message ?? "Stav sa nepodarilo zmeniť"),
   });
 
+  // Zrušenie kalkulácie, ktorá má rezerváciu. Samotný stav „Zamietnutá" uvoľní
+  // len to, čo držala kalkulácia — tovar rezervácie drží rezervácia, a tú treba
+  // zrušiť tiež. Doteraz to dialóg len oznámil a človek to musel dorobiť ručne
+  // (a keď zabudol, tovar ostal blokovaný).
+  const cancelQuote = useMutation({
+    mutationFn: async (alsoReservation: boolean) => {
+      const { error } = await supabase.from("quotes").update({ status: "rejected" }).eq("id", id);
+      if (error) throw error;
+      if (!alsoReservation) return [];
+      return cancelReservationForQuoteGroup((quote.data as any)?.quote_group_id);
+    },
+    onSuccess: (cancelled) => {
+      qc.invalidateQueries({ queryKey: ["quote", id] });
+      qc.invalidateQueries({ queryKey: ["quotes"] });
+      qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+      qc.invalidateQueries({ queryKey: ["reservations-by-quote-group"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success(
+        cancelled.length
+          ? "Kalkulácia aj rezervácia zrušené — tovar je opäť voľný"
+          : "Kalkulácia zrušená — tovar, ktorý držala, je opäť voľný",
+        cancelled.length
+          ? { description: `Rezervácia „${cancelled[0].event_name ?? "bez názvu"}" ostáva v kalendári ako Zrušená.` }
+          : undefined,
+      );
+    },
+    onError: (e: any) => toast.error(e.message ?? "Zrušenie sa nepodarilo"),
+  });
+
   const remove = useMutation({
     mutationFn: async () => {
       // Presun do koša aj povýšenie najnovšej zostávajúcej verzie robí databáza
@@ -205,11 +240,20 @@ function QuoteDetail() {
       // a celá kalkulácia zmizla zo zoznamu.
       const { error } = await supabase.rpc("soft_delete_quote", { _quote_id: id });
       if (error) throw error;
+      // Keď do koša ide posledná verzia, kalkulácia je preč celá — potom už
+      // tovar nemá čo držať ani jej rezervácia.
+      const last = (versions.data ?? []).filter((v: any) => v.id !== id).length === 0;
+      if (last && deleteResToo) {
+        await cancelReservationForQuoteGroup((quote.data as any)?.quote_group_id);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
       qc.invalidateQueries({ queryKey: ["quotes-trash"] });
       qc.invalidateQueries({ queryKey: ["quote-versions"] });
+      qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+      qc.invalidateQueries({ queryKey: ["reservations-by-quote-group"] });
       const q = quote.data as any;
       const others = (versions.data ?? []).filter((v: any) => v.id !== q.id);
       toast.success(
@@ -479,7 +523,7 @@ function QuoteDetail() {
                 )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50" disabled={setStatus.isPending}>
+                    <Button variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50" disabled={setStatus.isPending || cancelQuote.isPending}>
                       <Ban className="size-4 mr-1" />Zrušiť
                     </Button>
                   </AlertDialogTrigger>
@@ -489,18 +533,28 @@ function QuoteDetail() {
                       <AlertDialogDescription>
                         Kalkulácia <span className="font-semibold">zostane v zozname</span> so stavom „Zamietnutá“, aj so všetkými verziami — nemaže sa nič a kedykoľvek ju vieš obnoviť.
                         {" "}Tovar, ktorý držala, sa uvoľní pre ostatné kalkulácie.
-                        {res && (
-                          <>
-                            {" "}<span className="font-semibold">Pozor:</span> táto kalkulácia má rezerváciu „{res.event_name}“ a tá tovar drží ďalej. Ak ho chceš uvoľniť celý, zruš aj rezerváciu v jej detaile.
-                          </>
-                        )}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
+                    {res && res.status !== "cancelled" && (
+                      <label className="flex items-start gap-2 rounded-md border p-3 text-sm bg-muted/30 cursor-pointer">
+                        <Checkbox
+                          checked={cancelResToo}
+                          onCheckedChange={(v) => setCancelResToo(v === true)}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          Zrušiť aj rezerváciu <span className="font-semibold">„{res.event_name}“</span>
+                          <span className="block text-xs text-muted-foreground">
+                            Bez toho drží tovar ďalej rezervácia. Ostane v kalendári ako „Zrušená“, aj s položkami — vrátiť ju vieš v jej detaile.
+                          </span>
+                        </span>
+                      </label>
+                    )}
                     <AlertDialogFooter>
                       <AlertDialogCancel>Späť</AlertDialogCancel>
                       <AlertDialogAction
                         className="bg-rose-600 text-white hover:bg-rose-700"
-                        onClick={() => setStatus.mutate("rejected")}
+                        onClick={() => cancelQuote.mutate(!!res && res.status !== "cancelled" && cancelResToo)}
                       >
                         Zrušiť kalkuláciu
                       </AlertDialogAction>
@@ -574,6 +628,21 @@ function QuoteDetail() {
                     )}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                {(versions.data?.length ?? 1) <= 1 && res && res.status !== "cancelled" && (
+                  <label className="flex items-start gap-2 rounded-md border p-3 text-sm bg-muted/30 cursor-pointer">
+                    <Checkbox
+                      checked={deleteResToo}
+                      onCheckedChange={(v) => setDeleteResToo(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Zrušiť aj rezerváciu <span className="font-semibold">„{res.event_name}“</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Bez toho drží tovar ďalej rezervácia. Ostane v kalendári ako „Zrušená“, aj s položkami.
+                      </span>
+                    </span>
+                  </label>
+                )}
                 <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setDeleteOpen(false)}>Zrušiť</AlertDialogCancel>
                   <AlertDialogAction
