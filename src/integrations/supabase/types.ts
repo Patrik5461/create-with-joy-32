@@ -1454,6 +1454,7 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           deleted_by: string | null
+          discount_amount: number | null
           discount_type: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value: number
           dismantling_date: string | null
@@ -1491,6 +1492,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          discount_amount?: number | null
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value?: number
           dismantling_date?: string | null
@@ -1528,6 +1530,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          discount_amount?: number | null
           discount_type?: Database["public"]["Enums"]["quote_adjust_type"]
           discount_value?: number
           dismantling_date?: string | null

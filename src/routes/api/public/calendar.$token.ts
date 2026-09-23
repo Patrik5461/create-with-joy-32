@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { formatReservationItems } from "@/lib/ics-items";
+import { formatExtraItems, formatReservationItems, type IcsExtraRow } from "@/lib/ics-items";
 
 export const Route = createFileRoute("/api/public/calendar/$token")({
   server: {
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/api/public/calendar/$token")({
           .select(
             // Nábytok patrí do popisu udalosti — bez neho sa v Apple/Google
             // kalendári nedalo zistiť, čo sa na akciu vlastne vezie.
-            "id, event_name, venue, address, note, status, load_at, depart_at, event_start_at, event_end_at, return_at, available_from_at, contact_person, phone, email, updated_at, created_at, clients(company_name), reservation_items(qty, furniture_items(name))"
+            "id, event_name, venue, address, note, status, quote_group_id, load_at, depart_at, event_start_at, event_end_at, return_at, available_from_at, contact_person, phone, email, updated_at, created_at, clients(company_name), reservation_items(qty, furniture_items(name))"
           )
           .neq("status", "cancelled")
           .order("event_start_at", { ascending: true, nullsFirst: false });
@@ -37,7 +37,26 @@ export const Route = createFileRoute("/api/public/calendar/$token")({
           return new Response(`Error: ${error.message}`, { status: 500 });
         }
 
-        const ics = buildIcs((reservations ?? []) as unknown as ReservationRow[], profile.full_name ?? profile.id);
+        // Nábytok mimo skladu, služby a položky „Iné“ rezervácia nemá kde
+        // držať — sú len na kalkulácii. Do kalendára pritom patria: dopožičaný
+        // nábytok sa vezie rovnako ako vlastný.
+        const rows = (reservations ?? []) as unknown as ReservationRow[];
+        const groupIds = [...new Set(rows.map((r) => r.quote_group_id).filter(Boolean))] as string[];
+        const extrasByGroup = new Map<string, IcsExtraRow[]>();
+        if (groupIds.length > 0) {
+          const { data: quoteRows } = await supabaseAdmin
+            .from("quotes")
+            .select("quote_group_id, quote_items(kind, name, qty, furniture_item_id)")
+            .in("quote_group_id", groupIds)
+            .eq("is_current", true)
+            .is("deleted_at", null);
+          for (const q of quoteRows ?? []) {
+            const gid = (q as any).quote_group_id as string | null;
+            if (gid) extrasByGroup.set(gid, ((q as any).quote_items ?? []) as IcsExtraRow[]);
+          }
+        }
+
+        const ics = buildIcs(rows, profile.full_name ?? profile.id, extrasByGroup);
 
         return new Response(ics, {
           status: 200,
@@ -124,11 +143,16 @@ type ReservationRow = {
   email: string | null;
   updated_at: string | null;
   created_at: string | null;
+  quote_group_id: string | null;
   clients: { company_name: string | null } | null;
   reservation_items: { qty: number | null; furniture_items: { name: string | null } | null }[] | null;
 };
 
-function buildIcs(reservations: ReservationRow[], owner: string): string {
+function buildIcs(
+  reservations: ReservationRow[],
+  owner: string,
+  extrasByGroup?: Map<string, IcsExtraRow[]>,
+): string {
   const now = toIcsDate(new Date().toISOString())!;
   const lines: string[] = [
     "BEGIN:VCALENDAR",
@@ -149,6 +173,9 @@ function buildIcs(reservations: ReservationRow[], owner: string): string {
     const statusLabel = STATUS_LABEL[r.status ?? ""] ?? r.status ?? "";
     const location = [r.venue, r.address].filter(Boolean).join(", ");
     const itemsBlock = formatReservationItems(r.reservation_items);
+    const extrasBlock = formatExtraItems(
+      r.quote_group_id ? extrasByGroup?.get(r.quote_group_id) : null,
+    );
     const descParts = [
       client ? `Klient: ${client}` : null,
       statusLabel ? `Stav: ${statusLabel}` : null,
@@ -163,6 +190,7 @@ function buildIcs(reservations: ReservationRow[], owner: string): string {
       r.available_from_at ? `Dostupné od: ${formatHuman(r.available_from_at)}` : null,
       // Čo sa na akciu vezie — pri nakládke to je to hlavné, čo z kalendára treba.
       itemsBlock ? `\n${itemsBlock}` : null,
+      extrasBlock ? `\n${extrasBlock}` : null,
       r.note ? `\nPoznámka: ${r.note}` : null,
     ].filter(Boolean);
     const description = descParts.join("\n");

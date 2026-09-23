@@ -16,6 +16,7 @@ import {
   type AdjustType, type PriceMode, type QuoteLine,
   computeTotals, formatEur, lineTotal,
 } from "@/lib/quote-utils";
+import { combineDateTime, isoToLocalDate, isoToLocalTime } from "@/lib/date-time-field";
 
 interface QuoteRecord {
   id?: string;
@@ -58,28 +59,6 @@ interface Props {
 }
 
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
-
-function isoToLocalDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function isoToLocalDateTime(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function localDateTimeToIso(v: string): string | null {
-  return v ? new Date(v).toISOString() : null;
-}
 
 function addDaysIso(dateStr: string, days: number): string {
   const d = new Date(dateStr);
@@ -307,7 +286,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         venue: f.venue ?? (r as any).venue ?? null,
         address: f.address ?? (r as any).address ?? null,
         installation_date: f.installation_date ?? ((r as any).load_at ?? null),
-        event_date: f.event_date ?? isoToLocalDate((r as any).event_start_at),
+        event_date: f.event_date ?? (isoToLocalDate((r as any).event_start_at) || null),
         dismantling_date: f.dismantling_date ?? ((r as any).return_at ?? null),
       }));
     }
@@ -429,6 +408,10 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         surcharge_label: form.surcharge_label,
         notes: form.notes,
         subtotal: totals.subtotal,
+        // Suma zľavy sa ukladá, aby sa detail, tlač aj PDF nemuseli spoliehať
+        // na dopočet — pravidlo pre zľavu sa časom menilo a staré ponuky sa
+        // musia zobrazovať tak, ako boli vystavené.
+        discount_amount: totals.discount,
         total_without_vat: totals.totalWithoutVat,
         vat_amount: totals.vatAmount,
         total_with_vat: totals.totalWithVat,
@@ -596,30 +579,24 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
             <Label>Platnosť do</Label>
             <Input type="date" value={form.valid_until ?? ""} onChange={(e) => setForm({ ...form, valid_until: e.target.value || null })} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Začiatok eventu</Label>
-            <Input
-              type="datetime-local"
-              value={isoToLocalDateTime(form.event_start_at)}
-              onChange={(e) => setForm({ ...form, event_start_at: localDateTimeToIso(e.target.value) })}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Koniec eventu</Label>
-            <Input
-              type="datetime-local"
-              value={isoToLocalDateTime(form.event_end_at)}
-              onChange={(e) => setForm({ ...form, event_end_at: localDateTimeToIso(e.target.value) })}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Dátum inštalácie</Label>
-            <Input
-              type="datetime-local"
-              value={isoToLocalDateTime(form.installation_date)}
-              onChange={(e) => setForm({ ...form, installation_date: localDateTimeToIso(e.target.value) })}
-            />
-          </div>
+          <DateTimeField
+            label="Začiatok eventu"
+            value={form.event_start_at}
+            defaultTime="10:00"
+            onChange={(v) => setForm({ ...form, event_start_at: v })}
+          />
+          <DateTimeField
+            label="Koniec eventu"
+            value={form.event_end_at}
+            defaultTime="23:00"
+            onChange={(v) => setForm({ ...form, event_end_at: v })}
+          />
+          <DateTimeField
+            label="Dátum inštalácie"
+            value={form.installation_date}
+            defaultTime="08:00"
+            onChange={(v) => setForm({ ...form, installation_date: v })}
+          />
           <div className="space-y-1.5">
             <Label>Dátum eventu</Label>
             <Input
@@ -628,14 +605,12 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
               onChange={(e) => setForm({ ...form, event_date: e.target.value || null })}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label>Dátum demontáže</Label>
-            <Input
-              type="datetime-local"
-              value={isoToLocalDateTime(form.dismantling_date)}
-              onChange={(e) => setForm({ ...form, dismantling_date: localDateTimeToIso(e.target.value) })}
-            />
-          </div>
+          <DateTimeField
+            label="Dátum demontáže"
+            value={form.dismantling_date}
+            defaultTime="18:00"
+            onChange={(v) => setForm({ ...form, dismantling_date: v })}
+          />
           <div className="space-y-1.5">
             <Label>Stav</Label>
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as any })}>
@@ -809,7 +784,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         <CardContent className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Zľava (len na nábytok)</Label>
+              <Label>Zľava (len na nábytok zo skladu)</Label>
               {form.discount_type !== "none" && (
                 <Button
                   type="button"
@@ -843,7 +818,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
                 <Input type="number" step="0.01" min={0} value={form.discount_value} onChange={(e) => setForm({ ...form, discount_value: Number(e.target.value) })} />
               </div>
             )}
-            <p className="text-xs text-muted-foreground">Zľava sa uplatní iba na položky typu nábytok, nie na služby ani dopravu.</p>
+            <p className="text-xs text-muted-foreground">Zľava sa uplatní iba na nábytok zo skladu — nie na služby a dopravu, nie na položky „Iné“ a nie na nábytok mimo skladu.</p>
           </div>
           <div className="space-y-2">
             <Label>Príplatok</Label>
@@ -866,8 +841,9 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
       <Card>
         <CardHeader><CardTitle className="text-base">Súčty</CardTitle></CardHeader>
         <CardContent className="space-y-1.5 text-sm">
-          <Row label="Medzisúčet – nábytok" value={formatEur(totals.furnitureSubtotal)} />
-          {totals.discount > 0 && <Row label="Zľava (len nábytok)" value={`− ${formatEur(totals.discount)}`} tone="emerald" />}
+          <Row label="Medzisúčet – nábytok zo skladu" value={formatEur(totals.stockFurnitureSubtotal)} />
+          {totals.discount > 0 && <Row label="Zľava (len nábytok zo skladu)" value={`− ${formatEur(totals.discount)}`} tone="emerald" />}
+          {totals.offStockSubtotal > 0 && <Row label="Medzisúčet – nábytok mimo skladu" value={formatEur(totals.offStockSubtotal)} />}
           {totals.servicesSubtotal > 0 && <Row label="Medzisúčet – služby / doprava" value={formatEur(totals.servicesSubtotal)} />}
           {totals.otherSubtotal > 0 && <Row label="Medzisúčet – iné" value={formatEur(totals.otherSubtotal)} />}
           {totals.surcharge > 0 && <Row label={form.surcharge_label || "Príplatok"} value={`+ ${formatEur(totals.surcharge)}`} />}
@@ -876,7 +852,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           <div className="border-t pt-2 mt-2">
             <Row label="Spolu s DPH" value={formatEur(totals.totalWithVat)} bold big />
           </div>
-          <p className="text-xs text-muted-foreground pt-1">Zľava sa vzťahuje výhradne na položky typu nábytok; služby, doprava a položky „Iné“ sa nezľavňujú.</p>
+          <p className="text-xs text-muted-foreground pt-1">Zľava sa vzťahuje výhradne na nábytok zo skladu; služby, doprava, nábytok mimo skladu a položky „Iné“ sa nezľavňujú.</p>
         </CardContent>
       </Card>
 
@@ -905,6 +881,43 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           {versionParent ? `Uložiť ako novú verziu (v${versionParent.next_version})` : "Vytvoriť kalkuláciu"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** Dátum a čas oddelene — čas je nepovinný. Keď ho človek nevyplní, doplní sa
+ *  predvolená hodina a hneď ju v políčku vidí. Pri jednom políčku
+ *  `datetime-local` sa dátum bez času ticho zahodil. */
+function DateTimeField({
+  label, value, onChange, defaultTime,
+}: {
+  label: string;
+  value: string | null;
+  onChange: (iso: string | null) => void;
+  defaultTime: string;
+}) {
+  const date = isoToLocalDate(value);
+  const time = isoToLocalTime(value);
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          type="date"
+          className="flex-1"
+          value={date}
+          onChange={(e) => onChange(combineDateTime(e.target.value, time, defaultTime))}
+        />
+        <Input
+          type="time"
+          className="w-28"
+          value={time}
+          disabled={!date}
+          title={date ? "Čas" : "Najprv vyber dátum"}
+          onChange={(e) => onChange(combineDateTime(date, e.target.value, defaultTime))}
+        />
+      </div>
+      <p className="text-[11px] text-muted-foreground">Bez vyplneného času sa doplní {defaultTime}.</p>
     </div>
   );
 }

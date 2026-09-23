@@ -18,10 +18,16 @@ import type { ClientLine } from "./document-utils";
 
 export type QuoteBreakdown = {
   furniture: number;
+  /** Nábytok zo skladu — základ pre zľavu pri nových kalkuláciách. */
+  stockFurniture?: number;
+  /** Dopožičaný / dokúpený nábytok, ktorý sa nezľavňuje. */
+  offStock?: number;
   discount: number;
   services: number;
   other: number;
   surcharge: number;
+  /** true = zľava bola počítaná len z nábytku zo skladu (nové pravidlo). */
+  stockOnly?: boolean;
 };
 
 export type RenderQuotePdfOptions = {
@@ -274,8 +280,18 @@ export async function renderQuotePdfBase64(
 
   const b = opts.breakdown;
   const rows: Array<{ label: string; value: string; bold?: boolean }> = [];
-  rows.push({ label: "Medzisúčet – nábytok", value: fmtEur(b.furniture) });
-  if (b.discount > 0) rows.push({ label: "Zľava (len nábytok)", value: `− ${fmtEur(b.discount)}` });
+  const offStock = b.offStock ?? 0;
+  rows.push({
+    label: offStock > 0 ? "Medzisúčet – nábytok zo skladu" : "Medzisúčet – nábytok",
+    value: fmtEur(offStock > 0 ? (b.stockFurniture ?? b.furniture - offStock) : b.furniture),
+  });
+  if (b.discount > 0) {
+    rows.push({
+      label: b.stockOnly ? "Zľava (len nábytok zo skladu)" : "Zľava (len nábytok)",
+      value: `− ${fmtEur(b.discount)}`,
+    });
+  }
+  if (offStock > 0) rows.push({ label: "Medzisúčet – nábytok mimo skladu", value: fmtEur(offStock) });
   if (b.services > 0) {
     rows.push({ label: "Medzisúčet – služby / doprava", value: fmtEur(b.services) });
   }
@@ -323,7 +339,9 @@ export async function renderQuotePdfBase64(
   doc.setFontSize(7);
   doc.setTextColor(...COLOR_MUTED);
   const disclaimer = doc.splitTextToSize(
-    "Zľava sa vzťahuje výhradne na nábytok; služby a doprava sa nezľavňujú.",
+    b.stockOnly
+      ? "Zľava sa vzťahuje výhradne na nábytok zo skladu; služby, doprava a nábytok mimo skladu sa nezľavňujú."
+      : "Zľava sa vzťahuje výhradne na nábytok; služby a doprava sa nezľavňujú.",
     boxW,
   );
   doc.text(disclaimer, boxX, y);

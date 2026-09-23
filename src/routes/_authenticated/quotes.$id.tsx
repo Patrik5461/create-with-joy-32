@@ -291,6 +291,7 @@ function QuoteDetail() {
         vat_rate: q.vat_rate,
         discount_type: q.discount_type,
         discount_value: q.discount_value,
+        discount_amount: q.discount_amount,
         surcharge_type: q.surcharge_type,
         surcharge_value: q.surcharge_value,
         surcharge_label: q.surcharge_label,
@@ -843,31 +844,45 @@ function Row({ label, value, bold, big }: { label: string; value: string; bold?:
   );
 }
 
+/** Rozpad súm pre detail, tlač aj PDF.
+ *
+ *  Nové kalkulácie majú sumu zľavy uloženú (`discount_amount`) — zobrazí sa
+ *  presne tá, aby doklad vyzeral vždy rovnako ako v deň vystavenia. Staršie ju
+ *  uloženú nemajú, tak sa dopočíta podľa pravidla, ktoré vtedy platilo: zľava
+ *  z celého nábytku vrátane položiek mimo skladu. */
 function deriveBreakdown(q: any) {
   const items = (q.quote_items ?? []) as any[];
-  const furniture = items.filter((it) => it.kind === "furniture")
-    .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
-  const services = items.filter((it) => it.kind === "service")
-    .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
-  const other = items.filter((it) => it.kind === "other")
-    .reduce((s, it) => s + Number(it.line_total ?? 0), 0);
+  const sum = (rows: any[]) => rows.reduce((s, it) => s + Number(it.line_total ?? 0), 0);
+  const stockFurniture = sum(items.filter((it) => it.kind === "furniture" && it.furniture_item_id));
+  const offStock = sum(items.filter((it) => it.kind === "furniture" && !it.furniture_item_id));
+  const furniture = stockFurniture + offStock;
+  const services = sum(items.filter((it) => it.kind === "service"));
+  const other = sum(items.filter((it) => it.kind === "other"));
   const totalWithoutVat = Number(q.total_without_vat ?? 0);
-  const dtype = q.discount_type ?? "none";
-  const dval = Number(q.discount_value ?? 0);
-  const rawDiscount = dtype === "percent" ? (furniture * dval) / 100 : dtype === "fixed" ? dval : 0;
-  const discount = Math.min(Math.max(0, rawDiscount), furniture);
+  const stored = q.discount_amount == null ? null : Number(q.discount_amount);
+  const stockOnly = stored != null;
+  let discount: number;
+  if (stored != null) {
+    discount = Math.max(0, stored);
+  } else {
+    const dtype = q.discount_type ?? "none";
+    const dval = Number(q.discount_value ?? 0);
+    const rawDiscount = dtype === "percent" ? (furniture * dval) / 100 : dtype === "fixed" ? dval : 0;
+    discount = Math.min(Math.max(0, rawDiscount), furniture);
+  }
   const furnitureAfter = Math.max(0, furniture - discount);
   const baseForSurcharge = furnitureAfter + services + other;
   const surcharge = Math.max(0, totalWithoutVat - baseForSurcharge);
-  return { furniture, services, other, discount, surcharge };
+  return { furniture, stockFurniture, offStock, services, other, discount, surcharge, stockOnly };
 }
 
 function renderBreakdown(q: any) {
   const b = deriveBreakdown(q);
   return (
     <>
-      <Row label="Medzisúčet – nábytok" value={formatEur(b.furniture)} />
-      {b.discount > 0 && <Row label="Zľava (len nábytok)" value={`− ${formatEur(b.discount)}`} />}
+      <Row label={b.offStock > 0 ? "Medzisúčet – nábytok zo skladu" : "Medzisúčet – nábytok"} value={formatEur(b.offStock > 0 ? b.stockFurniture : b.furniture)} />
+      {b.discount > 0 && <Row label={b.stockOnly ? "Zľava (len nábytok zo skladu)" : "Zľava (len nábytok)"} value={`− ${formatEur(b.discount)}`} />}
+      {b.offStock > 0 && <Row label="Medzisúčet – nábytok mimo skladu" value={formatEur(b.offStock)} />}
       {b.services > 0 && <Row label="Medzisúčet – služby / doprava" value={formatEur(b.services)} />}
       {b.other > 0 && <Row label="Medzisúčet – iné" value={formatEur(b.other)} />}
       {b.surcharge > 0 && <Row label={q.surcharge_label || "Príplatok"} value={`+ ${formatEur(b.surcharge)}`} />}
@@ -880,9 +895,18 @@ function renderPrintBreakdown(q: any) {
   const b = deriveBreakdown(q);
   return (
     <>
-      <div className="flex justify-between"><span>Medzisúčet – nábytok</span><span>{formatEur(b.furniture)}</span></div>
+      <div className="flex justify-between">
+        <span>{b.offStock > 0 ? "Medzisúčet – nábytok zo skladu" : "Medzisúčet – nábytok"}</span>
+        <span>{formatEur(b.offStock > 0 ? b.stockFurniture : b.furniture)}</span>
+      </div>
       {b.discount > 0 && (
-        <div className="flex justify-between"><span>Zľava (len nábytok)</span><span>− {formatEur(b.discount)}</span></div>
+        <div className="flex justify-between">
+          <span>{b.stockOnly ? "Zľava (len nábytok zo skladu)" : "Zľava (len nábytok)"}</span>
+          <span>− {formatEur(b.discount)}</span>
+        </div>
+      )}
+      {b.offStock > 0 && (
+        <div className="flex justify-between"><span>Medzisúčet – nábytok mimo skladu</span><span>{formatEur(b.offStock)}</span></div>
       )}
       {b.services > 0 && (
         <div className="flex justify-between"><span>Medzisúčet – služby / doprava</span><span>{formatEur(b.services)}</span></div>

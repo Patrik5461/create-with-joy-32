@@ -18,9 +18,20 @@ export function lineTotal(l: QuoteLine): number {
   return Math.max(0, l.qty) * Math.max(0, l.unit_price) * days;
 }
 
+/** Nábytok mimo skladu — voľne napísaná položka bez väzby na sklad. Takýto kus
+ *  sa dopožičiava alebo dokupuje, takže sa naň zľava neuplatňuje. */
+export function isOffStock(l: Pick<QuoteLine, "kind" | "furniture_item_id">): boolean {
+  return l.kind === "furniture" && !l.furniture_item_id;
+}
+
 export interface QuoteTotals {
   subtotal: number;
+  /** Všetok nábytok — zo skladu aj mimo neho. */
   furnitureSubtotal: number;
+  /** Len nábytok zo skladu; z tohto sa počíta zľava. */
+  stockFurnitureSubtotal: number;
+  /** Nábytok mimo skladu (dopožičaný / dokúpený) — bez zľavy. */
+  offStockSubtotal: number;
   servicesSubtotal: number;
   otherSubtotal: number;
   discount: number;
@@ -38,9 +49,13 @@ export function computeTotals(opts: {
   surchargeValue: number;
   vatRate: number;
 }): QuoteTotals {
-  const furnitureSubtotal = opts.lines
-    .filter((l) => l.kind === "furniture")
+  const stockFurnitureSubtotal = opts.lines
+    .filter((l) => l.kind === "furniture" && !isOffStock(l))
     .reduce((s, l) => s + lineTotal(l), 0);
+  const offStockSubtotal = opts.lines
+    .filter(isOffStock)
+    .reduce((s, l) => s + lineTotal(l), 0);
+  const furnitureSubtotal = stockFurnitureSubtotal + offStockSubtotal;
   const servicesSubtotal = opts.lines
     .filter((l) => l.kind === "service")
     .reduce((s, l) => s + lineTotal(l), 0);
@@ -48,11 +63,13 @@ export function computeTotals(opts: {
     .filter((l) => l.kind === "other")
     .reduce((s, l) => s + lineTotal(l), 0);
   const subtotal = furnitureSubtotal + servicesSubtotal + otherSubtotal;
-  // Zľava sa vzťahuje LEN na nábytok, NIE na služby/dopravu ani položky "Iné".
+  // Zľava sa vzťahuje LEN na nábytok zo skladu — nie na služby/dopravu, nie na
+  // položky "Iné" a nie na nábytok mimo skladu (ten sa dopožičiava za cenu,
+  // ktorú sami platíme, takže zľavňovať ho by znamenalo predávať pod cenu).
   const rawDiscount =
-    opts.discountType === "percent" ? (furnitureSubtotal * opts.discountValue) / 100 :
+    opts.discountType === "percent" ? (stockFurnitureSubtotal * opts.discountValue) / 100 :
     opts.discountType === "fixed" ? opts.discountValue : 0;
-  const discount = Math.min(Math.max(0, rawDiscount), furnitureSubtotal);
+  const discount = Math.min(Math.max(0, rawDiscount), stockFurnitureSubtotal);
   const furnitureAfterDiscount = Math.max(0, furnitureSubtotal - discount);
   const baseForSurcharge = furnitureAfterDiscount + servicesSubtotal + otherSubtotal;
   const surcharge =
@@ -61,7 +78,7 @@ export function computeTotals(opts: {
   const totalWithoutVat = Math.max(0, baseForSurcharge + surcharge);
   const vatAmount = (totalWithoutVat * opts.vatRate) / 100;
   const totalWithVat = totalWithoutVat + vatAmount;
-  return { subtotal, furnitureSubtotal, servicesSubtotal, otherSubtotal, discount, surcharge, totalWithoutVat, vatAmount, totalWithVat };
+  return { subtotal, furnitureSubtotal, stockFurnitureSubtotal, offStockSubtotal, servicesSubtotal, otherSubtotal, discount, surcharge, totalWithoutVat, vatAmount, totalWithVat };
 }
 
 export function formatEur(n: number): string {

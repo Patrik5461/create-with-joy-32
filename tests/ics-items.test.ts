@@ -2,7 +2,7 @@
  * Testy zoznamu nábytku, ktorý ide do popisu udalosti v Apple/Google kalendári.
  */
 import { describe, expect, it } from "bun:test";
-import { MAX_ITEM_LINES, formatReservationItems, type IcsItemRow } from "../src/lib/ics-items";
+import { MAX_ITEM_LINES, formatExtraItems, formatReservationItems, type IcsExtraRow, type IcsItemRow } from "../src/lib/ics-items";
 
 const it_ = (name: string, qty: number): IcsItemRow => ({ qty, furniture_items: { name } });
 
@@ -50,5 +50,52 @@ describe("nábytok v popise udalosti", () => {
     expect(formatReservationItems(
       ["A", "B", "C", "D", "E"].map((n) => it_(n, 1)),
     )).toContain("(5 položiek,");
+  });
+});
+
+const extra = (kind: string, name: string, qty: number, stock = false): IcsExtraRow => ({
+  kind, name, qty, furniture_item_id: stock ? "stock-1" : null,
+});
+
+describe("ďalšie položky v popise udalosti", () => {
+  it("vypíše nábytok mimo skladu, služby aj „Iné“ a označí, čo je čo", () => {
+    const out = formatExtraItems([
+      extra("service", "doprava + montáž", 1),
+      extra("furniture", "koberec kruh 4m", 3),
+      extra("other", "vešanie banerov", 2),
+    ]);
+    expect(out).toBe(
+      "Ďalšie položky (3 položky):\n" +
+      "• 3× koberec kruh 4m — mimo skladu\n" +
+      "• 1× doprava + montáž — služba\n" +
+      "• 2× vešanie banerov — iné",
+    );
+  });
+
+  it("nábytok zo skladu nepridá — ten je už v zozname nábytku", () => {
+    expect(formatExtraItems([extra("furniture", "Ghost stolička", 12, true)])).toBeNull();
+  });
+
+  it("nič navyše = nič v popise", () => {
+    expect(formatExtraItems([])).toBeNull();
+    expect(formatExtraItems(null)).toBeNull();
+    expect(formatExtraItems(undefined)).toBeNull();
+  });
+
+  it("tú istú položku spočíta, prázdne a nulové preskočí", () => {
+    const out = formatExtraItems([
+      extra("service", "doprava", 1),
+      extra("service", "doprava", 2),
+      extra("other", "", 5),
+      extra("other", "nič", 0),
+    ]);
+    expect(out).toBe("Ďalšie položky (1 položka):\n• 3× doprava — služba");
+  });
+
+  it("dlhý zoznam sa oreže rovnako ako nábytok", () => {
+    const many = Array.from({ length: MAX_ITEM_LINES + 3 }, (_, i) => extra("other", `Polozka ${i}`, i + 1));
+    const lines = formatExtraItems(many)!.split("\n");
+    expect(lines).toHaveLength(1 + MAX_ITEM_LINES + 1);
+    expect(lines[lines.length - 1]).toBe("• … a ďalších 3 položiek");
   });
 });
