@@ -16,7 +16,7 @@ import {
   type AdjustType, type PriceMode, type QuoteLine,
   computeTotals, formatEur, lineTotal,
 } from "@/lib/quote-utils";
-import { combineDateTime, isoToLocalDate, isoToLocalTime } from "@/lib/date-time-field";
+import { MAX_YEAR, MIN_YEAR, combineDateTime, implausibleYear, isoToLocalDate, isoToLocalTime } from "@/lib/date-time-field";
 
 interface QuoteRecord {
   id?: string;
@@ -386,6 +386,19 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
     mutationFn: async () => {
       if (!form.client_id) throw new Error("Vyberte klienta.");
       if (lines.length === 0) throw new Error("Pridajte aspoň jednu položku.");
+      // Poistka proti nedopísanému roku (0202). Kalkulácia s rokom 1902 by sa
+      // nikde nezobrazila správne a v kalendári by skončila mimo dohľadu.
+      const badDate = ([
+        ["Platnosť do", form.valid_until],
+        ["Začiatok eventu", form.event_start_at],
+        ["Koniec eventu", form.event_end_at],
+        ["Dátum inštalácie", form.installation_date],
+        ["Dátum eventu", form.event_date],
+        ["Dátum demontáže", form.dismantling_date],
+      ] as const).find(([, v]) => implausibleYear(v));
+      if (badDate) {
+        throw new Error(`Skontroluj „${badDate[0]}“ — rok musí byť medzi ${MIN_YEAR} a ${MAX_YEAR}.`);
+      }
       const basePayload = {
         client_id: form.client_id,
         contact_id: form.contact_id,
@@ -898,13 +911,16 @@ function DateTimeField({
 }) {
   const date = isoToLocalDate(value);
   const time = isoToLocalTime(value);
+  const badYear = implausibleYear(value);
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <div className="flex gap-2">
         <Input
           type="date"
-          className="flex-1"
+          className={`flex-1 ${badYear ? "border-rose-400" : ""}`}
+          min={`${MIN_YEAR}-01-01`}
+          max={`${MAX_YEAR}-12-31`}
           value={date}
           onChange={(e) => onChange(combineDateTime(e.target.value, time, defaultTime))}
         />
@@ -917,7 +933,11 @@ function DateTimeField({
           onChange={(e) => onChange(combineDateTime(date, e.target.value, defaultTime))}
         />
       </div>
-      <p className="text-[11px] text-muted-foreground">Bez vyplneného času sa doplní {defaultTime}.</p>
+      <p className={`text-[11px] ${badYear ? "text-rose-600" : "text-muted-foreground"}`}>
+        {badYear
+          ? `Rok ${new Date(value!).getFullYear()} nebude správne — dopíš celý rok.`
+          : `Bez vyplneného času sa doplní ${defaultTime}.`}
+      </p>
     </div>
   );
 }
