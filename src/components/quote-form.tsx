@@ -17,6 +17,8 @@ import {
   computeTotals, formatEur, lineTotal,
 } from "@/lib/quote-utils";
 import { MAX_YEAR, MIN_YEAR, combineDateTime, implausibleYear, isoToLocalDate, isoToLocalTime } from "@/lib/date-time-field";
+import { syncReservationWithApprovedQuote, type AutoSyncResult } from "@/lib/quote-reservation-link";
+import { reportAutoSync, reportAutoSyncError } from "@/lib/quote-sync-feedback";
 
 interface QuoteRecord {
   id?: string;
@@ -432,6 +434,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
       const { data: userData } = await supabase.auth.getUser();
       const createdBy = userData?.user?.id ?? null;
       let id: string;
+      let groupId: string | null = versionParent?.quote_group_id ?? null;
       if (versionParent) {
         // Novú verziu vložíme ako neaktuálnu a prepneme ju až na konci, jedným
         // volaním v transakcii. Predtým sa najprv zhodil príznak „aktuálna" na
@@ -445,9 +448,10 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           is_current: false,
           parent_version_id: versionParent.prev_id,
           created_by: createdBy,
-        }).select("id").single();
+        }).select("id, quote_group_id").single();
         if (error) throw error;
         id = data.id;
+        groupId = data.quote_group_id ?? groupId;
       } else {
         // Číslo prideľuje databáza (trigger assign_quote_number + sekvencia
         // quotes_number_seq). Číslovanie tak vždy pokračuje ďalej a nikdy
@@ -459,9 +463,10 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           is_current: true,
           version_number: 1,
           created_by: createdBy,
-        }).select("id").single();
+        }).select("id, quote_group_id").single();
         if (error) throw error;
         id = data.id;
+        groupId = data.quote_group_id ?? groupId;
       }
       const rows = lines.map((l, idx) => ({
         quote_id: id!,
@@ -489,13 +494,27 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
         const { error } = await supabase.rpc("set_current_quote_version", { _quote_id: id! });
         if (error) throw error;
       }
-      return id!;
+      // Schválená verzia ťahá za sebou rezerváciu a kalendár. Keď sa upraví
+      // schválená kalkulácia, nová verzia ostáva schválená — a rezervácia sa
+      // musí posunúť s ňou, inak by sa na akciu viezlo to staré.
+      let sync: AutoSyncResult | null = null;
+      if (form.status === "approved") {
+        try {
+          sync = await syncReservationWithApprovedQuote(groupId);
+        } catch (e) {
+          reportAutoSyncError(e);
+        }
+      }
+      return { id: id!, sync };
     },
-    onSuccess: (id) => {
+    onSuccess: ({ id, sync }) => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
       qc.invalidateQueries({ queryKey: ["quote", id] });
       qc.invalidateQueries({ queryKey: ["quote-versions"] });
+      qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
       toast.success(versionParent ? `Uložené ako nová verzia v${versionParent.next_version}` : "Kalkulácia uložená");
+      if (sync) reportAutoSync(sync);
       navigate({ to: "/quotes/$id", params: { id } });
     },
     onError: (e: any) => toast.error(e.message ?? "Uloženie zlyhalo"),

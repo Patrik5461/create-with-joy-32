@@ -326,3 +326,56 @@ export async function cancelReservationForQuoteGroup(
   if (error) throw error;
   return (data ?? []) as { id: string; event_name: string | null }[];
 }
+
+export type AutoSyncResult =
+  | { synced: false; reason: "no-group" | "no-approved" | "no-reservation" | "cancelled" }
+  | { synced: true; reservationId: string; eventName: string | null; quoteVersion: number; skipped: SkippedItem[] };
+
+/**
+ * Zosúladí rezerváciu s **poslednou schválenou verziou** kalkulácie.
+ *
+ * Rezervácia (a teda aj kalendár, ktorý z nej číta) má vždy ukazovať to, čo je
+ * odsúhlasené — nie rozpracovanú verziu a nie verziu, ktorú už prepísala novšia
+ * schválená. Preto sa berie najvyššia verzia v stave „Schválená", nech je
+ * označená ako aktuálna alebo nie.
+ *
+ * Zrušenej rezervácie sa nedotýka — tá je zrušená zámerne a oživiť ju môže len
+ * človek. Keď rezervácia ešte neexistuje, sama nevznikne; na to je tlačidlo
+ * „Rezervácia".
+ */
+export async function syncReservationWithApprovedQuote(
+  quoteGroupId: string | null | undefined,
+): Promise<AutoSyncResult> {
+  if (!quoteGroupId) return { synced: false, reason: "no-group" };
+
+  const { data: approved, error: eQuote } = await supabase
+    .from("quotes")
+    .select("id, version_number")
+    .eq("quote_group_id", quoteGroupId)
+    .eq("status", "approved")
+    .is("deleted_at", null)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (eQuote) throw eQuote;
+  if (!approved) return { synced: false, reason: "no-approved" };
+
+  const { data: reservation, error: eRes } = await supabase
+    .from("reservations")
+    .select("id, event_name, status")
+    .eq("quote_group_id", quoteGroupId)
+    .limit(1)
+    .maybeSingle();
+  if (eRes) throw eRes;
+  if (!reservation) return { synced: false, reason: "no-reservation" };
+  if (reservation.status === "cancelled") return { synced: false, reason: "cancelled" };
+
+  const { skipped } = await syncReservationFromQuote(reservation.id, approved.id);
+  return {
+    synced: true,
+    reservationId: reservation.id,
+    eventName: reservation.event_name,
+    quoteVersion: approved.version_number,
+    skipped,
+  };
+}

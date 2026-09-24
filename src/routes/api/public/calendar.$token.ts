@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { formatExtraItems, formatReservationItems, type IcsExtraRow } from "@/lib/ics-items";
+import { formatExtraItems, formatReservationItems, pickCalendarQuotes, type IcsExtraRow, type IcsQuoteRow } from "@/lib/ics-items";
 
 export const Route = createFileRoute("/api/public/calendar/$token")({
   server: {
@@ -42,18 +42,17 @@ export const Route = createFileRoute("/api/public/calendar/$token")({
         // nábytok sa vezie rovnako ako vlastný.
         const rows = (reservations ?? []) as unknown as ReservationRow[];
         const groupIds = [...new Set(rows.map((r) => r.quote_group_id).filter(Boolean))] as string[];
-        const extrasByGroup = new Map<string, IcsExtraRow[]>();
+        let extrasByGroup = new Map<string, IcsExtraRow[]>();
         if (groupIds.length > 0) {
+          // Berú sa schválené aj aktuálne verzie; ktorá z nich platí, rozhodne
+          // `pickCalendarQuotes` — rovnako ako pri zosúlaďovaní rezervácie.
           const { data: quoteRows } = await supabaseAdmin
             .from("quotes")
-            .select("quote_group_id, quote_items(kind, name, qty, furniture_item_id)")
+            .select("quote_group_id, version_number, status, is_current, quote_items(kind, name, qty, furniture_item_id)")
             .in("quote_group_id", groupIds)
-            .eq("is_current", true)
-            .is("deleted_at", null);
-          for (const q of quoteRows ?? []) {
-            const gid = (q as any).quote_group_id as string | null;
-            if (gid) extrasByGroup.set(gid, ((q as any).quote_items ?? []) as IcsExtraRow[]);
-          }
+            .is("deleted_at", null)
+            .or("is_current.eq.true,status.eq.approved");
+          extrasByGroup = pickCalendarQuotes((quoteRows ?? []) as unknown as IcsQuoteRow[]);
         }
 
         const ics = buildIcs(rows, profile.full_name ?? profile.id, extrasByGroup);

@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, ChevronLeft, ChevronRight, Trash2, Check, Loader2, Ban, Undo2, CalendarPlus, CalendarCheck } from "lucide-react";
 import { toast } from "sonner";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, quoteClientName } from "@/lib/quote-utils";
-import { cancelReservationForQuoteGroup, createReservationFromQuote } from "@/lib/quote-reservation-link";
+import { cancelReservationForQuoteGroup, createReservationFromQuote, syncReservationWithApprovedQuote } from "@/lib/quote-reservation-link";
+import { reportAutoSync, reportAutoSyncError } from "@/lib/quote-sync-feedback";
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { sk } from "date-fns/locale";
 
@@ -128,14 +129,25 @@ function QuotesList() {
   // Schválenie priamo zo zoznamu — nemusí sa kvôli tomu otvárať a upravovať
   // kalkulácia (úprava zakladá novú verziu).
   const approve = useMutation({
-    mutationFn: async (quoteId: string) => {
-      const { error } = await supabase.from("quotes").update({ status: "approved" }).eq("id", quoteId);
+    mutationFn: async (q: { id: string; quote_group_id: string | null }) => {
+      const { error } = await supabase.from("quotes").update({ status: "approved" }).eq("id", q.id);
       if (error) throw error;
+      // Rezervácia a kalendár idú za poslednou schválenou verziou — sami, bez
+      // toho, aby si na to niekto spomenul.
+      try {
+        return await syncReservationWithApprovedQuote(q.quote_group_id);
+      } catch (e) {
+        reportAutoSyncError(e);
+        return null;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (sync) => {
       qc.invalidateQueries({ queryKey: ["quotes"] });
       qc.invalidateQueries({ queryKey: ["quote"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+      qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
       toast.success("Kalkulácia označená ako schválená");
+      if (sync) reportAutoSync(sync);
     },
     onError: (e: any) => toast.error(e.message ?? "Stav sa nepodarilo zmeniť"),
   });
@@ -370,10 +382,10 @@ function QuotesList() {
                         <Button
                           size="sm"
                           className="bg-emerald-600 text-white hover:bg-emerald-700 h-8"
-                          onClick={() => approve.mutate(q.id)}
+                          onClick={() => approve.mutate({ id: q.id, quote_group_id: q.quote_group_id })}
                           disabled={approve.isPending}
                         >
-                          {approve.isPending && approve.variables === q.id
+                          {approve.isPending && approve.variables?.id === q.id
                             ? <Loader2 className="size-3.5 mr-1 animate-spin" />
                             : <Check className="size-3.5 mr-1" />}
                           Schváliť

@@ -24,7 +24,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { QuoteForm } from "@/components/quote-form";
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_VARIANT, formatEur, lineTotal, quoteClientName, type QuoteLine } from "@/lib/quote-utils";
-import { cancelReservationForQuoteGroup, computeFieldsDiff, computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, type DiffRow, type FieldDiff } from "@/lib/quote-reservation-link";
+import { cancelReservationForQuoteGroup, computeFieldsDiff, computeItemsDiff, createReservationFromQuote, syncReservationFromQuote, syncReservationWithApprovedQuote, type AutoSyncResult, type DiffRow, type FieldDiff } from "@/lib/quote-reservation-link";
+import { reportAutoSync, reportAutoSyncError } from "@/lib/quote-sync-feedback";
 import { useServerFn } from "@tanstack/react-start";
 import { createQuotePdfUpload, sendQuoteEmail } from "@/lib/email.functions";
 import { buildClientLines, buildCompanyLines } from "@/lib/document-utils";
@@ -188,16 +189,29 @@ function QuoteDetail() {
     mutationFn: async (next: "draft" | "sent" | "approved" | "rejected") => {
       const { error } = await supabase.from("quotes").update({ status: next }).eq("id", id);
       if (error) throw error;
-      return next;
+      // Po schválení ide rezervácia (a teda aj kalendár) za poslednou
+      // schválenou verziou automaticky.
+      let sync: AutoSyncResult | null = null;
+      if (next === "approved") {
+        try {
+          sync = await syncReservationWithApprovedQuote((quote.data as any)?.quote_group_id);
+        } catch (e) {
+          reportAutoSyncError(e);
+        }
+      }
+      return { next, sync };
     },
-    onSuccess: (next) => {
+    onSuccess: ({ next, sync }) => {
       qc.invalidateQueries({ queryKey: ["quote", id] });
       qc.invalidateQueries({ queryKey: ["quotes"] });
+      qc.invalidateQueries({ queryKey: ["quote-linked-reservation"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
       toast.success(
         next === "approved" ? "Kalkulácia označená ako schválená"
         : next === "rejected" ? "Kalkulácia zrušená — tovar, ktorý držala, je opäť voľný"
         : `Stav zmenený na „${QUOTE_STATUS_LABEL[next]}“`,
       );
+      if (sync) reportAutoSync(sync);
     },
     onError: (e: any) => toast.error(e.message ?? "Stav sa nepodarilo zmeniť"),
   });
@@ -670,6 +684,9 @@ function QuoteDetail() {
                 <button className="underline font-medium" onClick={() => setSyncOpen(true)}>Zosúladiť podľa v{q.version_number}</button>
               </>
             )}
+            <div className="text-xs opacity-80 pt-1">
+              Rezervácia aj kalendár idú automaticky za poslednou schválenou verziou — po schválení sa zosúladia samy.
+            </div>
           </div>
         )}
 
@@ -763,6 +780,12 @@ function QuoteDetail() {
               Kalkulácia sa zmenila oproti prepojenej rezervácii. Skontrolujte zmeny nižšie a potvrďte aktualizáciu.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {q.status !== "approved" && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-900 p-3 text-xs">
+              Verzia v{q.version_number} nie je schválená. Prepíšeš rezerváciu rozpracovanou verziou — len na to pozor.
+              Po schválení ktorejkoľvek verzie sa rezervácia aj tak zosúladí podľa nej.
+            </div>
+          )}
           <div className="max-h-72 overflow-auto rounded-md border bg-muted/30 p-3 text-sm space-y-1">
             {diffs.length === 0 && fieldDiffs.length === 0 && (
               <div className="text-muted-foreground">Žiadne rozdiely.</div>

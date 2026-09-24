@@ -103,3 +103,45 @@ export function formatExtraItems(rows: IcsExtraRow[] | null | undefined): string
   }
   return `Ďalšie položky (${polozky(rowsOut.length)}):\n${lines.join("\n")}`;
 }
+
+/**
+ * Ktorú verziu kalkulácie má kalendár ukazovať.
+ *
+ * Rovnaké pravidlo, podľa akého sa zosúlaďuje rezervácia: platí **posledná
+ * schválená** verzia. Rozpracovaná novšia verzia sa do kalendára nedostane —
+ * kým ju niekto neschváli, nie je dohodnutá. Keď v skupine nie je nič
+ * schválené, berie sa aktuálna verzia, aby kalendár neostal prázdny.
+ */
+export interface IcsQuoteRow {
+  quote_group_id: string | null;
+  version_number: number | null;
+  status: string | null;
+  is_current: boolean | null;
+  quote_items: IcsExtraRow[] | null;
+}
+
+export function pickCalendarQuotes(rows: IcsQuoteRow[] | null | undefined): Map<string, IcsExtraRow[]> {
+  const best = new Map<string, IcsQuoteRow>();
+  for (const row of rows ?? []) {
+    const gid = row?.quote_group_id;
+    if (!gid) continue;
+    const prev = best.get(gid);
+    if (!prev || betterForCalendar(row, prev)) best.set(gid, row);
+  }
+  const out = new Map<string, IcsExtraRow[]>();
+  for (const [gid, row] of best) out.set(gid, row.quote_items ?? []);
+  return out;
+}
+
+function rank(row: IcsQuoteRow): number {
+  if (row.status === "approved") return 2;
+  if (row.is_current) return 1;
+  return 0;
+}
+
+function betterForCalendar(a: IcsQuoteRow, b: IcsQuoteRow): boolean {
+  const ra = rank(a);
+  const rb = rank(b);
+  if (ra !== rb) return ra > rb;
+  return (a.version_number ?? 0) > (b.version_number ?? 0);
+}

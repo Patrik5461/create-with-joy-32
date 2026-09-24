@@ -2,7 +2,7 @@
  * Testy zoznamu nábytku, ktorý ide do popisu udalosti v Apple/Google kalendári.
  */
 import { describe, expect, it } from "bun:test";
-import { MAX_ITEM_LINES, formatExtraItems, formatReservationItems, type IcsExtraRow, type IcsItemRow } from "../src/lib/ics-items";
+import { MAX_ITEM_LINES, formatExtraItems, formatReservationItems, pickCalendarQuotes, type IcsExtraRow, type IcsItemRow, type IcsQuoteRow } from "../src/lib/ics-items";
 
 const it_ = (name: string, qty: number): IcsItemRow => ({ qty, furniture_items: { name } });
 
@@ -97,5 +97,56 @@ describe("ďalšie položky v popise udalosti", () => {
     const lines = formatExtraItems(many)!.split("\n");
     expect(lines).toHaveLength(1 + MAX_ITEM_LINES + 1);
     expect(lines[lines.length - 1]).toBe("• … a ďalších 3 položiek");
+  });
+});
+
+const qrow = (v: number, status: string, is_current: boolean, item: string): IcsQuoteRow => ({
+  quote_group_id: "g1", version_number: v, status, is_current,
+  quote_items: [{ kind: "other", name: item, qty: 1, furniture_item_id: null }],
+});
+
+function nameIn(map: Map<string, IcsExtraRow[]>): string {
+  return (map.get("g1") ?? [])[0]?.name ?? "";
+}
+
+describe("ktorú verziu ukáže kalendár", () => {
+  it("schválenú, aj keď je novšia verzia rozpracovaná", () => {
+    const map = pickCalendarQuotes([
+      qrow(5, "approved", false, "schválené"),
+      qrow(6, "draft", true, "rozpracované"),
+    ]);
+    expect(nameIn(map)).toBe("schválené");
+  });
+
+  it("z viacerých schválených tú najnovšiu", () => {
+    const map = pickCalendarQuotes([
+      qrow(3, "approved", false, "staršie"),
+      qrow(7, "approved", true, "najnovšie"),
+    ]);
+    expect(nameIn(map)).toBe("najnovšie");
+  });
+
+  it("keď nie je nič schválené, aktuálnu verziu", () => {
+    const map = pickCalendarQuotes([
+      qrow(1, "draft", false, "stará"),
+      qrow(2, "sent", true, "aktuálna"),
+    ]);
+    expect(nameIn(map)).toBe("aktuálna");
+  });
+
+  it("zamietnutá verzia nič neprebije", () => {
+    const map = pickCalendarQuotes([
+      qrow(4, "approved", false, "schválené"),
+      qrow(9, "rejected", true, "zamietnuté"),
+    ]);
+    expect(nameIn(map)).toBe("schválené");
+  });
+
+  it("riadky bez skupiny sa preskočia", () => {
+    const map = pickCalendarQuotes([
+      { quote_group_id: null, version_number: 1, status: "approved", is_current: true, quote_items: [] },
+    ]);
+    expect(map.size).toBe(0);
+    expect(pickCalendarQuotes(null).size).toBe(0);
   });
 });
