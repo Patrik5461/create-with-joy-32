@@ -58,7 +58,9 @@ export interface IcsExtraRow {
   qty: number | null;
 }
 
-const EXTRA_LABEL: Record<string, string> = {
+export type ExtraKind = "offstock" | "service" | "other";
+
+export const EXTRA_LABEL: Record<string, string> = {
   offstock: "mimo skladu",
   service: "služba",
   other: "iné",
@@ -67,7 +69,7 @@ const EXTRA_LABEL: Record<string, string> = {
 /** Poradie v zozname: najprv tovar, potom služby, nakoniec ostatné. */
 const EXTRA_ORDER = ["offstock", "service", "other"];
 
-function extraKind(row: IcsExtraRow): string | null {
+function extraKind(row: IcsExtraRow): ExtraKind | null {
   const kind = (row?.kind ?? "").trim();
   if (kind === "furniture") return row.furniture_item_id ? null : "offstock";
   if (kind === "service") return "service";
@@ -75,8 +77,16 @@ function extraKind(row: IcsExtraRow): string | null {
   return null;
 }
 
-export function formatExtraItems(rows: IcsExtraRow[] | null | undefined): string | null {
-  const merged = new Map<string, { name: string; qty: number; kind: string }>();
+export interface ExtraItem {
+  name: string;
+  qty: number;
+  kind: ExtraKind;
+}
+
+/** Zoznam položiek navyše — spočítaný a zoradený. Používa ho popis udalosti
+ *  v kalendári aj detail rezervácie v CRM, aby obe ukazovali to isté. */
+export function collectExtraItems(rows: IcsExtraRow[] | null | undefined): ExtraItem[] {
+  const merged = new Map<string, ExtraItem>();
   for (const row of rows ?? []) {
     const kind = extraKind(row);
     if (!kind) continue;
@@ -87,14 +97,17 @@ export function formatExtraItems(rows: IcsExtraRow[] | null | undefined): string
     const prev = merged.get(key);
     merged.set(key, { name, qty: (prev?.qty ?? 0) + qty, kind });
   }
-  if (merged.size === 0) return null;
-
-  const rowsOut = [...merged.values()].sort(
+  return [...merged.values()].sort(
     (a, b) =>
       EXTRA_ORDER.indexOf(a.kind) - EXTRA_ORDER.indexOf(b.kind) ||
       b.qty - a.qty ||
       a.name.localeCompare(b.name, "sk"),
   );
+}
+
+export function formatExtraItems(rows: IcsExtraRow[] | null | undefined): string | null {
+  const rowsOut = collectExtraItems(rows);
+  if (rowsOut.length === 0) return null;
   const lines = rowsOut
     .slice(0, MAX_ITEM_LINES)
     .map((r) => `• ${r.qty}× ${r.name} — ${EXTRA_LABEL[r.kind]}`);
@@ -149,6 +162,15 @@ export function pickCalendarQuotes(rows: IcsQuoteRow[] | null | undefined): Cale
     return out;
   };
   return { byGroup: items(bestByGroup), byReservation: items(bestByRes) };
+}
+
+/** Ktorá z verzií platí: posledná schválená, inak aktuálna, inak najnovšia. */
+export function pickBestQuote<T extends IcsQuoteRow>(rows: T[] | null | undefined): T | null {
+  let best: T | null = null;
+  for (const row of rows ?? []) {
+    if (!best || betterForCalendar(row, best)) best = row;
+  }
+  return best;
 }
 
 function rank(row: IcsQuoteRow): number {

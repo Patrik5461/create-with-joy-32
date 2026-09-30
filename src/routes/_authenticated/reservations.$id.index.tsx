@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { quoteClientName } from "@/lib/quote-utils";
+import { EXTRA_LABEL, collectExtraItems, pickBestQuote, type IcsQuoteRow } from "@/lib/ics-items";
 import { checkAvailability } from "@/lib/availability";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
@@ -45,20 +46,24 @@ function ReservationDetail() {
     },
   });
 
+  // Kalkulácia, ktorou sa rezervácia riadi: posledná schválená verzia, inak
+  // aktuálna — to isté pravidlo ako pri zosúlaďovaní a v kalendári. Hľadá sa
+  // podľa skupiny aj podľa starého priameho prepojenia, lebo časť rezervácií
+  // skupinu vyplnenú nemá.
   const sourceQuote = useQuery({
-    queryKey: ["reservation-source-quote", (reservation.data as any)?.quote_group_id],
-    enabled: !!(reservation.data as any)?.quote_group_id,
+    queryKey: ["reservation-source-quote", id, (reservation.data as any)?.quote_group_id],
+    enabled: !!reservation.data,
     queryFn: async () => {
-      const gid = (reservation.data as any).quote_group_id as string;
-      const { data, error } = await supabase
+      const gid = (reservation.data as any)?.quote_group_id as string | null;
+      let query = supabase
         .from("quotes")
-        .select("id, quote_number, version_number, is_current, clients(company_name)")
-        .eq("quote_group_id", gid)
-        .is("deleted_at", null)
-        .eq("is_current", true)
-        .maybeSingle();
+        .select("id, quote_number, version_number, status, is_current, quote_group_id, reservation_id, clients(company_name), quote_items(kind, name, qty, furniture_item_id)")
+        .is("deleted_at", null);
+      query = gid ? query.eq("quote_group_id", gid) : query.eq("reservation_id", id);
+      const { data, error } = await query;
       if (error) throw error;
-      return data as any;
+      const best = pickBestQuote((data ?? []) as unknown as IcsQuoteRow[]) as any;
+      return best ? { ...best, extras: collectExtraItems(best.quote_items) } : null;
     },
   });
 
@@ -232,6 +237,29 @@ function ReservationDetail() {
                 })}
               </CardContent>
             </Card>
+
+            {(sourceQuote.data?.extras?.length ?? 0) > 0 && (
+              <Card className="lg:col-span-3">
+                <CardHeader>
+                  <CardTitle className="text-base">Ďalšie položky</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Nie sú v sklade, takže ich rezervácia nedrží — sú z kalkulácie
+                    {sourceQuote.data ? ` v${sourceQuote.data.version_number}` : ""}. Do kalendára idú tiež.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {(sourceQuote.data?.extras ?? []).map((it: any) => (
+                    <div key={`${it.kind}-${it.name}`} className="flex items-center justify-between p-2 rounded border">
+                      <div>
+                        <div className="text-sm font-medium">{it.name}</div>
+                        <div className="text-xs text-muted-foreground">{EXTRA_LABEL[it.kind]}</div>
+                      </div>
+                      <Badge variant="outline">{it.qty} ks</Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             <div className="lg:col-span-3">
               <SurveyCard reservationId={r.id} email={r.email} canGenerate={canEdit} />

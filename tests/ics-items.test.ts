@@ -2,7 +2,7 @@
  * Testy zoznamu nábytku, ktorý ide do popisu udalosti v Apple/Google kalendári.
  */
 import { describe, expect, it } from "bun:test";
-import { MAX_ITEM_LINES, formatExtraItems, formatReservationItems, pickCalendarQuotes, type IcsExtraRow, type IcsItemRow, type IcsQuoteRow } from "../src/lib/ics-items";
+import { MAX_ITEM_LINES, collectExtraItems, formatExtraItems, formatReservationItems, pickBestQuote, pickCalendarQuotes, type IcsExtraRow, type IcsItemRow, type IcsQuoteRow } from "../src/lib/ics-items";
 
 const it_ = (name: string, qty: number): IcsItemRow => ({ qty, furniture_items: { name } });
 
@@ -164,5 +164,36 @@ describe("ktorú verziu ukáže kalendár", () => {
       qrow(4, "draft", true, "rozpracované", "rez-1"),
     ]);
     expect(nameIn(byReservation, "rez-1")).toBe("schválené");
+  });
+});
+
+describe("zoznam položiek navyše pre CRM aj kalendár", () => {
+  it("vracia to isté, čo ide do kalendára — spočítané a zoradené", () => {
+    const items = collectExtraItems([
+      extra("service", "doprava", 1),
+      extra("service", "doprava", 2),
+      extra("furniture", "koberec", 4),
+      extra("other", "poplatok", 1),
+      extra("furniture", "Ghost stolička", 10, true),
+    ]);
+    expect(items).toEqual([
+      { name: "koberec", qty: 4, kind: "offstock" },
+      { name: "doprava", qty: 3, kind: "service" },
+      { name: "poplatok", qty: 1, kind: "other" },
+    ]);
+  });
+
+  it("bez položiek navyše je zoznam prázdny", () => {
+    expect(collectExtraItems([extra("furniture", "Ghost stolička", 10, true)])).toEqual([]);
+    expect(collectExtraItems(null)).toEqual([]);
+  });
+
+  it("detail rezervácie vyberá tú istú verziu ako kalendár", () => {
+    const best = pickBestQuote([
+      qrow(2, "approved", false, "schválené"),
+      qrow(3, "draft", true, "rozpracované"),
+    ]);
+    expect(best?.version_number).toBe(2);
+    expect(pickBestQuote([])).toBeNull();
   });
 });
