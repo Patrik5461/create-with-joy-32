@@ -114,23 +114,41 @@ export function formatExtraItems(rows: IcsExtraRow[] | null | undefined): string
  */
 export interface IcsQuoteRow {
   quote_group_id: string | null;
+  /** Staré priame prepojenie na rezerváciu. Časť rezervácií má len toto —
+   *  vznikli z opačnej strany a skupinu kalkulácií nemajú vyplnenú. */
+  reservation_id: string | null;
   version_number: number | null;
   status: string | null;
   is_current: boolean | null;
   quote_items: IcsExtraRow[] | null;
 }
 
-export function pickCalendarQuotes(rows: IcsQuoteRow[] | null | undefined): Map<string, IcsExtraRow[]> {
-  const best = new Map<string, IcsQuoteRow>();
+/** Položky navyše zvlášť podľa skupiny kalkulácií a zvlášť podľa priameho
+ *  prepojenia na rezerváciu — aby o ne neprišli ani staršie rezervácie. */
+export interface CalendarExtras {
+  byGroup: Map<string, IcsExtraRow[]>;
+  byReservation: Map<string, IcsExtraRow[]>;
+}
+
+export function pickCalendarQuotes(rows: IcsQuoteRow[] | null | undefined): CalendarExtras {
+  const bestByGroup = new Map<string, IcsQuoteRow>();
+  const bestByRes = new Map<string, IcsQuoteRow>();
   for (const row of rows ?? []) {
-    const gid = row?.quote_group_id;
-    if (!gid) continue;
-    const prev = best.get(gid);
-    if (!prev || betterForCalendar(row, prev)) best.set(gid, row);
+    if (row?.quote_group_id) {
+      const prev = bestByGroup.get(row.quote_group_id);
+      if (!prev || betterForCalendar(row, prev)) bestByGroup.set(row.quote_group_id, row);
+    }
+    if (row?.reservation_id) {
+      const prev = bestByRes.get(row.reservation_id);
+      if (!prev || betterForCalendar(row, prev)) bestByRes.set(row.reservation_id, row);
+    }
   }
-  const out = new Map<string, IcsExtraRow[]>();
-  for (const [gid, row] of best) out.set(gid, row.quote_items ?? []);
-  return out;
+  const items = (m: Map<string, IcsQuoteRow>) => {
+    const out = new Map<string, IcsExtraRow[]>();
+    for (const [key, row] of m) out.set(key, row.quote_items ?? []);
+    return out;
+  };
+  return { byGroup: items(bestByGroup), byReservation: items(bestByRes) };
 }
 
 function rank(row: IcsQuoteRow): number {

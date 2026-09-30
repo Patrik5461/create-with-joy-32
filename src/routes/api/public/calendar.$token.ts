@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { formatExtraItems, formatReservationItems, pickCalendarQuotes, type IcsExtraRow, type IcsQuoteRow } from "@/lib/ics-items";
+import { formatExtraItems, formatReservationItems, pickCalendarQuotes, type CalendarExtras, type IcsQuoteRow } from "@/lib/ics-items";
 
 export const Route = createFileRoute("/api/public/calendar/$token")({
   server: {
@@ -42,20 +42,31 @@ export const Route = createFileRoute("/api/public/calendar/$token")({
         // nábytok sa vezie rovnako ako vlastný.
         const rows = (reservations ?? []) as unknown as ReservationRow[];
         const groupIds = [...new Set(rows.map((r) => r.quote_group_id).filter(Boolean))] as string[];
-        let extrasByGroup = new Map<string, IcsExtraRow[]>();
-        if (groupIds.length > 0) {
+        // Priamo podľa rezervácie sa dopytujeme len na tie, ktoré skupinu
+        // kalkulácií nemajú — inak by adresa dopytu bezdôvodne rástla.
+        const resIds = rows.filter((r) => !r.quote_group_id).map((r) => r.id);
+        let extras: CalendarExtras = { byGroup: new Map(), byReservation: new Map() };
+        if (groupIds.length > 0 || resIds.length > 0) {
           // Berú sa schválené aj aktuálne verzie; ktorá z nich platí, rozhodne
           // `pickCalendarQuotes` — rovnako ako pri zosúlaďovaní rezervácie.
+          //
+          // Hľadá sa podľa skupiny kalkulácií aj podľa starého priameho
+          // prepojenia: časť rezervácií vznikla z opačnej strany a skupinu
+          // vyplnenú nemá, takže podľa nej by sa im položky nenašli.
+          const filters = [
+            groupIds.length ? `quote_group_id.in.(${groupIds.join(",")})` : null,
+            resIds.length ? `reservation_id.in.(${resIds.join(",")})` : null,
+          ].filter(Boolean).join(",");
           const { data: quoteRows } = await supabaseAdmin
             .from("quotes")
-            .select("quote_group_id, version_number, status, is_current, quote_items(kind, name, qty, furniture_item_id)")
-            .in("quote_group_id", groupIds)
+            .select("quote_group_id, reservation_id, version_number, status, is_current, quote_items(kind, name, qty, furniture_item_id)")
             .is("deleted_at", null)
+            .or(filters)
             .or("is_current.eq.true,status.eq.approved");
-          extrasByGroup = pickCalendarQuotes((quoteRows ?? []) as unknown as IcsQuoteRow[]);
+          extras = pickCalendarQuotes((quoteRows ?? []) as unknown as IcsQuoteRow[]);
         }
 
-        const ics = buildIcs(rows, profile.full_name ?? profile.id, extrasByGroup);
+        const ics = buildIcs(rows, profile.full_name ?? profile.id, extras);
 
         return new Response(ics, {
           status: 200,
@@ -150,7 +161,7 @@ type ReservationRow = {
 function buildIcs(
   reservations: ReservationRow[],
   owner: string,
-  extrasByGroup?: Map<string, IcsExtraRow[]>,
+  extras?: CalendarExtras,
 ): string {
   const now = toIcsDate(new Date().toISOString())!;
   const lines: string[] = [
@@ -173,7 +184,9 @@ function buildIcs(
     const location = [r.venue, r.address].filter(Boolean).join(", ");
     const itemsBlock = formatReservationItems(r.reservation_items);
     const extrasBlock = formatExtraItems(
-      r.quote_group_id ? extrasByGroup?.get(r.quote_group_id) : null,
+      (r.quote_group_id ? extras?.byGroup.get(r.quote_group_id) : null) ??
+        extras?.byReservation.get(r.id) ??
+        null,
     );
     const descParts = [
       client ? `Klient: ${client}` : null,

@@ -100,18 +100,18 @@ describe("ďalšie položky v popise udalosti", () => {
   });
 });
 
-const qrow = (v: number, status: string, is_current: boolean, item: string): IcsQuoteRow => ({
-  quote_group_id: "g1", version_number: v, status, is_current,
+const qrow = (v: number, status: string, is_current: boolean, item: string, reservation_id: string | null = null): IcsQuoteRow => ({
+  quote_group_id: "g1", reservation_id, version_number: v, status, is_current,
   quote_items: [{ kind: "other", name: item, qty: 1, furniture_item_id: null }],
 });
 
-function nameIn(map: Map<string, IcsExtraRow[]>): string {
-  return (map.get("g1") ?? [])[0]?.name ?? "";
+function nameIn(map: Map<string, IcsExtraRow[]>, key = "g1"): string {
+  return (map.get(key) ?? [])[0]?.name ?? "";
 }
 
 describe("ktorú verziu ukáže kalendár", () => {
   it("schválenú, aj keď je novšia verzia rozpracovaná", () => {
-    const map = pickCalendarQuotes([
+    const { byGroup: map } = pickCalendarQuotes([
       qrow(5, "approved", false, "schválené"),
       qrow(6, "draft", true, "rozpracované"),
     ]);
@@ -119,7 +119,7 @@ describe("ktorú verziu ukáže kalendár", () => {
   });
 
   it("z viacerých schválených tú najnovšiu", () => {
-    const map = pickCalendarQuotes([
+    const { byGroup: map } = pickCalendarQuotes([
       qrow(3, "approved", false, "staršie"),
       qrow(7, "approved", true, "najnovšie"),
     ]);
@@ -127,7 +127,7 @@ describe("ktorú verziu ukáže kalendár", () => {
   });
 
   it("keď nie je nič schválené, aktuálnu verziu", () => {
-    const map = pickCalendarQuotes([
+    const { byGroup: map } = pickCalendarQuotes([
       qrow(1, "draft", false, "stará"),
       qrow(2, "sent", true, "aktuálna"),
     ]);
@@ -135,18 +135,34 @@ describe("ktorú verziu ukáže kalendár", () => {
   });
 
   it("zamietnutá verzia nič neprebije", () => {
-    const map = pickCalendarQuotes([
+    const { byGroup: map } = pickCalendarQuotes([
       qrow(4, "approved", false, "schválené"),
       qrow(9, "rejected", true, "zamietnuté"),
     ]);
     expect(nameIn(map)).toBe("schválené");
   });
 
-  it("riadky bez skupiny sa preskočia", () => {
-    const map = pickCalendarQuotes([
-      { quote_group_id: null, version_number: 1, status: "approved", is_current: true, quote_items: [] },
+  it("bez skupiny aj bez prepojenia na rezerváciu neostane nič", () => {
+    const { byGroup, byReservation } = pickCalendarQuotes([
+      { quote_group_id: null, reservation_id: null, version_number: 1, status: "approved", is_current: true, quote_items: [] },
     ]);
-    expect(map.size).toBe(0);
-    expect(pickCalendarQuotes(null).size).toBe(0);
+    expect(byGroup.size).toBe(0);
+    expect(byReservation.size).toBe(0);
+    expect(pickCalendarQuotes(null).byGroup.size).toBe(0);
+  });
+
+  it("nájde položky aj podľa starého prepojenia na rezerváciu", () => {
+    const { byReservation } = pickCalendarQuotes([
+      qrow(2, "approved", true, "doprava", "rez-1"),
+    ]);
+    expect(nameIn(byReservation, "rez-1")).toBe("doprava");
+  });
+
+  it("aj v starom prepojení platí posledná schválená verzia", () => {
+    const { byReservation } = pickCalendarQuotes([
+      qrow(3, "approved", false, "schválené", "rez-1"),
+      qrow(4, "draft", true, "rozpracované", "rez-1"),
+    ]);
+    expect(nameIn(byReservation, "rez-1")).toBe("schválené");
   });
 });

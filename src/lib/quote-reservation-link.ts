@@ -350,7 +350,7 @@ export async function syncReservationWithApprovedQuote(
 
   const { data: approved, error: eQuote } = await supabase
     .from("quotes")
-    .select("id, version_number")
+    .select("id, version_number, reservation_id")
     .eq("quote_group_id", quoteGroupId)
     .eq("status", "approved")
     .is("deleted_at", null)
@@ -367,14 +367,28 @@ export async function syncReservationWithApprovedQuote(
     .limit(1)
     .maybeSingle();
   if (eRes) throw eRes;
-  if (!reservation) return { synced: false, reason: "no-reservation" };
-  if (reservation.status === "cancelled") return { synced: false, reason: "cancelled" };
 
-  const { skipped } = await syncReservationFromQuote(reservation.id, approved.id);
+  // Časť rezervácií vznikla z opačnej strany a skupinu kalkulácií vyplnenú
+  // nemá — prepojené sú len starým poľom `quotes.reservation_id`. Bez tejto
+  // záložnej cesty by sa im rezervácia nikdy nezosúladila.
+  let target = reservation;
+  if (!target && approved.reservation_id) {
+    const { data: legacy, error: eLegacy } = await supabase
+      .from("reservations")
+      .select("id, event_name, status")
+      .eq("id", approved.reservation_id)
+      .maybeSingle();
+    if (eLegacy) throw eLegacy;
+    target = legacy;
+  }
+  if (!target) return { synced: false, reason: "no-reservation" };
+  if (target.status === "cancelled") return { synced: false, reason: "cancelled" };
+
+  const { skipped } = await syncReservationFromQuote(target.id, approved.id);
   return {
     synced: true,
-    reservationId: reservation.id,
-    eventName: reservation.event_name,
+    reservationId: target.id,
+    eventName: target.event_name,
     quoteVersion: approved.version_number,
     skipped,
   };
