@@ -172,8 +172,11 @@ function buildIcs(
     "METHOD:PUBLISH",
     `X-WR-CALNAME:Mima Production CRM – ${escapeIcs(owner)}`,
     "X-WR-TIMEZONE:Europe/Bratislava",
-    "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
-    "X-PUBLISHED-TTL:PT1H",
+    // Koľko často si má kalendár feed stahovať. Apple ani Google to
+    // nesľubujú, ale bez tejto hodnoty si berú predvolený interval, ktorý je
+    // pokojne aj týždeň — a zmena v CRM sa potom objaví o týždeň.
+    "REFRESH-INTERVAL;VALUE=DURATION:PT15M",
+    "X-PUBLISHED-TTL:PT15M",
   ];
 
   for (const r of reservations) {
