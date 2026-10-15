@@ -19,6 +19,14 @@ export type DiffRow =
   | { type: "removed"; name: string; qty: number }
   | { type: "changed"; name: string; from: number; to: number };
 
+/** Počet kusov tak, ako ho na rezerváciu naozaj zapíše `syncReservationFromQuote`.
+ *  Bez toho hlásil indikátor rozdiel aj hneď po zosúladení — kalkulácia vie mať
+ *  0,5 ks (polovica dňa, polovica sady), rezervácia len celé kusy. */
+function reservableQty(qty: unknown): number {
+  const n = Number(qty) || 0;
+  return n > 0 ? Math.max(1, Math.round(n)) : 0;
+}
+
 /** Compare current quote furniture items vs reservation items. */
 export function computeItemsDiff(
   quoteItems: FurnitureQuoteItem[],
@@ -27,10 +35,12 @@ export function computeItemsDiff(
   const qMap = new Map<string, { name: string; qty: number }>();
   for (const it of quoteItems) {
     if (it.kind !== "furniture" || !it.furniture_item_id) continue;
+    const qty = reservableQty(it.qty);
+    if (qty === 0) continue; // nulová položka sa na rezerváciu nedostane
     const prev = qMap.get(it.furniture_item_id);
     qMap.set(it.furniture_item_id, {
       name: it.name || prev?.name || "",
-      qty: (prev?.qty ?? 0) + Number(it.qty || 0),
+      qty: (prev?.qty ?? 0) + qty,
     });
   }
   const rMap = new Map<string, { name: string; qty: number }>();
@@ -125,7 +135,14 @@ export async function syncReservationFromQuote(
     .maybeSingle();
   if (eQ) throw eQ;
   if (q) {
-    const patch = buildReservationPatch(q as QuoteSyncSource);
+    // Súčasné termíny treba poznať, aby sa ručne nastavený čas neprepísal
+    // hodinou, ktorú si funkcia len dopočítala z dátumu eventu.
+    const { data: now } = await supabase
+      .from("reservations")
+      .select("load_at, event_start_at, event_end_at, return_at, available_from_at")
+      .eq("id", reservationId)
+      .maybeSingle();
+    const patch = buildReservationPatch(q as QuoteSyncSource, now as ReservationTimes);
     if (Object.keys(patch).length > 0) {
       const { error: eUpd } = await supabase
         .from("reservations")
@@ -154,32 +171,64 @@ export type QuoteSyncSource = {
   address?: string | null;
 };
 
+/** Čo už na rezervácii je — aby sa dopočítané hodiny neprepísali cez ručne
+ *  nastavený čas. */
+export type ReservationTimes = Record<string, unknown> | null | undefined;
+
+function sameDay(a: unknown, b: string): boolean {
+  if (!a) return false;
+  const x = new Date(a as string);
+  const y = new Date(b);
+  if (Number.isNaN(x.getTime()) || Number.isNaN(y.getTime())) return false;
+  return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}
+
 /** Compute reservation fields from a quote row. Only fields the quote
  *  actually specifies are returned so we never blank out manual overrides.
  *
  *  Toto je jediný zdroj pravdy pre mapovanie kalkulácia → rezervácia. Číta z
  *  neho `syncReservationFromQuote` (čo zapíše) aj `computeFieldsDiff` (čo
- *  indikátor ohlási) — inak sa tie dve vetvy rozídu, ako sa už raz stalo. */
-export function buildReservationPatch(q: QuoteSyncSource): Record<string, string> {
+ *  indikátor ohlási) — inak sa tie dve vetvy rozídu, ako sa už raz stalo.
+ *
+ *  Rozlišujú sa dva druhy hodnôt:
+ *
+ *  • **Zadané v kalkulácii** (presný čas montáže, demontáže, začiatku a konca
+ *    eventu, miesto) — tie platia vždy, to je dohoda s klientom.
+ *  • **Dopočítané**, keď kalkulácia pozná len dátum eventu (10:00–23:00) alebo
+ *    keď sa „dostupné od" odvodzuje od návratu. Tie sa zapíšu, len ak na
+ *    rezervácii ešte nič nie je, alebo ak sa posunul deň. Inak by zosúladenie
+ *    prepísalo skutočný čas akcie (08:00) vymysleným (10:00) — a odkedy to
+ *    beží automaticky po schválení, dialo by sa to potichu. */
+export function buildReservationPatch(q: QuoteSyncSource, current?: ReservationTimes): Record<string, string> {
   const patch: Record<string, string> = {};
+
+  /** Dopočítanú hodnotu zapíš len vtedy, keď nemá čo pokaziť. */
+  const putDerived = (field: string, value: string) => {
+    const now = current?.[field];
+    if (now && sameDay(now, value)) return;
+    patch[field] = value;
+  };
 
   // event window
   const eventStart = q.event_start_at ?? (q.event_date ? dateAt(q.event_date, 10) : null);
   const eventEnd = q.event_end_at ?? (q.event_date ? dateAt(q.event_date, 23) : null);
-  if (eventStart) patch.event_start_at = new Date(eventStart).toISOString();
-  if (eventEnd) patch.event_end_at = new Date(eventEnd).toISOString();
+  if (q.event_start_at) patch.event_start_at = new Date(q.event_start_at).toISOString();
+  else if (eventStart) putDerived("event_start_at", new Date(eventStart).toISOString());
+  if (q.event_end_at) patch.event_end_at = new Date(q.event_end_at).toISOString();
+  else if (eventEnd) putDerived("event_end_at", new Date(eventEnd).toISOString());
 
   // load_at ← installation_date (presný čas) alebo začiatok eventu
-  const loadAt = q.installation_date ? new Date(q.installation_date).toISOString() : eventStart;
-  if (loadAt) patch.load_at = new Date(loadAt).toISOString();
+  if (q.installation_date) patch.load_at = new Date(q.installation_date).toISOString();
+  else if (eventStart) putDerived("load_at", new Date(eventStart).toISOString());
 
   // return_at ← dismantling_date (presný čas) alebo koniec eventu;
-  // available_from_at ← nasledujúci deň 08:00 alebo return_at
+  // available_from_at ← návrat + 10 hodín
   const returnAt = q.dismantling_date ? new Date(q.dismantling_date).toISOString() : eventEnd;
+  if (q.dismantling_date) patch.return_at = new Date(q.dismantling_date).toISOString();
+  else if (returnAt) putDerived("return_at", new Date(returnAt).toISOString());
   if (returnAt) {
-    patch.return_at = new Date(returnAt).toISOString();
     const nextDay = new Date(new Date(returnAt).getTime() + 10 * 3600 * 1000);
-    patch.available_from_at = nextDay.toISOString();
+    putDerived("available_from_at", nextDay.toISOString());
   }
 
   // Miesto konania — doteraz sa neprenášalo vôbec, takže rezervácie vznikali
@@ -229,7 +278,7 @@ export function computeFieldsDiff(
   quote: QuoteSyncSource,
   reservation: Record<string, unknown>,
 ): FieldDiff[] {
-  const patch = buildReservationPatch(quote);
+  const patch = buildReservationPatch(quote, reservation);
   const diffs: FieldDiff[] = [];
   for (const [field, next] of Object.entries(patch)) {
     if (isUnchanged(field, reservation[field], next)) continue;
