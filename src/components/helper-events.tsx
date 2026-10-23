@@ -3,16 +3,19 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Hourglass, List, Loader2, MapPin, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Hourglass, List, Loader2, MapPin, Package, X } from "lucide-react";
 import {
   addMonths, dayKey as dayKeyOf, eventsByDay, monthGrid, monthRange, startOfMonth,
 } from "@/lib/helper-calendar";
 import {
+  helperEventItems,
   helperSignUp,
   helperUpcomingEvents,
   helperWithdrawSignup,
   type HelperEvent,
+  type HelperEventItems,
 } from "@/lib/helper-shifts.functions";
+import { EXTRA_LABEL } from "@/lib/ics-items";
 
 /**
  * Rozpis akcií pre brigádnika. Len na čítanie — jediné, čo sa odtiaľto dá
@@ -145,6 +148,7 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
           onSelect={setSelected}
           busyId={busyId}
           onToggle={toggle}
+          token={token}
         />
       )}
 
@@ -156,7 +160,7 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
             {day.today && <Badge variant="secondary" className="text-[10px]">dnes</Badge>}
           </h2>
           {day.items.map((ev) => (
-            <EventCard key={ev.id} ev={ev} busy={busyId === ev.id} onToggle={() => toggle(ev)} />
+            <EventCard key={ev.id} ev={ev} busy={busyId === ev.id} onToggle={() => toggle(ev)} token={token} />
           ))}
         </section>
       ))}
@@ -170,7 +174,7 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
  * Dotknúť sa dá jedine vlastnej prihlášky, nič v kalendári sa upraviť nedá.
  */
 function MonthView({
-  events, month, onMonth, selected, onSelect, busyId, onToggle,
+  events, month, onMonth, selected, onSelect, busyId, onToggle, token,
 }: {
   events: HelperEvent[];
   month: Date;
@@ -179,6 +183,7 @@ function MonthView({
   onSelect: (key: string) => void;
   busyId: string | null;
   onToggle: (ev: HelperEvent) => void;
+  token: string;
 }) {
   const byDay = useMemo(() => eventsByDay(events), [events]);
   const weeks = useMemo(() => monthGrid(month), [month]);
@@ -261,7 +266,7 @@ function MonthView({
           <p className="text-sm text-muted-foreground py-2">V tento deň nie je žiadna akcia.</p>
         ) : (
           dnesne.map((ev) => (
-            <EventCard key={ev.id} ev={ev} busy={busyId === ev.id} onToggle={() => onToggle(ev)} />
+            <EventCard key={ev.id} ev={ev} busy={busyId === ev.id} onToggle={() => onToggle(ev)} token={token} />
           ))
         )}
       </div>
@@ -269,10 +274,31 @@ function MonthView({
   );
 }
 
-function EventCard({ ev, busy, onToggle }: { ev: HelperEvent; busy: boolean; onToggle: () => void }) {
+function EventCard({ ev, busy, onToggle, token }: { ev: HelperEvent; busy: boolean; onToggle: () => void; token: string }) {
   const start = ev.startAt ? new Date(ev.startAt) : null;
   const end = ev.endAt ? new Date(ev.endAt) : null;
   const confirmed = ev.assigned || ev.signup === "accepted";
+  const itemsFn = useServerFn(helperEventItems);
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<HelperEventItems | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  /** Zoznam sa ťahá až pri rozkliknutí — na mobilnom internete sa nenaťahuje
+   *  nábytok z dvadsiatich akcií, ktoré nikto neotvoril. */
+  async function toggleItems() {
+    const next = !open;
+    setOpen(next);
+    if (!next || items || loading) return;
+    setLoading(true);
+    try {
+      setItems(await itemsFn({ data: { token, reservationId: ev.id } }));
+    } catch (e: any) {
+      toast.error(e?.message ?? "Zoznam sa nepodarilo načítať.");
+      setOpen(false);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className={`rounded-lg border p-3 space-y-2 ${confirmed ? "border-emerald-300 bg-emerald-50/50" : "bg-background"}`}>
@@ -299,6 +325,46 @@ function EventCard({ ev, busy, onToggle }: { ev: HelperEvent; busy: boolean; onT
         <Clock className="size-3 shrink-0" />
         {start ? TIME.format(start) : "—"}
         {end && <> – {TIME.format(end)}{dayKey(ev.endAt) !== dayKey(ev.startAt) && " (nasl. deň)"}</>}
+      </div>
+
+      <div className="rounded-md border bg-muted/30">
+        <button
+          onClick={toggleItems}
+          className="w-full flex items-center justify-between gap-2 px-2.5 py-2 text-xs font-medium"
+          aria-expanded={open}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Package className="size-3.5" />
+            Čo sa vezie
+            {items && <span className="text-muted-foreground font-normal">· {items.totalQty} ks</span>}
+          </span>
+          {loading
+            ? <Loader2 className="size-3.5 animate-spin" />
+            : <ChevronDown className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />}
+        </button>
+        {open && items && (
+          <div className="px-2.5 pb-2.5 space-y-1.5">
+            {items.furniture.length === 0 && items.extras.length === 0 && (
+              <p className="text-xs text-muted-foreground">Na akcii zatiaľ nie je zapísaný žiadny nábytok.</p>
+            )}
+            {items.furniture.map((it) => (
+              <div key={it.name} className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="min-w-0">{it.name}</span>
+                <span className="font-semibold tabular-nums shrink-0">{it.qty} ks</span>
+              </div>
+            ))}
+            {items.extras.length > 0 && (
+              <div className="pt-1.5 border-t space-y-1.5">
+                {items.extras.map((it) => (
+                  <div key={`${it.kind}-${it.name}`} className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                    <span className="min-w-0">{it.name} <span className="opacity-70">({EXTRA_LABEL[it.kind] ?? it.kind})</span></span>
+                    <span className="font-semibold tabular-nums shrink-0">{it.qty} ks</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {confirmed ? (

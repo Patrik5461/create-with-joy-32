@@ -221,3 +221,83 @@ export const helperWithdrawSignup = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { status: "none" as const };
   });
+
+// -------- Zoznam nábytku na akcii --------
+
+export interface HelperEventItems {
+  /** Nábytok zo skladu — to, čo sa naloží. */
+  furniture: { name: string; qty: number }[];
+  /** Dopožičaný nábytok, služby a položky „Iné" z kalkulácie. */
+  extras: { name: string; qty: number; kind: string }[];
+  /** Súčet kusov nábytku zo skladu — pre hlavičku zoznamu. */
+  totalQty: number;
+}
+
+/**
+ * Čo sa na akciu vezie. Brigádnik to potrebuje vedieť pri nakládke, takže
+ * názvy a počty kusov áno — ceny, klient, kontakty ani poznámky nie.
+ *
+ * Vidieť sa dá len akcia, ktorá je aj v jeho rozpise (nezrušená, v okne 120
+ * dní). Inak by sa cez prehliadač dalo vyčítať, čo sa vozí na ktorúkoľvek
+ * akciu v histórii.
+ */
+export const helperEventItems = createServerFn({ method: "POST" })
+  .inputValidator((raw: unknown) => {
+    const d = raw as { token?: unknown; reservationId?: unknown };
+    if (!d || typeof d.token !== "string") throw new Error("Chýba token.");
+    if (typeof d.reservationId !== "string" || !UUID_RE.test(d.reservationId)) {
+      throw new Error("Neplatná akcia.");
+    }
+    return { token: d.token, reservationId: d.reservationId };
+  })
+  .handler(async ({ data }): Promise<HelperEventItems> => {
+    await helperFromToken(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { collectExtraItems, pickBestQuote } = await import("./ics-items");
+
+    const now = new Date();
+    const to = new Date(now.getTime() + HORIZON_DAYS * 24 * 3600 * 1000).toISOString();
+
+    const { data: r, error } = await supabaseAdmin
+      .from("reservations")
+      .select("id, status, quote_group_id, available_from_at, load_at, reservation_items(qty, furniture_items(name))")
+      .eq("id", data.reservationId)
+      .neq("status", "cancelled")
+      .gt("available_from_at", now.toISOString())
+      .lte("load_at", to)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!r) throw new Error("Akcia sa nenašla.");
+
+    // Nábytok zo skladu — tú istú položku z viacerých riadkov spočítame.
+    const merged = new Map<string, number>();
+    for (const row of ((r as any).reservation_items ?? []) as any[]) {
+      const name = (row?.furniture_items?.name ?? "").trim();
+      const qty = Math.max(0, Math.round(Number(row?.qty) || 0));
+      if (!name || qty === 0) continue;
+      merged.set(name, (merged.get(name) ?? 0) + qty);
+    }
+    const furniture = [...merged.entries()]
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name, "sk"));
+
+    // Položky, ktoré v sklade nie sú (dopožičaný nábytok, služby, „Iné") žijú
+    // len na kalkulácii — rovnaké pravidlo ako v kalendári: posledná schválená
+    // verzia, inak aktuálna.
+    let extras: HelperEventItems["extras"] = [];
+    const gid = (r as any).quote_group_id as string | null;
+    let qQuery = supabaseAdmin
+      .from("quotes")
+      .select("quote_group_id, reservation_id, version_number, status, is_current, quote_items(kind, name, qty, furniture_item_id)")
+      .is("deleted_at", null);
+    qQuery = gid ? qQuery.eq("quote_group_id", gid) : qQuery.eq("reservation_id", r.id);
+    const { data: quoteRows } = await qQuery;
+    const best = pickBestQuote((quoteRows ?? []) as any);
+    if (best) extras = collectExtraItems((best as any).quote_items);
+
+    return {
+      furniture,
+      extras,
+      totalQty: furniture.reduce((s, f) => s + f.qty, 0),
+    };
+  });
