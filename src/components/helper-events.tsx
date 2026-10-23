@@ -3,7 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, Clock, Hourglass, Loader2, MapPin, X } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Hourglass, List, Loader2, MapPin, X } from "lucide-react";
+import {
+  addMonths, dayKey as dayKeyOf, eventsByDay, monthGrid, monthRange, startOfMonth,
+} from "@/lib/helper-calendar";
 import {
   helperSignUp,
   helperUpcomingEvents,
@@ -13,9 +16,14 @@ import {
 
 /**
  * Rozpis akcií pre brigádnika. Len na čítanie — jediné, čo sa odtiaľto dá
- * zapísať, je vlastná prihláška. Na telefóne je to zoznam po dňoch, nie mesačná
- * mriežka: brigádnik potrebuje vidieť čas a miesto, nie farebné bodky.
+ * zapísať, je vlastná prihláška; server ani nič iné neposiela a nič iné
+ * neprijíma.
+ *
+ * Dve zobrazenia: mesačný kalendár (prehľad, čo kedy je) a zoznam po dňoch
+ * (čas a miesto pod sebou). Prepína sa to hore a kalendár je predvolený.
  */
+const MONTH = new Intl.DateTimeFormat("sk-SK", { month: "long", year: "numeric" });
+const WEEKDAYS = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"];
 
 const DAY = new Intl.DateTimeFormat("sk-SK", { weekday: "long", day: "numeric", month: "long" });
 const TIME = new Intl.DateTimeFormat("sk-SK", { hour: "2-digit", minute: "2-digit" });
@@ -38,6 +46,9 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
 
   const [events, setEvents] = useState<HelperEvent[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [view, setView] = useState<"kalendar" | "zoznam">("kalendar");
+  const [month, setMonth] = useState<Date>(() => startOfMonth(new Date()));
+  const [selected, setSelected] = useState<string>(() => dayKeyOf(new Date()));
 
   async function refresh() {
     try {
@@ -105,13 +116,39 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
         )}
       </div>
 
+      <div className="inline-flex w-full rounded-md border p-0.5 bg-muted/40">
+        {([["kalendar", "Kalendár", CalendarDays], ["zoznam", "Zoznam", List]] as const).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            onClick={() => setView(key)}
+            className={`flex-1 h-9 rounded text-sm inline-flex items-center justify-center gap-1.5 ${
+              view === key ? "bg-background shadow-sm font-medium" : "text-muted-foreground"
+            }`}
+          >
+            <Icon className="size-3.5" />{label}
+          </button>
+        ))}
+      </div>
+
       {days.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-8">
           Zatiaľ tu nie sú žiadne nadchádzajúce akcie.
         </p>
       )}
 
-      {days.map((day) => (
+      {view === "kalendar" && days.length > 0 && (
+        <MonthView
+          events={events}
+          month={month}
+          onMonth={setMonth}
+          selected={selected}
+          onSelect={setSelected}
+          busyId={busyId}
+          onToggle={toggle}
+        />
+      )}
+
+      {view === "zoznam" && days.map((day) => (
         <section key={day.label} className="space-y-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <CalendarDays className="size-3.5" />
@@ -123,6 +160,111 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
           ))}
         </section>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Mesačný kalendár — len na prezeranie. Deň s akciou má bodku, po kliknutí sa
+ * pod mriežkou rozbalia akcie toho dňa (rovnaké kartičky ako v zozname).
+ * Dotknúť sa dá jedine vlastnej prihlášky, nič v kalendári sa upraviť nedá.
+ */
+function MonthView({
+  events, month, onMonth, selected, onSelect, busyId, onToggle,
+}: {
+  events: HelperEvent[];
+  month: Date;
+  onMonth: (d: Date) => void;
+  selected: string;
+  onSelect: (key: string) => void;
+  busyId: string | null;
+  onToggle: (ev: HelperEvent) => void;
+}) {
+  const byDay = useMemo(() => eventsByDay(events), [events]);
+  const weeks = useMemo(() => monthGrid(month), [month]);
+  const range = useMemo(() => monthRange(events), [events]);
+  const canBack = month.getTime() > range.from.getTime();
+  const canFwd = month.getTime() < range.to.getTime();
+  const dnesne = byDay.get(selected) ?? [];
+
+  /** Prelistovanie mesiaca hneď ukáže prvú akciu v ňom — inak by pod mriežkou
+   *  ostalo „žiadna akcia" aj v mesiaci, kde akcie sú. */
+  const goMonth = (delta: number) => {
+    const next = addMonths(month, delta);
+    onMonth(next);
+    const prefix = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+    const firstDay = [...byDay.keys()].filter((k) => k.startsWith(prefix)).sort()[0];
+    if (firstDay) onSelect(firstDay);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          variant="outline" size="icon" className="size-9 shrink-0"
+          aria-label="Predchádzajúci mesiac"
+          disabled={!canBack}
+          onClick={() => goMonth(-1)}
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <div className="text-sm font-medium capitalize text-center flex-1">{MONTH.format(month)}</div>
+        <Button
+          variant="outline" size="icon" className="size-9 shrink-0"
+          aria-label="Nasledujúci mesiac"
+          disabled={!canFwd}
+          onClick={() => goMonth(1)}
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {WEEKDAYS.map((d) => (
+          <div key={d} className="text-[10px] uppercase tracking-wide text-muted-foreground py-1">{d}</div>
+        ))}
+        {weeks.flat().map((day) => {
+          const list = byDay.get(day.key) ?? [];
+          const mine = list.some((e) => e.assigned || e.signup === "accepted");
+          const isSel = day.key === selected;
+          return (
+            <button
+              key={day.key}
+              onClick={() => onSelect(day.key)}
+              aria-label={`${day.date.getDate()}. — ${list.length === 0 ? "bez akcií" : `${list.length} akcií`}`}
+              className={`aspect-square rounded-md border text-sm flex flex-col items-center justify-center gap-0.5
+                ${isSel ? "border-foreground bg-muted font-semibold" : "border-transparent"}
+                ${day.inMonth ? "" : "text-muted-foreground/40"}
+                ${day.isToday && !isSel ? "ring-1 ring-foreground/30" : ""}
+                ${list.length > 0 ? "bg-muted/50" : ""}`}
+            >
+              <span>{day.date.getDate()}</span>
+              {list.length > 0 && (
+                <span className={`size-1.5 rounded-full ${mine ? "bg-emerald-600" : "bg-foreground/50"}`} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-foreground/50" />akcia</span>
+        <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-emerald-600" />si na nej nasadený</span>
+      </div>
+
+      <div className="space-y-2 border-t pt-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <CalendarDays className="size-3.5" />
+          {selected ? DAY.format(new Date(`${selected}T12:00:00`)) : "Vyber deň"}
+        </h2>
+        {dnesne.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-2">V tento deň nie je žiadna akcia.</p>
+        ) : (
+          dnesne.map((ev) => (
+            <EventCard key={ev.id} ev={ev} busy={busyId === ev.id} onToggle={() => onToggle(ev)} />
+          ))
+        )}
+      </div>
     </div>
   );
 }
