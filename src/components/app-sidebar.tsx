@@ -16,6 +16,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Permission } from "@/lib/permissions";
 import { useUnreadTotal } from "@/hooks/use-chat-conversations";
+import { useNewInquiriesCount } from "@/hooks/use-new-inquiries";
 import { ChatNotifications } from "@/components/chat/chat-notifications";
 
 type NavItem = { title: string; url: string; icon: any; permission: Permission | null };
@@ -45,6 +46,10 @@ export function AppSidebar() {
   const isActive = (url: string) => pathname === url || pathname.startsWith(url + "/");
   const { total: unread } = useUnreadTotal(user?.id);
   const visibleMain = mainItems.filter((it) => it.permission === null || can(it.permission));
+  // Počet nových dopytov sa ťahá, len keď na ne používateľ vôbec má právo.
+  const { count: newInquiries } = useNewInquiriesCount(can("reservations.view"));
+  const badgeFor = (url: string) =>
+    url === "/chat" ? unread : url === "/inquiries" ? newInquiries : 0;
   const showUsers = can("users.manage");
   const showEmail = can("settings.manage");
   const showHelpers = can("settings.manage");
@@ -72,10 +77,18 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title} className={itemClass}>
                     <Link to={item.url} className="flex items-center gap-3">
-                      <item.icon className="size-[18px]" />
+                      <span className="relative shrink-0">
+                        <item.icon className="size-[18px]" />
+                        {/* Zbalené menu nemá kde ukázať číslo, tak aspoň bodku. */}
+                        {badgeFor(item.url) > 0 && (
+                          <span className="hidden group-data-[collapsible=icon]:block absolute -top-0.5 -right-0.5 size-2 rounded-full bg-sidebar-primary ring-2 ring-sidebar" />
+                        )}
+                      </span>
                       <span className="flex-1">{item.title}</span>
-                      {item.url === "/chat" && unread > 0 && (
-                        <Badge className="h-5 min-w-5 px-1.5 text-[10px]">{unread > 99 ? "99+" : unread}</Badge>
+                      {badgeFor(item.url) > 0 && (
+                        <Badge className="h-5 min-w-5 px-1.5 text-[10px] group-data-[collapsible=icon]:hidden">
+                          {badgeFor(item.url) > 99 ? "99+" : badgeFor(item.url)}
+                        </Badge>
                       )}
                     </Link>
                   </SidebarMenuButton>
