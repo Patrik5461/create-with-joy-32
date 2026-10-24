@@ -93,3 +93,48 @@ export function monthRange<T extends { startAt: string | null }>(
   }
   return { from, to };
 }
+
+/** Jeden riadok v časovom rozpise akcie. */
+export interface ScheduleRow {
+  kind: "load" | "event" | "return";
+  /** ISO čas, tak ako prišiel zo servera. */
+  at: string;
+  /** true = je to iný deň než nakládka, treba ukázať aj dátum. */
+  otherDay: boolean;
+}
+
+/**
+ * Čo a kedy sa na akcii deje, v poradí nakládka → akcia → vrátenie.
+ *
+ * Brigádnik potrebuje zo všetkého najskôr vedieť, **kedy je nakládka** — holý
+ * čas bez popisu mu nepovie, či má prísť do skladu alebo na miesto. Preto má
+ * každý riadok svoj druh a formátovanie si rieši zobrazenie.
+ *
+ * Riadok, ktorý nič nepridá, vypadne: chýbajúci termín aj začiatok akcie
+ * zhodný s nakládkou (to je ten istý údaj dvakrát).
+ */
+export function scheduleRows(ev: {
+  startAt: string | null;
+  eventStartAt?: string | null;
+  endAt: string | null;
+}): ScheduleRow[] {
+  const ms = (v: string | null | undefined) => {
+    if (!v) return null;
+    const t = new Date(v).getTime();
+    return Number.isNaN(t) ? null : t;
+  };
+  const load = ms(ev.startAt);
+  const event = ms(ev.eventStartAt);
+  const ret = ms(ev.endAt);
+  const baseKey = dayKey(ev.startAt) || dayKey(ev.eventStartAt) || dayKey(ev.endAt);
+
+  const rows: ScheduleRow[] = [];
+  const push = (kind: ScheduleRow["kind"], at: string | null | undefined) => {
+    if (!at || ms(at) === null) return;
+    rows.push({ kind, at, otherDay: !!baseKey && dayKey(at) !== baseKey });
+  };
+  push("load", ev.startAt);
+  if (event !== null && event !== load) push("event", ev.eventStartAt);
+  if (ret !== null && ret !== load && ret !== event) push("return", ev.endAt);
+  return rows;
+}

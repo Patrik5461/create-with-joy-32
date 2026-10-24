@@ -3,9 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Hourglass, List, Loader2, MapPin, Package, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Hourglass, List, Loader2, MapPin, Package, PartyPopper, Truck, Undo2, X } from "lucide-react";
 import {
-  addMonths, dayKey as dayKeyOf, eventsByDay, monthGrid, monthRange, startOfMonth,
+  addMonths, dayKey as dayKeyOf, eventsByDay, monthGrid, monthRange, scheduleRows, startOfMonth,
+  type ScheduleRow,
 } from "@/lib/helper-calendar";
 import {
   helperEventItems,
@@ -30,6 +31,17 @@ const WEEKDAYS = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"];
 
 const DAY = new Intl.DateTimeFormat("sk-SK", { weekday: "long", day: "numeric", month: "long" });
 const TIME = new Intl.DateTimeFormat("sk-SK", { hour: "2-digit", minute: "2-digit" });
+const SHORT_DAY = new Intl.DateTimeFormat("sk-SK", { weekday: "short", day: "numeric", month: "numeric" });
+
+/**
+ * Čo brigádnik na akcii vidí ako prvé: kedy je nakládka. Holý čas bez popisu
+ * mu nepovie, či má prísť do skladu, na miesto, alebo až po nábytok naspäť.
+ */
+const SCHEDULE: Record<ScheduleRow["kind"], { label: string; icon: typeof Truck; hint: string }> = {
+  load: { label: "Nakládka", icon: Truck, hint: "vyzdvihnutie nábytku v sklade" },
+  event: { label: "Akcia", icon: PartyPopper, hint: "začiatok akcie" },
+  return: { label: "Vrátenie", icon: Undo2, hint: "nábytok späť v sklade" },
+};
 
 function dayKey(iso: string | null): string {
   if (!iso) return "bez-terminu";
@@ -117,6 +129,10 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
         {mine.length > 0 && (
           <> Zatiaľ máš {mine.length} {mine.length === 1 ? "akciu" : mine.length < 5 ? "akcie" : "akcií"}.</>
         )}
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <Truck className="size-3 shrink-0" />
+          Akcia je v kalendári v deň nakládky — vtedy sa nábytok vyzdvihuje zo skladu.
+        </div>
       </div>
 
       <div className="inline-flex w-full rounded-md border p-0.5 bg-muted/40">
@@ -232,29 +248,55 @@ function MonthView({
           const list = byDay.get(day.key) ?? [];
           const mine = list.some((e) => e.assigned || e.signup === "accepted");
           const isSel = day.key === selected;
+          // V bunke je čas prvej nakládky — brigádnik tak vidí z mriežky, kedy
+          // sa v ten deň nakladá, bez toho aby deň otváral.
+          const firstLoad = list.map((e) => e.startAt).filter(Boolean).sort()[0];
           return (
             <button
               key={day.key}
               onClick={() => onSelect(day.key)}
-              aria-label={`${day.date.getDate()}. — ${list.length === 0 ? "bez akcií" : `${list.length} akcií`}`}
+              aria-label={`${day.date.getDate()}. — ${
+                list.length === 0
+                  ? "bez akcií"
+                  : `${list.length} ${list.length === 1 ? "akcia" : list.length < 5 ? "akcie" : "akcií"}${
+                      firstLoad ? `, nakládka o ${TIME.format(new Date(firstLoad))}` : ""
+                    }`
+              }`}
               className={`aspect-square rounded-md border text-sm flex flex-col items-center justify-center gap-0.5
                 ${isSel ? "border-foreground bg-muted font-semibold" : "border-transparent"}
                 ${day.inMonth ? "" : "text-muted-foreground/40"}
                 ${day.isToday && !isSel ? "ring-1 ring-foreground/30" : ""}
                 ${list.length > 0 ? "bg-muted/50" : ""}`}
             >
-              <span>{day.date.getDate()}</span>
+              <span className="leading-none">{day.date.getDate()}</span>
               {list.length > 0 && (
-                <span className={`size-1.5 rounded-full ${mine ? "bg-emerald-600" : "bg-foreground/50"}`} />
+                <>
+                  <span className="flex gap-0.5">
+                    {list.slice(0, 3).map((e) => (
+                      <span
+                        key={e.id}
+                        className={`size-1.5 rounded-full ${
+                          e.assigned || e.signup === "accepted" ? "bg-emerald-600" : "bg-foreground/50"
+                        }`}
+                      />
+                    ))}
+                  </span>
+                  {firstLoad && (
+                    <span className={`text-[9px] leading-none tabular-nums ${mine ? "text-emerald-700" : "text-muted-foreground"}`}>
+                      {TIME.format(new Date(firstLoad))}
+                    </span>
+                  )}
+                </>
               )}
             </button>
           );
         })}
       </div>
 
-      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-foreground/50" />akcia</span>
         <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-emerald-600" />si na nej nasadený</span>
+        <span className="inline-flex items-center gap-1"><Truck className="size-3" />čas v bunke = nakládka</span>
       </div>
 
       <div className="space-y-2 border-t pt-3">
@@ -275,8 +317,7 @@ function MonthView({
 }
 
 function EventCard({ ev, busy, onToggle, token }: { ev: HelperEvent; busy: boolean; onToggle: () => void; token: string }) {
-  const start = ev.startAt ? new Date(ev.startAt) : null;
-  const end = ev.endAt ? new Date(ev.endAt) : null;
+  const rows = useMemo(() => scheduleRows(ev), [ev.startAt, ev.eventStartAt, ev.endAt]);
   const confirmed = ev.assigned || ev.signup === "accepted";
   const itemsFn = useServerFn(helperEventItems);
   const [open, setOpen] = useState(false);
@@ -321,10 +362,24 @@ function EventCard({ ev, busy, onToggle, token }: { ev: HelperEvent; busy: boole
         ) : null}
       </div>
 
-      <div className="text-xs text-muted-foreground flex items-center gap-1">
-        <Clock className="size-3 shrink-0" />
-        {start ? TIME.format(start) : "—"}
-        {end && <> – {TIME.format(end)}{dayKey(ev.endAt) !== dayKey(ev.startAt) && " (nasl. deň)"}</>}
+      <div className="rounded-md bg-muted/40 px-2.5 py-2 space-y-1">
+        {rows.length === 0 && <p className="text-xs text-muted-foreground">Termín zatiaľ nie je zadaný.</p>}
+        {rows.map((r) => {
+          const { label, icon: Icon, hint } = SCHEDULE[r.kind];
+          const at = new Date(r.at);
+          const main = r.kind === "load";
+          return (
+            <div key={r.kind} className="flex items-center justify-between gap-2 text-xs" title={hint}>
+              <span className={`inline-flex items-center gap-1.5 ${main ? "font-medium" : "text-muted-foreground"}`}>
+                <Icon className="size-3.5 shrink-0" />{label}
+              </span>
+              <span className={`tabular-nums shrink-0 ${main ? "font-semibold" : "text-muted-foreground"}`}>
+                {r.otherDay && <span className="font-normal">{SHORT_DAY.format(at)}, </span>}
+                {TIME.format(at)}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       <div className="rounded-md border bg-muted/30">

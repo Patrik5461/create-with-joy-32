@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
-  addMonths, dayKey, eventsByDay, monthGrid, monthRange, sameMonth, startOfMonth,
+  addMonths, dayKey, eventsByDay, monthGrid, monthRange, sameMonth, scheduleRows, startOfMonth,
 } from "../src/lib/helper-calendar";
 
 const d = (s: string) => new Date(`${s}T12:00:00`);
@@ -83,5 +83,37 @@ describe("akcie v dňoch", () => {
   it("bez akcií sa nikam nelistuje", () => {
     const { from, to } = monthRange([], d("2026-10-15"));
     expect(from.getTime()).toBe(to.getTime());
+  });
+});
+
+describe("rozpis akcie", () => {
+  const ev = (startAt: string | null, eventStartAt: string | null, endAt: string | null) =>
+    ({ startAt, eventStartAt, endAt });
+
+  it("nakládka je prvá a je označená", () => {
+    const rows = scheduleRows(ev("2026-10-15T06:00:00Z", "2026-10-15T15:00:00Z", "2026-10-16T08:00:00Z"));
+    expect(rows.map((r) => r.kind)).toEqual(["load", "event", "return"]);
+    expect(rows[0].at).toBe("2026-10-15T06:00:00Z");
+  });
+
+  it("vrátenie v iný deň si pýta dátum, ostatné nie", () => {
+    const rows = scheduleRows(ev("2026-10-15T06:00:00Z", "2026-10-15T15:00:00Z", "2026-10-16T08:00:00Z"));
+    expect(rows.map((r) => r.otherDay)).toEqual([false, false, true]);
+  });
+
+  it("začiatok akcie zhodný s nakládkou sa neopakuje", () => {
+    const rows = scheduleRows(ev("2026-10-15T06:00:00Z", "2026-10-15T06:00:00Z", "2026-10-15T20:00:00Z"));
+    expect(rows.map((r) => r.kind)).toEqual(["load", "return"]);
+  });
+
+  it("chýbajúce termíny vynechá a z ničoho nespraví riadok", () => {
+    expect(scheduleRows(ev(null, null, null))).toEqual([]);
+    expect(scheduleRows(ev(null, "2026-10-15T15:00:00Z", null)).map((r) => r.kind)).toEqual(["event"]);
+    expect(scheduleRows(ev("nedátum", null, null))).toEqual([]);
+  });
+
+  it("bez nakládky sa dátum počíta od prvého známeho termínu", () => {
+    const rows = scheduleRows(ev(null, "2026-10-15T15:00:00Z", "2026-10-16T08:00:00Z"));
+    expect(rows.map((r) => r.otherDay)).toEqual([false, true]);
   });
 });
