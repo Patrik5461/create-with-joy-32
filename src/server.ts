@@ -37,12 +37,35 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+/**
+ * Stránka sa nesmie cacheovať natvrdo.
+ *
+ * Súbory v `/assets` majú v názve hash a cacheujú sa na rok — to je v poriadku.
+ * HTML, ktoré na ne odkazuje, ale doteraz nemalo žiadnu hlavičku, takže si ho
+ * prehliadač (hlavne Safari na telefóne a ikona na ploche) pokojne nechal a po
+ * nasadení ťahal starú verziu aplikácie. `no-cache` neznamená „nesťahuj znova",
+ * ale „vždy sa spýtaj, či je to ešte aktuálne" — pri nezmenenej stránke príde
+ * 304 a nestiahne sa nič navyše.
+ */
+function withHtmlRevalidation(response: Response): Response {
+  const type = response.headers.get("content-type") ?? "";
+  if (!type.includes("text/html")) return response;
+  if (response.headers.has("cache-control")) return response;
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "no-cache, must-revalidate");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withHtmlRevalidation(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
