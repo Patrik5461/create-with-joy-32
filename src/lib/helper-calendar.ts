@@ -68,17 +68,6 @@ export function monthGrid(anchor: Date, today: Date = new Date()): CalendarDay[]
   return weeks;
 }
 
-/** Akcie zoradené pod kľúč dňa, v ktorom začínajú. */
-export function eventsByDay<T extends { startAt: string | null }>(events: T[]): Map<string, T[]> {
-  const map = new Map<string, T[]>();
-  for (const ev of events) {
-    const key = dayKey(ev.startAt);
-    if (!key) continue;
-    map.set(key, [...(map.get(key) ?? []), ev]);
-  }
-  return map;
-}
-
 /** Od ktorého do ktorého mesiaca má zmysel listovať. */
 export function monthRange<T extends { startAt: string | null }>(
   events: T[],
@@ -94,47 +83,110 @@ export function monthRange<T extends { startAt: string | null }>(
   return { from, to };
 }
 
+/** Čo sa s nábytkom deje: nakládka v sklade → inštalácia na mieste → demontáž. */
+export type PhaseKind = "load" | "install" | "teardown";
+
 /** Jeden riadok v časovom rozpise akcie. */
 export interface ScheduleRow {
-  kind: "load" | "event" | "return";
+  /** Čo sa v tom čase deje. Viac naraz, keď to padá na tú istú minútu —
+   *  kalkulácia vtedy nerozlišuje nakládku a inštaláciu. */
+  kinds: PhaseKind[];
   /** ISO čas, tak ako prišiel zo servera. */
   at: string;
-  /** true = je to iný deň než nakládka, treba ukázať aj dátum. */
+  /** true = je to iný deň než ten, ku ktorému sa rozpis vzťahuje. */
   otherDay: boolean;
 }
 
 /**
- * Čo a kedy sa na akcii deje, v poradí nakládka → akcia → vrátenie.
+ * Čo a kedy sa na akcii deje, v poradí nakládka → inštalácia → demontáž.
  *
  * Brigádnik potrebuje zo všetkého najskôr vedieť, **kedy je nakládka** — holý
  * čas bez popisu mu nepovie, či má prísť do skladu alebo na miesto. Preto má
  * každý riadok svoj druh a formátovanie si rieši zobrazenie.
  *
- * Riadok, ktorý nič nepridá, vypadne: chýbajúci termín aj začiatok akcie
- * zhodný s nakládkou (to je ten istý údaj dvakrát).
+ * Termíny na tú istú minútu sa zlúčia do jedného riadku (`kinds`), aby tam
+ * dvakrát nestál ten istý čas; chýbajúci termín vypadne.
  */
-export function scheduleRows(ev: {
+export function scheduleRows(
+  ev: { startAt: string | null; eventStartAt?: string | null; endAt: string | null },
+  /** Deň, z pohľadu ktorého sa rozpis číta; inak je to deň nakládky. */
+  baseDay?: string,
+): ScheduleRow[] {
+  const baseKey = baseDay || dayKey(ev.startAt) || dayKey(ev.eventStartAt) || dayKey(ev.endAt);
+  const entries: [PhaseKind, string | null | undefined][] = [
+    ["load", ev.startAt],
+    ["install", ev.eventStartAt],
+    ["teardown", ev.endAt],
+  ];
+
+  const byTime = new Map<number, ScheduleRow>();
+  for (const [kind, at] of entries) {
+    if (!at) continue;
+    const t = new Date(at).getTime();
+    if (Number.isNaN(t)) continue;
+    const row = byTime.get(t);
+    if (row) row.kinds.push(kind);
+    else byTime.set(t, { kinds: [kind], at, otherDay: !!baseKey && dayKey(at) !== baseKey });
+  }
+  return [...byTime.entries()].sort((a, b) => a[0] - b[0]).map(([, row]) => row);
+}
+
+/**
+ * Akcia rozpísaná na dni — tak, ako to robí Google Calendar.
+ *
+ * Keď je nakládka 27. a demontáž 28., akcia sa objaví pod oboma dátumami a pri
+ * každom je napísané, čo sa v ten deň robí. Brigádnik si inak musel domyslieť,
+ * či 28. má prísť nakladať alebo rozoberať.
+ *
+ * Čo padne na ten istý deň, sa spojí do jedného výskytu (`kinds`), aby tá istá
+ * akcia nebola v jednom dni dvakrát.
+ */
+export interface PhaseOccurrence<T> {
+  /** Stabilný kľúč pre zoznam. */
+  key: string;
+  ev: T;
+  /** Deň, pod ktorým sa výskyt zobrazí (`RRRR-MM-DD`). */
+  day: string;
+  /** Čo sa v ten deň deje, v poradí nakládka → inštalácia → demontáž. */
+  kinds: PhaseKind[];
+  /** Najskorší čas toho dňa (ISO). */
+  at: string;
+}
+
+export interface PhaseSource {
+  id: string;
   startAt: string | null;
   eventStartAt?: string | null;
   endAt: string | null;
-}): ScheduleRow[] {
-  const ms = (v: string | null | undefined) => {
-    if (!v) return null;
-    const t = new Date(v).getTime();
-    return Number.isNaN(t) ? null : t;
-  };
-  const load = ms(ev.startAt);
-  const event = ms(ev.eventStartAt);
-  const ret = ms(ev.endAt);
-  const baseKey = dayKey(ev.startAt) || dayKey(ev.eventStartAt) || dayKey(ev.endAt);
+}
 
-  const rows: ScheduleRow[] = [];
-  const push = (kind: ScheduleRow["kind"], at: string | null | undefined) => {
-    if (!at || ms(at) === null) return;
-    rows.push({ kind, at, otherDay: !!baseKey && dayKey(at) !== baseKey });
-  };
-  push("load", ev.startAt);
-  if (event !== null && event !== load) push("event", ev.eventStartAt);
-  if (ret !== null && ret !== load && ret !== event) push("return", ev.endAt);
-  return rows;
+export function expandPhases<T extends PhaseSource>(events: T[]): PhaseOccurrence<T>[] {
+  const out: PhaseOccurrence<T>[] = [];
+  for (const ev of events) {
+    const byDay = new Map<string, { kinds: PhaseKind[]; at: string }>();
+    for (const row of scheduleRows(ev)) {
+      const day = dayKey(row.at);
+      if (!day) continue;
+      const cur = byDay.get(day);
+      if (!cur) byDay.set(day, { kinds: [...row.kinds], at: row.at });
+      else {
+        cur.kinds.push(...row.kinds);
+        if (new Date(row.at).getTime() < new Date(cur.at).getTime()) cur.at = row.at;
+      }
+    }
+    for (const [day, v] of byDay) out.push({ key: `${ev.id}-${day}`, ev, day, kinds: v.kinds, at: v.at });
+  }
+  out.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  return out;
+}
+
+/** Výskyty zoradené pod kľúč dňa. */
+export function occurrencesByDay<T extends PhaseSource>(
+  events: T[],
+): Map<string, PhaseOccurrence<T>[]> {
+  const map = new Map<string, PhaseOccurrence<T>[]>();
+  for (const occ of expandPhases(events)) {
+    map.set(occ.day, [...(map.get(occ.day) ?? []), occ]);
+  }
+  return map;
 }

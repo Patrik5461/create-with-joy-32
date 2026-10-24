@@ -3,7 +3,8 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
-  addMonths, dayKey, eventsByDay, monthGrid, monthRange, sameMonth, scheduleRows, startOfMonth,
+  addMonths, dayKey, expandPhases, monthGrid, monthRange, occurrencesByDay, sameMonth, scheduleRows,
+  startOfMonth,
 } from "../src/lib/helper-calendar";
 
 const d = (s: string) => new Date(`${s}T12:00:00`);
@@ -58,24 +59,25 @@ describe("pomocné funkcie", () => {
 });
 
 describe("akcie v dňoch", () => {
-  const ev = (id: string, startAt: string | null) => ({ id, startAt });
+  const ev = (id: string, startAt: string | null, eventStartAt?: string | null, endAt?: string | null) =>
+    ({ id, startAt, eventStartAt: eventStartAt ?? null, endAt: endAt ?? null });
 
-  it("zoradí akcie pod deň, v ktorom začínajú", () => {
-    const map = eventsByDay([
+  it("zoradí akcie pod deň, v ktorom sa na nich robí", () => {
+    const map = occurrencesByDay([
       ev("a", "2026-10-15T08:00:00Z"),
       ev("b", "2026-10-15T14:00:00Z"),
       ev("c", "2026-10-20T08:00:00Z"),
     ]);
-    expect(map.get("2026-10-15")?.map((e) => e.id)).toEqual(["a", "b"]);
-    expect(map.get("2026-10-20")?.map((e) => e.id)).toEqual(["c"]);
+    expect(map.get("2026-10-15")?.map((o) => o.ev.id)).toEqual(["a", "b"]);
+    expect(map.get("2026-10-20")?.map((o) => o.ev.id)).toEqual(["c"]);
   });
 
   it("akciu bez termínu do mriežky nedá", () => {
-    expect(eventsByDay([ev("x", null)]).size).toBe(0);
+    expect(occurrencesByDay([ev("x", null)]).size).toBe(0);
   });
 
   it("listovať sa dá od tohto mesiaca po mesiac poslednej akcie", () => {
-    const { from, to } = monthRange([ev("a", "2026-12-24T08:00:00Z")], d("2026-10-15"));
+    const { from, to } = monthRange([{ startAt: "2026-12-24T08:00:00Z" }], d("2026-10-15"));
     expect(dayKey(from)).toBe("2026-10-01");
     expect(dayKey(to)).toBe("2026-12-01");
   });
@@ -92,7 +94,7 @@ describe("rozpis akcie", () => {
 
   it("nakládka je prvá a je označená", () => {
     const rows = scheduleRows(ev("2026-10-15T06:00:00Z", "2026-10-15T15:00:00Z", "2026-10-16T08:00:00Z"));
-    expect(rows.map((r) => r.kind)).toEqual(["load", "event", "return"]);
+    expect(rows.map((r) => r.kinds)).toEqual([["load"], ["install"], ["teardown"]]);
     expect(rows[0].at).toBe("2026-10-15T06:00:00Z");
   });
 
@@ -101,19 +103,57 @@ describe("rozpis akcie", () => {
     expect(rows.map((r) => r.otherDay)).toEqual([false, false, true]);
   });
 
-  it("začiatok akcie zhodný s nakládkou sa neopakuje", () => {
+  it("nakládka a inštalácia na tú istú minútu sú jeden riadok, nie dva časy", () => {
     const rows = scheduleRows(ev("2026-10-15T06:00:00Z", "2026-10-15T06:00:00Z", "2026-10-15T20:00:00Z"));
-    expect(rows.map((r) => r.kind)).toEqual(["load", "return"]);
+    expect(rows.map((r) => r.kinds)).toEqual([["load", "install"], ["teardown"]]);
   });
 
   it("chýbajúce termíny vynechá a z ničoho nespraví riadok", () => {
     expect(scheduleRows(ev(null, null, null))).toEqual([]);
-    expect(scheduleRows(ev(null, "2026-10-15T15:00:00Z", null)).map((r) => r.kind)).toEqual(["event"]);
+    expect(scheduleRows(ev(null, "2026-10-15T15:00:00Z", null)).map((r) => r.kinds)).toEqual([["install"]]);
     expect(scheduleRows(ev("nedátum", null, null))).toEqual([]);
   });
 
   it("bez nakládky sa dátum počíta od prvého známeho termínu", () => {
     const rows = scheduleRows(ev(null, "2026-10-15T15:00:00Z", "2026-10-16T08:00:00Z"));
     expect(rows.map((r) => r.otherDay)).toEqual([false, true]);
+  });
+});
+
+describe("akcia rozpísaná na dni", () => {
+  const ev = { id: "r1", startAt: "2026-10-27T05:00:00Z", eventStartAt: "2026-10-28T07:00:00Z", endAt: "2026-10-28T16:00:00Z" };
+
+  it("nakládka 27. a demontáž 28. sú pod oboma dátumami", () => {
+    const occ = expandPhases([ev]);
+    expect(occ.map((o) => o.day)).toEqual(["2026-10-27", "2026-10-28"]);
+    expect(occ[0].kinds).toEqual(["load"]);
+  });
+
+  it("čo padne na ten istý deň, je jeden výskyt s oboma názvami", () => {
+    const occ = expandPhases([ev]);
+    expect(occ[1].kinds).toEqual(["install", "teardown"]);
+    // čas výskytu je ten najskorší v danom dni
+    expect(occ[1].at).toBe("2026-10-28T07:00:00Z");
+  });
+
+  it("výskyty idú v čase, naprieč akciami", () => {
+    const iny = { id: "r2", startAt: "2026-10-27T12:00:00Z", eventStartAt: null, endAt: null };
+    expect(expandPhases([iny, ev]).map((o) => `${o.ev.id}@${o.day}`))
+      .toEqual(["r1@2026-10-27", "r2@2026-10-27", "r1@2026-10-28"]);
+  });
+
+  it("kľúč výskytu je jedinečný, aby sa dni nemiešali", () => {
+    const keys = expandPhases([ev]).map((o) => o.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("keď je nakládka aj inštalácia na tú istú minútu, deň to povie oboje", () => {
+    const [occ] = expandPhases([{ id: "r3", startAt: "2026-11-02T07:00:00Z", eventStartAt: "2026-11-02T07:00:00Z", endAt: null }]);
+    expect(occ.kinds).toEqual(["load", "install"]);
+  });
+
+  it("rozpis sa dá čítať z pohľadu vybraného dňa", () => {
+    const rows = scheduleRows(ev, "2026-10-28");
+    expect(rows.map((r) => r.otherDay)).toEqual([true, false, false]);
   });
 });

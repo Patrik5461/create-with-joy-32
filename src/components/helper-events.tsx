@@ -3,10 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Hourglass, List, Loader2, MapPin, Package, PartyPopper, Truck, Undo2, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Hourglass, List, Loader2, MapPin, Package, PackageOpen, Truck, Wrench, X } from "lucide-react";
 import {
-  addMonths, dayKey as dayKeyOf, eventsByDay, monthGrid, monthRange, scheduleRows, startOfMonth,
-  type ScheduleRow,
+  addMonths, dayKey as dayKeyOf, expandPhases, monthGrid, monthRange, scheduleRows, startOfMonth,
+  type PhaseKind, type PhaseOccurrence,
 } from "@/lib/helper-calendar";
 import {
   helperEventItems,
@@ -25,6 +25,10 @@ import { EXTRA_LABEL } from "@/lib/ics-items";
  *
  * Dve zobrazenia: mesačný kalendár (prehľad, čo kedy je) a zoznam po dňoch
  * (čas a miesto pod sebou). Prepína sa to hore a kalendár je predvolený.
+ *
+ * Akcia nie je v kalendári raz, ale v každý deň, keď sa na nej robí — tak, ako
+ * to má Google Calendar. Pri nakládke 27. a demontáži 28. visí pod oboma
+ * dátumami a pri každom je napísané, čo sa v ten deň robí.
  */
 const MONTH = new Intl.DateTimeFormat("sk-SK", { month: "long", year: "numeric" });
 const WEEKDAYS = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"];
@@ -34,25 +38,20 @@ const TIME = new Intl.DateTimeFormat("sk-SK", { hour: "2-digit", minute: "2-digi
 const SHORT_DAY = new Intl.DateTimeFormat("sk-SK", { weekday: "short", day: "numeric", month: "numeric" });
 
 /**
- * Čo brigádnik na akcii vidí ako prvé: kedy je nakládka. Holý čas bez popisu
- * mu nepovie, či má prísť do skladu, na miesto, alebo až po nábytok naspäť.
+ * Čo brigádnik potrebuje vedieť ako prvé: čo sa v ten deň robí. Holý čas bez
+ * popisu mu nepovie, či má prísť nakladať do skladu, stavať na mieste, alebo
+ * už len rozoberať.
  */
-const SCHEDULE: Record<ScheduleRow["kind"], { label: string; icon: typeof Truck; hint: string }> = {
-  load: { label: "Nakládka", icon: Truck, hint: "vyzdvihnutie nábytku v sklade" },
-  event: { label: "Akcia", icon: PartyPopper, hint: "začiatok akcie" },
-  return: { label: "Vrátenie", icon: Undo2, hint: "nábytok späť v sklade" },
+const PHASE: Record<PhaseKind, { label: string; short: string; icon: typeof Truck; hint: string }> = {
+  load: { label: "Nakládka", short: "N", icon: Truck, hint: "vyzdvihnutie nábytku v sklade" },
+  install: { label: "Inštalácia", short: "I", icon: Wrench, hint: "stavba na mieste" },
+  teardown: { label: "Demontáž", short: "D", icon: PackageOpen, hint: "zbalenie a návrat do skladu" },
 };
 
-function dayKey(iso: string | null): string {
-  if (!iso) return "bez-terminu";
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
+/** Deň výskytu ako nadpis: „streda 28. októbra“. */
+const dayLabel = (day: string) => DAY.format(new Date(`${day}T12:00:00`));
 
-function isToday(iso: string | null): boolean {
-  if (!iso) return false;
-  return dayKey(iso) === dayKey(new Date().toISOString());
-}
+type Occ = PhaseOccurrence<HelperEvent>;
 
 export function HelperEvents({ token, onExpired }: { token: string; onExpired: () => void }) {
   const listFn = useServerFn(helperUpcomingEvents);
@@ -95,21 +94,19 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
     }
   }
 
+  const occurrences = useMemo(() => expandPhases(events ?? []), [events]);
+
   const days = useMemo(() => {
-    const map = new Map<string, { label: string; today: boolean; items: HelperEvent[] }>();
-    for (const ev of events ?? []) {
-      const key = dayKey(ev.startAt);
-      if (!map.has(key)) {
-        map.set(key, {
-          label: ev.startAt ? DAY.format(new Date(ev.startAt)) : "Bez termínu",
-          today: isToday(ev.startAt),
-          items: [],
-        });
+    const today = dayKeyOf(new Date());
+    const map = new Map<string, { day: string; label: string; today: boolean; items: Occ[] }>();
+    for (const occ of occurrences) {
+      if (!map.has(occ.day)) {
+        map.set(occ.day, { day: occ.day, label: dayLabel(occ.day), today: occ.day === today, items: [] });
       }
-      map.get(key)!.items.push(ev);
+      map.get(occ.day)!.items.push(occ);
     }
     return [...map.values()];
-  }, [events]);
+  }, [occurrences]);
 
   const mine = (events ?? []).filter((e) => e.assigned || e.signup === "pending" || e.signup === "accepted");
 
@@ -129,9 +126,14 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
         {mine.length > 0 && (
           <> Zatiaľ máš {mine.length} {mine.length === 1 ? "akciu" : mine.length < 5 ? "akcie" : "akcií"}.</>
         )}
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <Truck className="size-3 shrink-0" />
-          Akcia je v kalendári v deň nakládky — vtedy sa nábytok vyzdvihuje zo skladu.
+        <div className="mt-1.5 flex items-start gap-1.5">
+          <CalendarDays className="size-3 shrink-0 mt-0.5" />
+          <span>
+            Akcia je v kalendári v každý deň, keď sa na nej robí, a pri každom dátume je
+            napísané čo: <span className="font-medium">nakládka</span>,{" "}
+            <span className="font-medium">inštalácia</span> alebo{" "}
+            <span className="font-medium">demontáž</span>.
+          </span>
         </div>
       </div>
 
@@ -157,7 +159,7 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
 
       {view === "kalendar" && days.length > 0 && (
         <MonthView
-          events={events}
+          occurrences={occurrences}
           month={month}
           onMonth={setMonth}
           selected={selected}
@@ -169,14 +171,14 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
       )}
 
       {view === "zoznam" && days.map((day) => (
-        <section key={day.label} className="space-y-2">
+        <section key={day.day} className="space-y-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <CalendarDays className="size-3.5" />
             {day.label}
             {day.today && <Badge variant="secondary" className="text-[10px]">dnes</Badge>}
           </h2>
-          {day.items.map((ev) => (
-            <EventCard key={ev.id} ev={ev} busy={busyId === ev.id} onToggle={() => toggle(ev)} token={token} />
+          {day.items.map((occ) => (
+            <EventCard key={occ.key} occ={occ} busy={busyId === occ.ev.id} onToggle={() => toggle(occ.ev)} token={token} />
           ))}
         </section>
       ))}
@@ -185,14 +187,15 @@ export function HelperEvents({ token, onExpired }: { token: string; onExpired: (
 }
 
 /**
- * Mesačný kalendár — len na prezeranie. Deň s akciou má bodku, po kliknutí sa
- * pod mriežkou rozbalia akcie toho dňa (rovnaké kartičky ako v zozname).
- * Dotknúť sa dá jedine vlastnej prihlášky, nič v kalendári sa upraviť nedá.
+ * Mesačný kalendár — len na prezeranie. Deň, keď sa na nejakej akcii robí, má
+ * bodku a pod ňou skratku toho, čo sa robí (N/I/D) a čas; po kliknutí sa pod
+ * mriežkou rozbalia kartičky toho dňa. Dotknúť sa dá jedine vlastnej
+ * prihlášky, nič v kalendári sa upraviť nedá.
  */
 function MonthView({
-  events, month, onMonth, selected, onSelect, busyId, onToggle, token,
+  occurrences, month, onMonth, selected, onSelect, busyId, onToggle, token,
 }: {
-  events: HelperEvent[];
+  occurrences: Occ[];
   month: Date;
   onMonth: (d: Date) => void;
   selected: string;
@@ -201,15 +204,21 @@ function MonthView({
   onToggle: (ev: HelperEvent) => void;
   token: string;
 }) {
-  const byDay = useMemo(() => eventsByDay(events), [events]);
+  const byDay = useMemo(() => {
+    const map = new Map<string, Occ[]>();
+    for (const occ of occurrences) map.set(occ.day, [...(map.get(occ.day) ?? []), occ]);
+    return map;
+  }, [occurrences]);
   const weeks = useMemo(() => monthGrid(month), [month]);
-  const range = useMemo(() => monthRange(events), [events]);
+  // Listuje sa po posledný deň, keď sa ešte na niečom robí — nie len po
+  // poslednú nakládku.
+  const range = useMemo(() => monthRange(occurrences.map((o) => ({ startAt: o.at }))), [occurrences]);
   const canBack = month.getTime() > range.from.getTime();
   const canFwd = month.getTime() < range.to.getTime();
   const dnesne = byDay.get(selected) ?? [];
 
-  /** Prelistovanie mesiaca hneď ukáže prvú akciu v ňom — inak by pod mriežkou
-   *  ostalo „žiadna akcia" aj v mesiaci, kde akcie sú. */
+  /** Prelistovanie mesiaca hneď ukáže prvý deň s prácou — inak by pod mriežkou
+   *  ostalo „žiadna akcia“ aj v mesiaci, kde akcie sú. */
   const goMonth = (delta: number) => {
     const next = addMonths(month, delta);
     onMonth(next);
@@ -246,22 +255,22 @@ function MonthView({
         ))}
         {weeks.flat().map((day) => {
           const list = byDay.get(day.key) ?? [];
-          const mine = list.some((e) => e.assigned || e.signup === "accepted");
+          const mine = list.some((o) => o.ev.assigned || o.ev.signup === "accepted");
           const isSel = day.key === selected;
-          // V bunke je čas prvej nakládky — brigádnik tak vidí z mriežky, kedy
-          // sa v ten deň nakladá, bez toho aby deň otváral.
-          const firstLoad = list.map((e) => e.startAt).filter(Boolean).sort()[0];
+          const first = list[0];
+          // Skratka v bunke hovorí, čo sa v ten deň robí — bez nej je čas
+          // nejednoznačný: o siedmej ráno sa dá rovnako dobre nakladať aj
+          // rozoberať.
+          const short = first ? first.kinds.map((k) => PHASE[k].short).join("") : "";
+          const popis = list
+            .map((o) => `${o.kinds.map((k) => PHASE[k].label).join(" + ")} ${TIME.format(new Date(o.at))} — ${o.ev.name}`)
+            .join("\n");
           return (
             <button
               key={day.key}
               onClick={() => onSelect(day.key)}
-              aria-label={`${day.date.getDate()}. — ${
-                list.length === 0
-                  ? "bez akcií"
-                  : `${list.length} ${list.length === 1 ? "akcia" : list.length < 5 ? "akcie" : "akcií"}${
-                      firstLoad ? `, nakládka o ${TIME.format(new Date(firstLoad))}` : ""
-                    }`
-              }`}
+              title={popis || undefined}
+              aria-label={`${day.date.getDate()}. — ${list.length === 0 ? "nič" : popis.replace(/\n/g, "; ")}`}
               className={`aspect-square rounded-md border text-sm flex flex-col items-center justify-center gap-0.5
                 ${isSel ? "border-foreground bg-muted font-semibold" : "border-transparent"}
                 ${day.inMonth ? "" : "text-muted-foreground/40"}
@@ -269,23 +278,21 @@ function MonthView({
                 ${list.length > 0 ? "bg-muted/50" : ""}`}
             >
               <span className="leading-none">{day.date.getDate()}</span>
-              {list.length > 0 && (
+              {first && (
                 <>
                   <span className="flex gap-0.5">
-                    {list.slice(0, 3).map((e) => (
+                    {list.slice(0, 3).map((o) => (
                       <span
-                        key={e.id}
+                        key={o.key}
                         className={`size-1.5 rounded-full ${
-                          e.assigned || e.signup === "accepted" ? "bg-emerald-600" : "bg-foreground/50"
+                          o.ev.assigned || o.ev.signup === "accepted" ? "bg-emerald-600" : "bg-foreground/50"
                         }`}
                       />
                     ))}
                   </span>
-                  {firstLoad && (
-                    <span className={`text-[9px] leading-none tabular-nums ${mine ? "text-emerald-700" : "text-muted-foreground"}`}>
-                      {TIME.format(new Date(firstLoad))}
-                    </span>
-                  )}
+                  <span className={`text-[9px] leading-none tabular-nums ${mine ? "text-emerald-700" : "text-muted-foreground"}`}>
+                    <span className="font-semibold">{short}</span> {TIME.format(new Date(first.at))}
+                  </span>
                 </>
               )}
             </button>
@@ -294,21 +301,27 @@ function MonthView({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-foreground/50" />akcia</span>
-        <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-emerald-600" />si na nej nasadený</span>
-        <span className="inline-flex items-center gap-1"><Truck className="size-3" />čas v bunke = nakládka</span>
+        {(["load", "install", "teardown"] as PhaseKind[]).map((k) => (
+          <span key={k} className="inline-flex items-center gap-1">
+            <span className="font-semibold text-foreground">{PHASE[k].short}</span>
+            {PHASE[k].label.toLowerCase()}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1">
+          <span className="size-1.5 rounded-full bg-emerald-600" />si na nej nasadený
+        </span>
       </div>
 
       <div className="space-y-2 border-t pt-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <CalendarDays className="size-3.5" />
-          {selected ? DAY.format(new Date(`${selected}T12:00:00`)) : "Vyber deň"}
+          {selected ? dayLabel(selected) : "Vyber deň"}
         </h2>
         {dnesne.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-2">V tento deň nie je žiadna akcia.</p>
+          <p className="text-sm text-muted-foreground py-2">V tento deň sa na ničom nerobí.</p>
         ) : (
-          dnesne.map((ev) => (
-            <EventCard key={ev.id} ev={ev} busy={busyId === ev.id} onToggle={() => onToggle(ev)} token={token} />
+          dnesne.map((occ) => (
+            <EventCard key={occ.key} occ={occ} busy={busyId === occ.ev.id} onToggle={() => onToggle(occ.ev)} token={token} />
           ))
         )}
       </div>
@@ -316,8 +329,11 @@ function MonthView({
   );
 }
 
-function EventCard({ ev, busy, onToggle, token }: { ev: HelperEvent; busy: boolean; onToggle: () => void; token: string }) {
-  const rows = useMemo(() => scheduleRows(ev), [ev.startAt, ev.eventStartAt, ev.endAt]);
+function EventCard({ occ, busy, onToggle, token }: { occ: Occ; busy: boolean; onToggle: () => void; token: string }) {
+  const ev = occ.ev;
+  // Rozpis sa číta z pohľadu dňa, pod ktorým kartička visí: čo je v tento deň,
+  // je zvýraznené, ostatné termíny majú pri sebe dátum.
+  const rows = useMemo(() => scheduleRows(ev, occ.day), [ev.startAt, ev.eventStartAt, ev.endAt, occ.day]);
   const confirmed = ev.assigned || ev.signup === "accepted";
   const itemsFn = useServerFn(helperEventItems);
   const [open, setOpen] = useState(false);
@@ -343,6 +359,21 @@ function EventCard({ ev, busy, onToggle, token }: { ev: HelperEvent; busy: boole
 
   return (
     <div className={`rounded-lg border p-3 space-y-2 ${confirmed ? "border-emerald-300 bg-emerald-50/50" : "bg-background"}`}>
+      <div className="flex flex-wrap items-center gap-1">
+        {occ.kinds.map((k) => {
+          const { label, icon: Icon, hint } = PHASE[k];
+          return (
+            <span
+              key={k}
+              title={hint}
+              className="inline-flex items-center gap-1 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            >
+              <Icon className="size-3" />{label}
+            </span>
+          );
+        })}
+      </div>
+
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="font-medium leading-tight">{ev.name}</div>
@@ -365,15 +396,19 @@ function EventCard({ ev, busy, onToggle, token }: { ev: HelperEvent; busy: boole
       <div className="rounded-md bg-muted/40 px-2.5 py-2 space-y-1">
         {rows.length === 0 && <p className="text-xs text-muted-foreground">Termín zatiaľ nie je zadaný.</p>}
         {rows.map((r) => {
-          const { label, icon: Icon, hint } = SCHEDULE[r.kind];
+          const Icon = PHASE[r.kinds[0]].icon;
           const at = new Date(r.at);
-          const main = r.kind === "load";
+          const dnes = !r.otherDay;
           return (
-            <div key={r.kind} className="flex items-center justify-between gap-2 text-xs" title={hint}>
-              <span className={`inline-flex items-center gap-1.5 ${main ? "font-medium" : "text-muted-foreground"}`}>
-                <Icon className="size-3.5 shrink-0" />{label}
+            <div
+              key={r.at}
+              className="flex items-center justify-between gap-2 text-xs"
+              title={r.kinds.map((k) => PHASE[k].hint).join(" + ")}
+            >
+              <span className={`inline-flex items-center gap-1.5 ${dnes ? "font-medium" : "text-muted-foreground"}`}>
+                <Icon className="size-3.5 shrink-0" />{r.kinds.map((k) => PHASE[k].label).join(" + ")}
               </span>
-              <span className={`tabular-nums shrink-0 ${main ? "font-semibold" : "text-muted-foreground"}`}>
+              <span className={`tabular-nums shrink-0 ${dnes ? "font-semibold" : "text-muted-foreground"}`}>
                 {r.otherDay && <span className="font-normal">{SHORT_DAY.format(at)}, </span>}
                 {TIME.format(at)}
               </span>
