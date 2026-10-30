@@ -85,7 +85,17 @@ export function ConversationList({ conversations, activeId, meId, onSelect, onSt
             </div>
           </button>
         ))}
-        {!conversations.length && <p className="text-sm text-muted-foreground p-4 text-center">Žiadne konverzácie.</p>}
+        {!conversations.length && (
+          // Kto nevidí firemný kanál, má zoznam na začiatku prázdny — musí z
+          // neho byť jasné, že chat funguje a ako sa začína.
+          <div className="p-4 text-center space-y-2">
+            <MessageSquare className="size-7 mx-auto text-muted-foreground/60" />
+            <p className="text-sm text-muted-foreground">Zatiaľ žiadna konverzácia.</p>
+            <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+              <Plus className="size-3.5 mr-1" />Napísať kolegovi
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
