@@ -212,6 +212,15 @@ export const submitPublicInquiry = createServerFn({ method: "POST" })
       }
     }
 
+    // Do dopytu sa ukladá aj názov položky, nie len jej id. Keď sa nábytok
+    // premenuje alebo vyradí zo skladu, dopyt musí ostať čitateľný — inak sa z
+    // karty dopytu nedá zistiť, čo si klient vlastne naklikal.
+    const itemsJson = items.map((i) => ({
+      furniture_item_id: i.furniture_item_id,
+      name: (validItems ?? []).find((v: any) => v.id === i.furniture_item_id)?.name ?? null,
+      qty: i.qty,
+    }));
+
     const { error: iErr } = await supabaseAdmin.from("inquiries").insert({
       name: data.name,
       company: data.company || null,
@@ -221,7 +230,7 @@ export const submitPublicInquiry = createServerFn({ method: "POST" })
       event_end_at: end.toISOString(),
       venue: data.venue || null,
       message: data.message || null,
-      items: items as any,
+      items: itemsJson as any,
       reservation_id: reservation.id,
       client_id: clientId,
     });

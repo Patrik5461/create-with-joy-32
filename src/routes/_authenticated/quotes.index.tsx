@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
@@ -37,29 +37,95 @@ function getRange(view: RangeView, anchor: Date): { start: Date; end: Date; labe
   return { start, end, label: format(anchor, "LLLL yyyy", { locale: sk }) };
 }
 
+/**
+ * Nastavenie filtra žije v adrese, nie v pamäti komponentu.
+ *
+ * Kto si vyfiltroval ponuky podľa dátumu a otvoril kalkuláciu, prišel po
+ * návrate o celý filter a nahadzoval ho odznova. Odkedy je filter v adrese,
+ * vráti ho späť tlačidlo „dozadu" — a odkaz na vyfiltrovaný zoznam sa dá aj
+ * poslať kolegovi.
+ */
+type QuotesSearch = {
+  q?: string;
+  status?: string;
+  client?: string;
+  view?: RangeView;
+  /** Kotva obdobia ako `RRRR-MM-DD`. */
+  anchor?: string;
+  /** Filter obdobia je zapnutý. */
+  dates?: boolean;
+  field?: DateField;
+  from?: string;
+  to?: string;
+  sort?: SortKey;
+};
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const fmtDay = (d: Date) => format(d, "yyyy-MM-dd");
+const asDay = (v: unknown) => (typeof v === "string" && DAY_RE.test(v) ? v : undefined);
+const asText = (v: unknown, max = 200) => {
+  const t = typeof v === "string" ? v.slice(0, max) : "";
+  return t || undefined;
+};
+const asOneOf = <T extends string>(v: unknown, allowed: readonly T[]): T | undefined =>
+  typeof v === "string" && (allowed as readonly string[]).includes(v) ? (v as T) : undefined;
+
 export const Route = createFileRoute("/_authenticated/quotes/")({
   head: () => ({ meta: [{ title: "Kalkulácie · Mima Production CRM" }] }),
+  // Z adresy sa berie len to, čo dáva zmysel — podstrčený nezmysel filter
+  // nezhodí, len sa ignoruje.
+  validateSearch: (raw: Record<string, unknown>): QuotesSearch => ({
+    q: asText(raw.q),
+    status: asOneOf(raw.status, ["draft", "sent", "approved", "rejected"] as const),
+    client: asText(raw.client, 64),
+    view: asOneOf(raw.view, ["day", "week"] as const),
+    anchor: asDay(raw.anchor),
+    dates: raw.dates === true || raw.dates === "true" ? true : undefined,
+    field: asOneOf(raw.field, ["event_date"] as const),
+    from: asDay(raw.from),
+    to: asDay(raw.to),
+    sort: asOneOf(raw.sort, ["event_date"] as const),
+  }),
   component: QuotesList,
 });
 
 function QuotesList() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string>("all");
-  const [clientId, setClientId] = useState<string>("all");
-  const [view, setView] = useState<RangeView>("month");
-  const [anchor, setAnchor] = useState<Date>(() => new Date());
-  const [dateFilterOn, setDateFilterOn] = useState(false);
-  const [dateField, setDateField] = useState<DateField>("issue_date");
-  const [eventFrom, setEventFrom] = useState<string>("");
-  const [eventTo, setEventTo] = useState<string>("");
-  const [sortBy, setSortBy] = useState<SortKey>("issue_date");
+  const sp = Route.useSearch();
 
+  /** Zmena filtra prepíše adresu (`replace`), aby sa história nezaplnila
+   *  každým písmenom v hľadaní a „dozadu" viedlo z kalkulácie na zoznam. */
+  const setSp = (patch: Partial<QuotesSearch>) =>
+    // `any` je tu zámer: router zlieva typy hľadania zo všetkých ciest dokopy.
+    navigate({ to: "/quotes", search: (prev: any) => ({ ...prev, ...patch }), replace: true });
+
+  const search = sp.q ?? "";
+  const setSearch = (v: string) => setSp({ q: v || undefined });
+  const status = sp.status ?? "all";
+  const setStatus = (v: string) => setSp({ status: v === "all" ? undefined : v });
+  const clientId = sp.client ?? "all";
+  const setClientId = (v: string) => setSp({ client: v === "all" ? undefined : v });
+  const view: RangeView = sp.view ?? "month";
+  const dateFilterOn = sp.dates === true;
+  const setDateFilterOn = (on: boolean) => setSp({ dates: on ? true : undefined });
+  const dateField: DateField = sp.field ?? "issue_date";
+  const setDateField = (v: DateField) => setSp({ field: v === "issue_date" ? undefined : v });
+  const eventFrom = sp.from ?? "";
+  const setEventFrom = (v: string) => setSp({ from: v || undefined });
+  const eventTo = sp.to ?? "";
+  const setEventTo = (v: string) => setSp({ to: v || undefined });
+  const sortBy: SortKey = sp.sort ?? "issue_date";
+  const setSortBy = (v: SortKey) => setSp({ sort: v === "issue_date" ? undefined : v });
+
+  const anchor = useMemo(
+    () => (sp.anchor ? new Date(`${sp.anchor}T12:00:00`) : new Date()),
+    [sp.anchor],
+  );
   const range = useMemo(() => getRange(view, anchor), [view, anchor]);
   const shift = (dir: 1 | -1) => {
-    setAnchor((a) => (view === "day" ? addDays(a, dir) : view === "week" ? addWeeks(a, dir) : addMonths(a, dir)));
-    setDateFilterOn(true);
+    const next = view === "day" ? addDays(anchor, dir) : view === "week" ? addWeeks(anchor, dir) : addMonths(anchor, dir);
+    setSp({ anchor: fmtDay(next), dates: true });
   };
 
   const clients = useQuery({
@@ -225,12 +291,12 @@ function QuotesList() {
     const now = new Date();
     const s = startOfMonth(now);
     const e = endOfMonth(now);
-    setEventFrom(s.toISOString().slice(0, 10));
-    setEventTo(e.toISOString().slice(0, 10));
+    setEventFrom(fmtDay(s));
+    setEventTo(fmtDay(e));
   };
   const quickUpcoming = () => {
     const now = new Date();
-    setEventFrom(now.toISOString().slice(0, 10));
+    setEventFrom(fmtDay(now));
     setEventTo("");
   };
   const clearEventRange = () => { setEventFrom(""); setEventTo(""); };
@@ -282,7 +348,7 @@ function QuotesList() {
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" aria-label="Predchádzajúce obdobie" onClick={() => shift(-1)}><ChevronLeft className="size-4" /></Button>
             <Button variant="outline" size="icon" aria-label="Nasledujúce obdobie" onClick={() => shift(1)}><ChevronRight className="size-4" /></Button>
-            <Button variant="outline" size="sm" onClick={() => { setAnchor(new Date()); setDateFilterOn(true); }}>Dnes</Button>
+            <Button variant="outline" size="sm" onClick={() => setSp({ anchor: fmtDay(new Date()), dates: true })}>Dnes</Button>
             <div className="ml-2 text-sm font-medium capitalize">{range.label}</div>
             <Select value={dateField} onValueChange={(v) => setDateField(v as DateField)}>
               <SelectTrigger className="h-8 w-40 ml-2"><SelectValue /></SelectTrigger>
@@ -299,7 +365,7 @@ function QuotesList() {
             {(["day", "week", "month"] as const).map((v) => (
               <button
                 key={v}
-                onClick={() => { setView(v); setDateFilterOn(true); }}
+                onClick={() => setSp({ view: v === "month" ? undefined : v, dates: true })}
                 className={`px-3 py-1 text-sm rounded ${view === v ? "bg-background shadow-sm" : "text-muted-foreground"}`}
               >
                 {v === "day" ? "Deň" : v === "week" ? "Týždeň" : "Mesiac"}
