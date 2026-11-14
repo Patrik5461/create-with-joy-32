@@ -19,6 +19,8 @@ import { useCurrentUser, hasRole } from "@/hooks/use-current-user";
 import { SurveyCard } from "@/components/survey-card";
 import { ReservationStatusWorkflow } from "@/components/reservation-status-workflow";
 import { DocumentsSection } from "@/components/documents-section";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useReservationContext } from "@/hooks/use-reservation-context";
 import { ReservationStaffSection } from "@/components/reservation-staff-section";
 
 export const Route = createFileRoute("/_authenticated/reservations/$id/")({
@@ -111,7 +113,18 @@ function ReservationDetail() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const r = reservation.data;
+  // Kto vidí rezervácie, ale nemá práva na klientov/kalkulácie, by inak
+  // dostal prázdneho klienta a žiadne „Ďalšie položky" — doplníme ich zo
+  // servera (bez cien). S plnými právami sa nič navyše nenačítava.
+  const { can } = usePermissions();
+  const ctx = useReservationContext(reservation.data ? [id] : [], { withQuote: true });
+  const extra = ctx.data?.[id];
+  const r = reservation.data
+    ? { ...reservation.data, clients: reservation.data.clients ?? extra?.client ?? null }
+    : reservation.data;
+  const quote: any = sourceQuote.data ?? (extra?.quote
+    ? { ...extra.quote, clients: { company_name: extra.quote.client_name } }
+    : null);
 
   return (
     <>
@@ -148,14 +161,18 @@ function ReservationDetail() {
 
         {!editing && r && (
           <div className="grid gap-4 lg:grid-cols-3">
-            {sourceQuote.data && (
+            {quote && (
               <div className="lg:col-span-3">
                 <div className="rounded-md border border-sky-300 bg-sky-50 text-sky-900 p-3 text-sm flex items-center gap-2">
                   <FileText className="size-4" />
                   Vytvorené z kalkulácie:&nbsp;
-                  <Link to="/quotes/$id" params={{ id: sourceQuote.data.id }} className="font-semibold underline">
-                    {quoteClientName(sourceQuote.data)} · v{sourceQuote.data.version_number}
-                  </Link>
+                  {can("quotes.view") ? (
+                    <Link to="/quotes/$id" params={{ id: quote.id }} className="font-semibold underline">
+                      {quoteClientName(quote)} · v{quote.version_number}
+                    </Link>
+                  ) : (
+                    <span className="font-semibold">{quoteClientName(quote)} · v{quote.version_number}</span>
+                  )}
                 </div>
               </div>
             )}
@@ -238,17 +255,17 @@ function ReservationDetail() {
               </CardContent>
             </Card>
 
-            {(sourceQuote.data?.extras?.length ?? 0) > 0 && (
+            {(quote?.extras?.length ?? 0) > 0 && (
               <Card className="lg:col-span-3">
                 <CardHeader>
                   <CardTitle className="text-base">Ďalšie položky</CardTitle>
                   <p className="text-sm text-muted-foreground">
                     Nie sú v sklade, takže ich rezervácia nedrží — sú z kalkulácie
-                    {sourceQuote.data ? ` v${sourceQuote.data.version_number}` : ""}. Do kalendára idú tiež.
+                    {quote ? ` v${quote.version_number}` : ""}. Do kalendára idú tiež.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {(sourceQuote.data?.extras ?? []).map((it: any) => (
+                  {(quote?.extras ?? []).map((it: any) => (
                     <div key={`${it.kind}-${it.name}`} className="flex items-center justify-between p-2 rounded border">
                       <div>
                         <div className="text-sm font-medium">{it.name}</div>

@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { sk } from "date-fns/locale";
 import { RESERVATION_FLOW, STATUS_LABEL, STATUS_BADGE_VARIANT, STATUS_DOT, type ReservationStatus } from "@/lib/reservation-status";
 import { HelperSignupsCard } from "@/components/helper-signups-card";
+import { useReservationContext } from "@/hooks/use-reservation-context";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard · Mima Production CRM" }] }),
@@ -103,6 +104,12 @@ function Stat({ icon: Icon, label, value, hint }: { icon: any; label: string; va
 
 function Dashboard() {
   const { data, isLoading } = useDashboardData();
+  // Bez práva na klientov by RLS vrátila prázdne meno klienta — doplní ho server.
+  const clientCtx = useReservationContext(
+    [...(data?.todayLoad ?? []), ...(data?.todayReturn ?? []), ...(data?.outNow ?? []), ...(data?.upcoming ?? [])].map((r: any) => r.id),
+  );
+  const clientLabel = (r: any): string =>
+    r.clients?.company_name ?? clientCtx.data?.[r.id]?.client?.company_name ?? r.contact_person ?? "—";
 
   return (
     <>
@@ -163,7 +170,7 @@ function Dashboard() {
                 <div key={r.id} className="flex items-center justify-between rounded-md border p-3">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{r.event_name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
+                    <div className="text-xs text-muted-foreground truncate">{clientLabel(r)} · {r.venue}</div>
                   </div>
                   <div className="text-right text-sm">
                     <div className="font-mono">{format(new Date(r.load_at), "HH:mm")}</div>
@@ -185,7 +192,7 @@ function Dashboard() {
                 <div key={r.id} className="flex items-center justify-between rounded-md border p-3">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{r.event_name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
+                    <div className="text-xs text-muted-foreground truncate">{clientLabel(r)} · {r.venue}</div>
                   </div>
                   <div className="text-right text-sm font-mono">{format(new Date(r.return_at), "HH:mm")}</div>
                 </div>
@@ -206,7 +213,7 @@ function Dashboard() {
                 <div key={r.id} className="flex items-center justify-between rounded-md border p-3">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{r.event_name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{r.clients?.company_name ?? r.contact_person ?? "—"} · {r.venue}</div>
+                    <div className="text-xs text-muted-foreground truncate">{clientLabel(r)} · {r.venue}</div>
                   </div>
                   <div className="text-right text-xs">
                     <div>{format(new Date(r.event_start_at), "d. MMM HH:mm", { locale: sk })}</div>
@@ -242,7 +249,7 @@ function Dashboard() {
               {!isLoading && data?.outNow.length === 0 && <p className="text-sm text-muted-foreground">Všetko je na sklade.</p>}
               {data?.outNow.map((r: any) => (
                 <div key={r.id} className="flex items-center justify-between py-2 border-b last:border-0 text-sm">
-                  <span className="truncate">{r.event_name} · {r.clients?.company_name ?? r.contact_person ?? "—"}</span>
+                  <span className="truncate">{r.event_name} · {clientLabel(r)}</span>
                   <span className="text-xs text-muted-foreground">návrat {format(new Date(r.return_at), "d.M. HH:mm")}</span>
                 </div>
               ))}

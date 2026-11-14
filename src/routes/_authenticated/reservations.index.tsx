@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useReservationContext } from "@/hooks/use-reservation-context";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -103,7 +104,17 @@ function Reservations() {
     },
   });
 
-  const ids = (reservations.data ?? []).map((r) => r.id);
+  // Bez práva na klientov by RLS vrátila prázdne meno klienta a karta by
+  // ukázala len kontaktnú osobu — doplníme ho zo servera.
+  const clientCtx = useReservationContext((reservations.data ?? []).map((r) => r.id));
+  const resData = useMemo(() => {
+    const extra = clientCtx.data;
+    if (!reservations.data || !extra) return reservations.data;
+    return reservations.data.map((r: any) =>
+      r.clients || !extra[r.id]?.client ? r : { ...r, clients: { company_name: extra[r.id].client!.company_name } },
+    );
+  }, [reservations.data, clientCtx.data]);
+  const ids = (resData ?? []).map((r) => r.id);
   const overbooked = useQuery({
     queryKey: ["reservations-overbooked", ids.join(",")],
     enabled: ids.length > 0,
@@ -115,7 +126,7 @@ function Reservations() {
   });
   const overbookedSet: Set<string> = overbooked.data ?? new Set();
 
-  const occurrences = useMemo(() => expandOccurrences(reservations.data ?? []), [reservations.data]);
+  const occurrences = useMemo(() => expandOccurrences(resData ?? []), [resData]);
 
   // Load staff for all visible reservations
   const staffQ = useQuery({
@@ -170,8 +181,8 @@ function Reservations() {
 
   const [staffDialogResId, setStaffDialogResId] = useState<string | null>(null);
   const dialogRes = useMemo(
-    () => (reservations.data ?? []).find((r) => r.id === staffDialogResId) ?? null,
-    [reservations.data, staffDialogResId],
+    () => (resData ?? []).find((r) => r.id === staffDialogResId) ?? null,
+    [resData, staffDialogResId],
   );
 
   const openNewAt = (day: Date, hour = 9) => {
