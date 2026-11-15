@@ -207,11 +207,11 @@ function ReservationDetail() {
                   </div>
                 )}
                 <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm border-t pt-4">
-                  <Info label="Nakládka" value={fmt(r.load_at)} />
+                  <Info label="Inštalácia" value={fmt(r.load_at)} />
                   <Info label="Odchod" value={fmt(r.depart_at)} />
                   <Info label="Začiatok eventu" value={fmt(r.event_start_at)} />
                   <Info label="Koniec eventu" value={fmt(r.event_end_at)} />
-                  <Info label="Návrat nábytku" value={fmt(r.return_at)} />
+                  <Info label="Demontáž" value={fmt(r.return_at)} />
                   <Info label="Opätovne dostupné od" value={fmt(r.available_from_at)} />
                 </div>
                 {r.note && (

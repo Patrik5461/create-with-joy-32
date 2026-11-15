@@ -575,11 +575,11 @@ export function ReservationForm({ existingId, initial, initialStart }: { existin
       <Card>
         <CardHeader><CardTitle className="text-base">Časový plán</CardTitle></CardHeader>
         <CardContent className="grid md:grid-cols-3 gap-3">
-          <TimeField label="Nakládka" value={form.load_at} onChange={(v) => setForm({ ...form, load_at: v })} />
+          <TimeField label="Inštalácia" value={form.load_at} onChange={(v) => setForm({ ...form, load_at: v })} />
           <TimeField label="Odchod na event" value={form.depart_at} onChange={(v) => setForm({ ...form, depart_at: v })} />
           <TimeField label="Začiatok eventu" value={form.event_start_at} onChange={(v) => setForm({ ...form, event_start_at: v })} />
           <TimeField label="Koniec eventu" value={form.event_end_at} onChange={(v) => setForm({ ...form, event_end_at: v })} />
-          <TimeField label="Návrat nábytku" value={form.return_at} onChange={(v) => setForm({ ...form, return_at: v })} />
+          <TimeField label="Demontáž" value={form.return_at} onChange={(v) => setForm({ ...form, return_at: v })} />
           <TimeField label="Opätovne dostupné od" value={form.available_from_at} onChange={(v) => setForm({ ...form, available_from_at: v })} />
         </CardContent>
       </Card>

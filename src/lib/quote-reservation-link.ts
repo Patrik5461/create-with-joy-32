@@ -244,10 +244,10 @@ export function buildReservationPatch(q: QuoteSyncSource, current?: ReservationT
 export type FieldDiff = { field: string; label: string; from: string | null; to: string };
 
 const FIELD_LABELS: Record<string, string> = {
-  load_at: "Nakládka",
+  load_at: "Inštalácia",
   event_start_at: "Začiatok eventu",
   event_end_at: "Koniec eventu",
-  return_at: "Návrat",
+  return_at: "Demontáž",
   available_from_at: "Dostupné od",
   venue: "Miesto",
   address: "Adresa",
