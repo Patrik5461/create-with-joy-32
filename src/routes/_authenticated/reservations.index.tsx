@@ -304,7 +304,7 @@ type OccurrenceKind = "setup" | "event" | "teardown";
 type Occurrence = { key: string; date: Date; kind: OccurrenceKind; kinds: OccurrenceKind[]; r: any };
 
 const KIND_LABEL: Record<OccurrenceKind, string> = {
-  setup: "Montáž",
+  setup: "Inštalácia",
   event: "Event",
   teardown: "Demontáž",
 };

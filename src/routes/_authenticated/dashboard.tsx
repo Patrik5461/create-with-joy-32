@@ -121,8 +121,8 @@ function Dashboard() {
         </div>
 
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          <Stat icon={Truck} label="Dnešné nakládky" value={data?.todayLoad.length ?? "—"} />
-          <Stat icon={Package} label="Dnešné návraty" value={data?.todayReturn.length ?? "—"} />
+          <Stat icon={Truck} label="Dnešné inštalácie" value={data?.todayLoad.length ?? "—"} />
+          <Stat icon={Package} label="Dnešné demontáže" value={data?.todayReturn.length ?? "—"} />
           <Stat icon={CalendarRange} label="Aktívne rezervácie" value={data?.active ?? "—"} />
           <Stat icon={TrendingUp} label="Eventy tento mesiac" value={data?.monthCount ?? "—"} />
         </div>
@@ -160,12 +160,12 @@ function Dashboard() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><Truck className="size-4" />Dnešné nakládky</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><Truck className="size-4" />Dnešné inštalácie</CardTitle>
               <CardDescription>Plán odvozov na dnes</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
-              {!isLoading && data?.todayLoad.length === 0 && <p className="text-sm text-muted-foreground">Žiadne nakládky.</p>}
+              {!isLoading && data?.todayLoad.length === 0 && <p className="text-sm text-muted-foreground">Žiadne inštalácie.</p>}
               {data?.todayLoad.map((r: any) => (
                 <div key={r.id} className="flex items-center justify-between rounded-md border p-3">
                   <div className="min-w-0">
@@ -183,11 +183,11 @@ function Dashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><Package className="size-4" />Dnešné návraty</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><Package className="size-4" />Dnešné demontáže</CardTitle>
               <CardDescription>Nábytok, ktorý sa dnes vracia na sklad</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {!isLoading && data?.todayReturn.length === 0 && <p className="text-sm text-muted-foreground">Žiadne návraty.</p>}
+              {!isLoading && data?.todayReturn.length === 0 && <p className="text-sm text-muted-foreground">Žiadne demontáže.</p>}
               {data?.todayReturn.map((r: any) => (
                 <div key={r.id} className="flex items-center justify-between rounded-md border p-3">
                   <div className="min-w-0">
@@ -250,7 +250,7 @@ function Dashboard() {
               {data?.outNow.map((r: any) => (
                 <div key={r.id} className="flex items-center justify-between py-2 border-b last:border-0 text-sm">
                   <span className="truncate">{r.event_name} · {clientLabel(r)}</span>
-                  <span className="text-xs text-muted-foreground">návrat {format(new Date(r.return_at), "d.M. HH:mm")}</span>
+                  <span className="text-xs text-muted-foreground">demontáž {format(new Date(r.return_at), "d.M. HH:mm")}</span>
                 </div>
               ))}
             </CardContent>

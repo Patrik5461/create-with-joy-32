@@ -116,7 +116,7 @@ function Logistics() {
       <div className="p-4 md:p-6 space-y-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Plán logistiky</h2>
-          <p className="text-sm text-muted-foreground">Prehľad nakládok a návratov nábytku.</p>
+          <p className="text-sm text-muted-foreground">Prehľad inštalácií a demontáží.</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
@@ -159,8 +159,8 @@ function Logistics() {
         {view === "day" ? (
           <>
             <div className="grid lg:grid-cols-2 gap-4">
-              <LogColumn title="Nakládky" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
-              <LogColumn title="Návraty" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
+              <LogColumn title="Inštalácie" icon={Truck} list={loadingsToday} type="load" onSave={(p: any) => saveNote.mutate(p)} />
+              <LogColumn title="Demontáže" icon={Package} list={returnsToday} type="return" onSave={(p: any) => saveNote.mutate(p)} />
             </div>
             <StaffDay day={cursor} reservations={[...loadingsToday, ...returnsToday]} />
           </>
@@ -190,17 +190,17 @@ function RangeList({ range, byDay, onSave, onPickDay }: { range: { from: Date; t
                 <button className="hover:underline" onClick={() => onPickDay(d)}>{format(d, "EEEE d. MMMM", { locale: sk })}</button>
                 {!empty && (
                   <span className="text-xs text-muted-foreground font-normal">
-                    {bucket!.loads.length > 0 && <>Nakládky: {bucket!.loads.length}</>}
+                    {bucket!.loads.length > 0 && <>Inštalácie: {bucket!.loads.length}</>}
                     {bucket!.loads.length > 0 && bucket!.returns.length > 0 && " · "}
-                    {bucket!.returns.length > 0 && <>Návraty: {bucket!.returns.length}</>}
+                    {bucket!.returns.length > 0 && <>Demontáže: {bucket!.returns.length}</>}
                   </span>
                 )}
               </CardTitle>
             </CardHeader>
             {!empty && (
               <CardContent className="grid md:grid-cols-2 gap-3 pt-0">
-                <MiniList title="Nakládky" icon={Truck} list={bucket!.loads} type="load" onSave={onSave} />
-                <MiniList title="Návraty" icon={Package} list={bucket!.returns} type="return" onSave={onSave} />
+                <MiniList title="Inštalácie" icon={Truck} list={bucket!.loads} type="load" onSave={onSave} />
+                <MiniList title="Demontáže" icon={Package} list={bucket!.returns} type="return" onSave={onSave} />
               </CardContent>
             )}
           </Card>
@@ -603,7 +603,7 @@ function StaffDay({ day, reservations }: { day: Date; reservations: any[] }) {
         )}
         {query.isLoading && <p className="text-sm text-muted-foreground">Načítavam…</p>}
         {!query.isLoading && uniqueReservations.length === 0 && (
-          <p className="text-sm text-muted-foreground">Na tento deň nie sú žiadne akcie (nakládky ani návraty).</p>
+          <p className="text-sm text-muted-foreground">Na tento deň nie sú žiadne akcie (inštalácie ani demontáže).</p>
         )}
         <div className="grid gap-3 md:grid-cols-2">
           {uniqueReservations.map((r: any) => {

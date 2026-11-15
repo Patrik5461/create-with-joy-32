@@ -197,11 +197,11 @@ function buildIcs(
       r.contact_person ? `Kontakt: ${r.contact_person}` : null,
       r.phone ? `Tel.: ${r.phone}` : null,
       r.email ? `Email: ${r.email}` : null,
-      r.load_at ? `Nakládka: ${formatHuman(r.load_at)}` : null,
+      r.load_at ? `Inštalácia: ${formatHuman(r.load_at)}` : null,
       r.depart_at ? `Odchod: ${formatHuman(r.depart_at)}` : null,
       r.event_start_at ? `Začiatok eventu: ${formatHuman(r.event_start_at)}` : null,
       r.event_end_at ? `Koniec eventu: ${formatHuman(r.event_end_at)}` : null,
-      r.return_at ? `Návrat: ${formatHuman(r.return_at)}` : null,
+      r.return_at ? `Demontáž: ${formatHuman(r.return_at)}` : null,
       r.available_from_at ? `Dostupné od: ${formatHuman(r.available_from_at)}` : null,
       // Čo sa na akciu vezie — pri nakládke to je to hlavné, čo z kalendára treba.
       itemsBlock ? `\n${itemsBlock}` : null,
@@ -232,7 +232,7 @@ function buildIcs(
         stamp,
         start: r.load_at,
         end: r.depart_at,
-        summary: `🚚 Nakládka: ${title}`,
+        summary: `🚚 Inštalácia: ${title}`,
         description,
         location,
       });
@@ -245,7 +245,7 @@ function buildIcs(
         stamp,
         start: r.return_at,
         end: r.available_from_at,
-        summary: `📦 Návrat: ${title}`,
+        summary: `📦 Demontáž: ${title}`,
         description,
         location,
       });
