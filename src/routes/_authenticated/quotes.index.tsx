@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DayFilterInput } from "@/components/day-filter-input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -377,11 +378,11 @@ function QuotesList() {
         <div className="flex flex-wrap items-end gap-2 rounded-md border p-3 bg-muted/30">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Dátum eventu od</label>
-            <Input type="date" className="h-9 w-40" value={eventFrom} onChange={(e) => setEventFrom(e.target.value)} />
+            <DayFilterInput className="h-9 w-40" aria-label="Dátum eventu od" value={eventFrom} onChange={setEventFrom} />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">do</label>
-            <Input type="date" className="h-9 w-40" value={eventTo} onChange={(e) => setEventTo(e.target.value)} />
+            <DayFilterInput className="h-9 w-40" aria-label="Dátum eventu do" value={eventTo} onChange={setEventTo} />
           </div>
           <Button variant="outline" size="sm" onClick={quickThisMonth}>Tento mesiac</Button>
           <Button variant="outline" size="sm" onClick={quickUpcoming}>Nadchádzajúce eventy</Button>

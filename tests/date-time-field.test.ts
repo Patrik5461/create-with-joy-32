@@ -2,7 +2,25 @@
  * Dátum bez času sa nesmie stratiť — presne to sa dialo pri `datetime-local`.
  */
 import { describe, expect, it } from "bun:test";
-import { MAX_YEAR, MIN_YEAR, combineDateTime, implausibleYear, isoToLocalDate, isoToLocalTime } from "../src/lib/date-time-field";
+import { MAX_YEAR, MIN_YEAR, combineDateTime, implausibleYear, isCompleteDay, isoToLocalDate, isoToLocalTime } from "../src/lib/date-time-field";
+
+describe("dátum vo filtri kalkulácií", () => {
+  it("rozpísaný rok sa do filtra nepustí", () => {
+    for (const v of ["0002-11-16", "0020-11-16", "0202-11-16", "1999-12-31", "2101-01-01"]) {
+      expect(isCompleteDay(v)).toBe(false);
+    }
+  });
+  it("celý dátum prejde", () => {
+    expect(isCompleteDay("2026-11-16")).toBe(true);
+    expect(isCompleteDay("2028-02-29")).toBe(true);
+  });
+  it("neexistujúci deň a nezmysly neprejdú", () => {
+    expect(isCompleteDay("2026-02-30")).toBe(false);
+    expect(isCompleteDay("")).toBe(false);
+    expect(isCompleteDay(null)).toBe(false);
+    expect(isCompleteDay("16.11.2026")).toBe(false);
+  });
+});
 
 describe("dátum a čas v kalkulácii", () => {
   it("dátum bez času sa uloží s predvolenou hodinou", () => {

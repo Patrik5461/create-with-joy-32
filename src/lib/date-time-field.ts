@@ -69,3 +69,19 @@ export function implausibleYear(value: string | null | undefined): boolean {
   const y = d.getFullYear();
   return y < MIN_YEAR || y > MAX_YEAR;
 }
+
+/**
+ * Je `RRRR-MM-DD` hotový dátum, ktorý sa dá použiť vo filtri?
+ *
+ * Prehliadač pri písaní roka posiela medzistavy (0002, 0020, 0202 …). Keď sa
+ * každý z nich hneď zapísal do filtra a pole sa znova načítalo, dátum
+ * „preskakoval". Filter preto berie len dátum s rozumným rokom.
+ */
+export function isCompleteDay(value: string | null | undefined): boolean {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  if (y < MIN_YEAR || y > MAX_YEAR || m < 1 || m > 12 || d < 1) return false;
+  const dt = new Date(2000, 0, 1);
+  dt.setFullYear(y, m - 1, d);
+  return dt.getMonth() === m - 1 && dt.getDate() === d;
+}
