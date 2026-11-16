@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { DateTimeInput } from "@/components/date-input";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -475,12 +476,13 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
                       />
                       <span>Prišiel</span>
                     </label>
-                    <Input
-                      type="datetime-local"
-                      className="h-7 w-[180px] text-xs"
+                    <DateTimeInput
+                      className="w-[260px]"
+                      dateClassName="h-7 text-xs"
+                      timeClassName="h-7 text-xs"
                       disabled={!canManage || !row.arrived}
                       value={toLocalInput(row.actual_arrival)}
-                      onChange={(e) => updateTime.mutate({ id: row.id, field: "actual_arrival", value: e.target.value })}
+                      onChange={(v) => updateTime.mutate({ id: row.id, field: "actual_arrival", value: v })}
                     />
                   </div>
                   <div className="flex flex-wrap items-center gap-3 mt-1.5">
@@ -492,12 +494,13 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
                       />
                       <span>Odišiel</span>
                     </label>
-                    <Input
-                      type="datetime-local"
-                      className="h-7 w-[180px] text-xs"
+                    <DateTimeInput
+                      className="w-[260px]"
+                      dateClassName="h-7 text-xs"
+                      timeClassName="h-7 text-xs"
                       disabled={!canManage || !row.departed}
                       value={toLocalInput(row.actual_departure)}
-                      onChange={(e) => updateTime.mutate({ id: row.id, field: "actual_departure", value: e.target.value })}
+                      onChange={(v) => updateTime.mutate({ id: row.id, field: "actual_departure", value: v })}
                     />
                   </div>
                 </div>
@@ -566,11 +569,11 @@ export function ReservationStaffSection({ reservationId }: { reservationId: stri
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label className="text-xs">Plánovaný začiatok</Label>
-                  <Input type="datetime-local" value={form.planned_start} onChange={(e) => setForm((f) => ({ ...f, planned_start: e.target.value }))} />
+                  <DateTimeInput value={form.planned_start} onChange={(v) => setForm((f) => ({ ...f, planned_start: v }))} />
                 </div>
                 <div>
                   <Label className="text-xs">Plánovaný koniec</Label>
-                  <Input type="datetime-local" value={form.planned_end} onChange={(e) => setForm((f) => ({ ...f, planned_end: e.target.value }))} />
+                  <DateTimeInput value={form.planned_end} onChange={(v) => setForm((f) => ({ ...f, planned_end: v }))} />
                 </div>
               </div>
               <div>

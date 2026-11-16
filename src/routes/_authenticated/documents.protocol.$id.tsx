@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { DateTimeInput } from "@/components/date-input";
+import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/app-header";
@@ -306,9 +308,10 @@ function ProtocolDetail() {
             <div><span className="text-muted-foreground">Vydal:</span> {p.issued_by_name ?? "—"}</div>
             <div className="space-y-1.5">
               <Label>{isReturn ? "Dátum a čas vrátenia" : "Dátum a čas výdaja"}</Label>
-              <Input type="datetime-local" disabled={!canEdit || isSigned}
-                value={issuedAt ? new Date(issuedAt).toISOString().slice(0, 16) : ""}
-                onChange={(e) => setIssuedAt(new Date(e.target.value).toISOString())} />
+              {/* Miestny čas — predtým sa ukazoval UTC (o hodinu-dve posunutý). */}
+              <DateTimeInput disabled={!canEdit || isSigned}
+                value={issuedAt ? format(new Date(issuedAt), "yyyy-MM-dd'T'HH:mm") : ""}
+                onChange={(v) => v && setIssuedAt(new Date(v).toISOString())} />
             </div>
             <div className="space-y-1.5">
               <Label>{isReturn ? "Vrátil (meno)" : "Prevzal (meno za klienta)"}</Label>

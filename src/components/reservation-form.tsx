@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { DateTimeInput } from "@/components/date-input";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { checkAvailability } from "@/lib/availability";
@@ -722,7 +723,7 @@ function TimeField({ label, value, onChange }: { label: string; value: string; o
   return (
     <div className="space-y-1.5">
       <Label className="text-xs">{label}</Label>
-      <Input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} />
+      <DateTimeInput value={value} onChange={onChange} />
     </div>
   );
 }

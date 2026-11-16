@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { DateInput, DateTimeInput, MonthInput } from "@/components/date-input";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -397,7 +398,7 @@ function ManualEntryDialog({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <Label className="text-xs">Dátum</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateInput className="h-9" value={date} onChange={(d) => d && setDate(d)} />
             </div>
             <div>
               <Label className="text-xs">Príchod</Label>
@@ -605,24 +606,24 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
           {range === "day" && (
             <div>
               <Label className="text-xs">Dátum</Label>
-              <Input type="date" value={dayVal} onChange={(e) => setDayVal(e.target.value)} />
+              <DateInput className="h-9" value={dayVal} onChange={(d) => d && setDayVal(d)} />
             </div>
           )}
           {range === "month" && (
             <div>
               <Label className="text-xs">Mesiac</Label>
-              <Input type="month" value={monthVal} onChange={(e) => setMonthVal(e.target.value)} />
+              <MonthInput value={monthVal} onChange={setMonthVal} />
             </div>
           )}
           {range === "custom" && (
             <>
               <div>
                 <Label className="text-xs">Od</Label>
-                <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+                <DateInput className="h-9" value={customFrom} onChange={setCustomFrom} />
               </div>
               <div>
                 <Label className="text-xs">Do</Label>
-                <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+                <DateInput className="h-9" value={customTo} onChange={setCustomTo} />
               </div>
             </>
           )}
@@ -737,15 +738,13 @@ function SummarySection({ isAdmin, currentUserId }: { isAdmin: boolean; currentU
                                   </div>
                                   <div>
                                     <Label className="text-[10px] text-muted-foreground">Príchod</Label>
-                                    <Input type="datetime-local" className="h-8 w-full sm:w-[180px] text-xs"
-                                      defaultValue={toLocal(a.clock_in)}
-                                      onBlur={(e) => e.target.value && saveTime.mutate({ id: a.id, field: "clock_in", value: e.target.value })} />
+                                    <ClockEdit className="w-full sm:w-[260px]" small initial={toLocal(a.clock_in)}
+                                      onSave={(v) => v && saveTime.mutate({ id: a.id, field: "clock_in", value: v })} />
                                   </div>
                                   <div>
                                     <Label className="text-[10px] text-muted-foreground">Odchod</Label>
-                                    <Input type="datetime-local" className="h-8 w-full sm:w-[180px] text-xs"
-                                      defaultValue={toLocal(a.clock_out)}
-                                      onBlur={(e) => saveTime.mutate({ id: a.id, field: "clock_out", value: e.target.value })} />
+                                    <ClockEdit className="w-full sm:w-[260px]" small initial={toLocal(a.clock_out)}
+                                      onSave={(v) => saveTime.mutate({ id: a.id, field: "clock_out", value: v })} />
                                   </div>
                                   {isAdmin && (
                                     <AlertDialog>
@@ -960,7 +959,7 @@ function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between space-y-0">
         <CardTitle className="text-base">Denný záznam</CardTitle>
-        <Input type="date" className="w-full sm:w-[180px]" value={date} onChange={(e) => setDate(e.target.value)} />
+        <DateInput className="h-9 w-full sm:w-[180px]" value={date} onChange={(d) => d && setDate(d)} />
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3">
@@ -1047,13 +1046,13 @@ function DailyLog({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
               <div className="grid gap-2 sm:grid-cols-3">
                 <div>
                   <Label className="text-xs">Príchod</Label>
-                  <Input type="datetime-local" defaultValue={toLocal(r.clock_in)}
-                    onBlur={(e) => e.target.value && saveTime.mutate({ id: r.id, field: "clock_in", value: e.target.value })} />
+                  <ClockEdit initial={toLocal(r.clock_in)}
+                    onSave={(v) => v && saveTime.mutate({ id: r.id, field: "clock_in", value: v })} />
                 </div>
                 <div>
                   <Label className="text-xs">Odchod</Label>
-                  <Input type="datetime-local" defaultValue={toLocal(r.clock_out)}
-                    onBlur={(e) => saveTime.mutate({ id: r.id, field: "clock_out", value: e.target.value })} />
+                  <ClockEdit initial={toLocal(r.clock_out)}
+                    onSave={(v) => saveTime.mutate({ id: r.id, field: "clock_out", value: v })} />
                 </div>
                 <div className="text-xs flex flex-col justify-center">
                   <div className="text-muted-foreground uppercase tracking-wider">Odpracované (čisté)</div>
@@ -1108,3 +1107,24 @@ function AttendancePage() {
 
 // silence unused imports (dead-code) — addDays reserved for future
 void addDays;
+/** Úprava príchodu/odchodu: ukladá sa až po dokončení výberu (ako predtým pri
+ *  opustení poľa), nie pri každej zmene. */
+function ClockEdit({ initial, onSave, className, small }: {
+  initial: string;
+  onSave: (v: string) => void;
+  className?: string;
+  small?: boolean;
+}) {
+  const [v, setV] = useState(initial);
+  useEffect(() => { setV(initial); }, [initial]);
+  return (
+    <DateTimeInput
+      className={className}
+      dateClassName={small ? "h-8 text-xs" : undefined}
+      timeClassName={small ? "h-8 text-xs" : undefined}
+      value={v}
+      onChange={setV}
+      onCommit={(nv) => { if (nv !== initial) onSave(nv); }}
+    />
+  );
+}

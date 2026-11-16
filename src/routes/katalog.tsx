@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { DateTimeInput } from "@/components/date-input";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getPublicCatalog,
@@ -304,8 +305,8 @@ function InquirySheet({
             <div className="col-span-2"><Label>Firma</Label><Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} /></div>
             <div><Label>Email *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div>
             <div><Label>Telefón</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-            <div><Label>Termín od</Label><Input type="datetime-local" value={form.event_start_at} onChange={(e) => setForm({ ...form, event_start_at: e.target.value })} /></div>
-            <div><Label>Termín do</Label><Input type="datetime-local" value={form.event_end_at} onChange={(e) => setForm({ ...form, event_end_at: e.target.value })} /></div>
+            <div><Label>Termín od</Label><DateTimeInput defaultTime="10:00" value={form.event_start_at} onChange={(v) => setForm({ ...form, event_start_at: v })} /></div>
+            <div><Label>Termín do</Label><DateTimeInput defaultTime="22:00" value={form.event_end_at} onChange={(v) => setForm({ ...form, event_end_at: v })} /></div>
             <div className="col-span-2"><Label>Miesto eventu</Label><Input value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} placeholder="Adresa alebo názov priestoru" /></div>
             <div className="col-span-2"><Label>Správa</Label><Textarea rows={3} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Doplňujúce informácie, požiadavky…" /></div>
             {/* Honeypot — must remain empty for humans */}

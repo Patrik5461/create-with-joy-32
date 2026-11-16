@@ -1,14 +1,11 @@
-import { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { MAX_YEAR, MIN_YEAR, isCompleteDay } from "@/lib/date-time-field";
+import { DateInput } from "@/components/date-input";
+import { isCompleteDay } from "@/lib/date-time-field";
 
 /**
- * Dátumové pole do filtra (len deň, bez času).
+ * Dátumové pole do filtra (len deň, bez času) so slovenským kalendárom.
  *
- * Rozpísaný dátum si drží samo a von ho pustí, až keď je celý — alebo prázdny.
- * Inak by sa do filtra (a adresy) zapisoval každý medzistav roka a pole by
- * pri písaní preskakovalo. Zmena zvonka (napr. „Tento mesiac", „Vymazať")
- * sa do poľa prenesie hneď.
+ * Do filtra (a adresy) ide len celý dátum s rozumným rokom (2000–2100) alebo
+ * prázdna hodnota — rozpísaný dátum si pole drží samo, takže nepreskakuje.
  */
 export function DayFilterInput({
   value,
@@ -21,27 +18,14 @@ export function DayFilterInput({
   className?: string;
   "aria-label"?: string;
 }) {
-  const [draft, setDraft] = useState(value);
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
-
-  const unfinished = draft !== "" && !isCompleteDay(draft);
   return (
-    <Input
-      type="date"
+    <DateInput
+      className={className}
       aria-label={ariaLabel}
-      min={`${MIN_YEAR}-01-01`}
-      max={`${MAX_YEAR}-12-31`}
-      className={`${className} ${unfinished ? "border-rose-400" : ""}`}
-      title={unfinished ? "Dopíš celý dátum" : undefined}
-      value={draft}
-      onChange={(e) => {
-        const v = e.target.value;
-        setDraft(v);
-        if (v === "" || isCompleteDay(v)) {
-          if (v !== value) onChange(v);
-        }
+      value={value}
+      invalid={value !== "" && !isCompleteDay(value)}
+      onChange={(d) => {
+        if (d === "" || isCompleteDay(d)) onChange(d);
       }}
     />
   );

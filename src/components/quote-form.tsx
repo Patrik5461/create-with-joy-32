@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DateInput } from "@/components/date-input";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -589,7 +590,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           </div>
           <div className="space-y-1.5">
             <Label>Dátum vystavenia</Label>
-            <Input type="date" value={form.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} />
+            <DateInput className="h-9" value={form.issue_date ?? ""} onChange={(d) => setForm({ ...form, issue_date: d })} />
           </div>
           <div className="space-y-1.5">
             <Label>Miesto konania / montáže</Label>
@@ -609,7 +610,7 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           </div>
           <div className="space-y-1.5">
             <Label>Platnosť do</Label>
-            <Input type="date" value={form.valid_until ?? ""} onChange={(e) => setForm({ ...form, valid_until: e.target.value || null })} />
+            <DateInput className="h-9" value={form.valid_until ?? ""} onChange={(d) => setForm({ ...form, valid_until: d || null })} />
           </div>
           <DateTimeField
             label="Začiatok eventu"
@@ -631,10 +632,10 @@ export function QuoteForm({ initial, quoteId, versionParent }: Props) {
           />
           <div className="space-y-1.5">
             <Label>Dátum eventu</Label>
-            <Input
-              type="date"
+            <DateInput
+              className="h-9"
               value={form.event_date ?? ""}
-              onChange={(e) => setForm({ ...form, event_date: e.target.value || null })}
+              onChange={(d) => setForm({ ...form, event_date: d || null })}
             />
           </div>
           <DateTimeField
@@ -935,13 +936,11 @@ function DateTimeField({
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <div className="flex gap-2">
-        <Input
-          type="date"
-          className={`flex-1 ${badYear ? "border-rose-400" : ""}`}
-          min={`${MIN_YEAR}-01-01`}
-          max={`${MAX_YEAR}-12-31`}
+        <DateInput
+          className="h-9 min-w-0 flex-1"
+          invalid={badYear}
           value={date}
-          onChange={(e) => onChange(combineDateTime(e.target.value, time, defaultTime))}
+          onChange={(d) => onChange(combineDateTime(d, time, defaultTime))}
         />
         <Input
           type="time"
